@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { definePluginEntry } from 'openclaw/plugin-sdk';
 
 /**
  * Levea Agentic Video Editor Handler
@@ -421,50 +422,59 @@ function handleError(tool: string, error: any): EditorResponse {
   };
 }
 
-/**
- * OpenClaw Skill Registration
- */
-export default {
-  name: 'ai-video-editor',
-  description: 'OpenClaw AI video editor for natural-language edits: viral clips, captions, vertical video, chroma key, audio cleanup, and MP4 export. Use `autonomous_edit` for free-form prompts or deterministic tools for structured params.',
-  parameters: {
-    type: 'object',
-    properties: {
-      tool: {
-        type: 'string',
-        description: 'Tool to execute. Use `autonomous_edit` with params.prompt for free-form edits, or pick a deterministic tool when you have structured params.',
-        enum: [
-          'autonomous_edit',
-          'read_scene', 'read_media', 'read_visual', 'query_transcript',
-          'scene_update', 'scene_insert', 'scene_timing',
-          'scene_mask', 'chroma_key', 'split_screen',
-          'caption_compose', 'media_treat', 'scene_track',
-          'clean_audio', 'audio_mix', 'audio_mixing',
-          'voiceover_add', 'music_generate',
-          'export_video'
-        ]
-      },
-      params: {
-        type: 'object',
-        description: 'Tool-specific parameters. For autonomous_edit, set params.prompt to a natural-language description of the desired edit.'
-      },
-      project_id: {
-        type: 'string',
-        description: 'Optional project identifier for tracking'
-      }
+const TOOL_PARAMETERS = {
+  type: 'object',
+  properties: {
+    tool: {
+      type: 'string',
+      description: 'Tool name. Use `autonomous_edit` with params.prompt for free-form natural-language video edits.',
+      enum: [
+        'autonomous_edit',
+        'read_scene', 'read_media', 'read_visual', 'query_transcript',
+        'scene_update', 'scene_insert', 'scene_timing',
+        'scene_mask', 'chroma_key', 'split_screen',
+        'caption_compose', 'media_treat', 'scene_track',
+        'clean_audio', 'audio_mix', 'audio_mixing',
+        'voiceover_add', 'music_generate',
+        'export_video'
+      ]
     },
-    required: ['tool']
+    params: {
+      type: 'object',
+      description: 'Tool-specific parameters. For autonomous_edit, set params.prompt to a natural-language description of the desired edit.'
+    },
+    project_id: {
+      type: 'string',
+      description: 'Optional project identifier for tracking.'
+    }
   },
-  handler: handleEditorOperation,
-  
-  // Specialized workflow handlers
-  workflows: {
-    generateViralClips,
-    addCaptions,
-    removeSilence,
-    generateBRoll,
-    applyChromaKey,
-    trackSubject,
-    exportVideo
-  }
-};
+  required: ['tool']
+} as const;
+
+/**
+ * OpenClaw plugin registration (2026.5.x contract).
+ *
+ * The host loader walks the default export for a `register` function. Plain
+ * `{ handler, parameters, ... }` objects fail validation on 2026.5+; the
+ * `definePluginEntry` + `api.registerTool(...)` shape is the canonical entry.
+ */
+export default definePluginEntry({
+  id: 'openclaw-ai-video-editor',
+  name: 'OpenClaw AI Video Editor',
+  description: 'Agentic AI video editor — natural-language video edits end-to-end via a single `autonomous_edit` tool: viral clips, captions, vertical reframe, chroma key, AI background removal, audio cleanup, motion tracking, B-roll, voiceover, music, and MP4 / multi-platform export.',
+  register(api) {
+    api.registerTool({
+      name: 'ai-video-editor',
+      label: 'AI Video Editor',
+      description: 'Run a natural-language video edit. Pass a prompt describing what you want; the agent plans the steps, executes, verifies, and exports. Anything from a one-liner ("make this TikTok-ready") to a multi-paragraph creative brief works.',
+      parameters: TOOL_PARAMETERS,
+      execute: async (_toolCallId: string, params: any) => {
+        const result = await handleEditorOperation(params as EditorRequest);
+        return {
+          content: [{ type: 'text' as const, text: result.message }],
+          details: result,
+        };
+      },
+    });
+  },
+});

@@ -1,8 +1,8 @@
 {
   "id": "openclaw-ai-video-editor",
   "name": "OpenClaw AI Video Editor",
-  "description": "AI video editor for natural-language edits, viral clips, captions, vertical video, chroma key, audio cleanup, and MP4 export through the Levea/OpenClaw API.",
-  "version": "1.0.0",
+  "description": "Agentic AI video editor — natural-language video edits end-to-end via a single `autonomous_edit` tool. Viral clips, captions, vertical reframe, chroma key, AI background removal, audio cleanup, motion tracking, B-roll, voiceover, music, and MP4 / multi-platform export.",
+  "version": "1.0.17",
   "enabledByDefault": true,
   "skills": [
     "./SKILL.md"
