@@ -1,0 +1,19 @@
+# Source files
+*.ts
+!*.d.ts
+tsconfig.json
+
+# Development
+node_modules
+.git
+.gitignore
+.DS_Store
+
+# Tests
+test
+tests
+*.test.ts
+*.spec.ts
+
+# CI/CD
+.github
