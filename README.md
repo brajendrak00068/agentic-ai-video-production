@@ -153,7 +153,7 @@ Anything in the [capability surface](#capability-surface) above is reachable fro
 
 ### 1. Get an API key
 
-Sign up at [https://studio.levea.ai/](https://studio.levea.ai/) and generate an OpenClaw API key from the account UI.
+Sign up at [https://studio.livecor.ai/](https://studio.livecor.ai/) and generate an OpenClaw API key from the account UI.
 
 ### 2. Install the plugin
 
@@ -170,7 +170,7 @@ npm install openclaw-ai-video-editor
 ### 3. Configure
 
 ```bash
-export ADSCENE_API_URL="https://api.levea.ai"
+export ADSCENE_API_URL="https://api.livecore.ai"
 export ADSCENE_API_KEY="your-openclaw-api-key"
 ```
 
@@ -183,7 +183,7 @@ Or in OpenClaw skill config:
       "openclaw_ai_video_editor": {
         "enabled": true,
         "env": {
-          "ADSCENE_API_URL": "https://api.levea.ai",
+          "ADSCENE_API_URL": "https://api.livecore.ai",
           "ADSCENE_API_KEY": "your-openclaw-api-key"
         }
       }
@@ -211,7 +211,7 @@ curl -sS -X POST "$ADSCENE_API_URL/api/v1/misc/openclaw/v1/execute" \
 
 ## API surface
 
-Base URL: `{ADSCENE_API_URL}` (production: `https://api.levea.ai`)
+Base URL: `{ADSCENE_API_URL}` (production: `https://api.livecore.ai`)
 
 | Endpoint | Purpose |
 |---|---|
@@ -226,7 +226,7 @@ Auth header:
 Authorization: Bearer {ADSCENE_API_KEY}
 ```
 
-Do **not** set `ADSCENE_API_URL` to `https://studio.levea.ai` or the in-product editor route `/api/v1/misc/editor/`. Studio is the user-facing app; OpenClaw requests go to the API-key route on `https://api.levea.ai`.
+Do **not** set `ADSCENE_API_URL` to `https://studio.livecor.ai` or the in-product editor route `/api/v1/misc/editor/`. Studio is the user-facing app; OpenClaw requests go to the API-key route on `https://api.livecore.ai`.
 
 ### Request body
 
@@ -375,8 +375,8 @@ curl -sS "$ADSCENE_API_URL/api/v1/misc/openclaw/v1/jobs/$JOB_ID" \
 - **ClawHub skill (agentic)** — [clawhub.ai/skills/ai-agentic-video-editor](https://clawhub.ai/skills/ai-agentic-video-editor)
 - **ClawHub skill (Levea brand)** — [clawhub.ai/skills/levea-ai-video-editor](https://clawhub.ai/skills/levea-ai-video-editor)
 - **npm** — [npmjs.com/package/openclaw-ai-video-editor](https://www.npmjs.com/package/openclaw-ai-video-editor)
-- **Sign up + API keys** — [studio.levea.ai](https://studio.levea.ai/)
-- **API base** — `https://api.levea.ai`
+- **Sign up + API keys** — [studio.livecor.ai](https://studio.livecor.ai/)
+- **API base** — `https://api.livecore.ai`
 
 ## Support
 

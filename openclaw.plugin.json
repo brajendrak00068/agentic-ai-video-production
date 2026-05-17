@@ -15,11 +15,11 @@
   "uiHints": {
     "apiUrl": {
       "label": "Levea API Base URL",
-      "help": "Use https://api.levea.ai or a full /api/v1/misc/openclaw/v1/execute endpoint."
+      "help": "Use https://api.livecore.ai or a full /api/v1/misc/openclaw/v1/execute endpoint."
     },
     "apiKey": {
       "label": "Levea API Key",
-      "help": "Create an API key at https://studio.levea.ai/.",
+      "help": "Create an API key at https://studio.livecor.ai/.",
       "sensitive": true
     }
   },

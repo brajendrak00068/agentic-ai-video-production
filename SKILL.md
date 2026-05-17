@@ -15,10 +15,10 @@ metadata:
     envVars:
       - name: ADSCENE_API_URL
         required: true
-        description: Base URL for the Levea API, for example https://api.levea.ai. Do not use the studio URL or the /api/v1/misc/editor route.
+        description: Base URL for the Levea API, for example https://api.livecore.ai. Do not use the studio URL or the /api/v1/misc/editor route.
       - name: ADSCENE_API_KEY
         required: true
-        description: OpenClaw API key generated from the Studio app at https://studio.levea.ai/.
+        description: OpenClaw API key generated from the Studio app at https://studio.livecor.ai/.
     skillKey: openclaw_ai_video_editor
     homepage: https://github.com/brajendrak00068/openclaw-ai-video-editor#readme
 ---
@@ -37,8 +37,8 @@ Use this skill when the user asks for OpenClaw video editing, AI video editing, 
 
 Auth: `Authorization: Bearer {ADSCENE_API_KEY}`
 
-Create an account and generate the OpenClaw API key in Studio: `https://studio.levea.ai/`.
-Use `https://api.levea.ai` for `ADSCENE_API_URL`; Studio is only for signup, login, and key management.
+Create an account and generate the OpenClaw API key in Studio: `https://studio.livecor.ai/`.
+Use `https://api.livecore.ai` for `ADSCENE_API_URL`; Studio is only for signup, login, and key management.
 
 Accepts either single-shot JSON (default) or SSE (`Accept: text/event-stream` or `?stream=true`).
 
