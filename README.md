@@ -11,9 +11,9 @@
 
 Most "AI video editors" are GPT wrappers calling `ffmpeg -vf`. This isn't that.
 
-Behind a single `autonomous_edit` tool sits a four-tier intelligence stack, a canonical action registry of 80+ deterministic edits, six GPU-warmed perception models, a Postgres-backed memory plane with pgvector similarity search, and a verifier loop that re-runs the agent if its own output fails sanity checks.
+Behind a single `autonomous_edit` tool sits a four-tier intelligence stack, a comprehensive registry of deterministic canonical edits, a fleet of warmed perception models on a dedicated GPU pod, a memory plane with vector similarity search, and a verifier loop that re-runs the agent if its own output fails sanity checks.
 
-You send a sentence. The agent classifies the goal, decomposes it into atomic steps, plans a DAG of canonical actions, dispatches each through hardware-accelerated renderers, verifies the timeline post-edit, and emits the rendered MP4. Two LLM calls in the whole flow. Everything else is deterministic execution against pre-computed signals.
+You send a sentence. The agent classifies the goal, decomposes it into atomic steps, plans a DAG of canonical actions, dispatches each through hardware-accelerated renderers, verifies the timeline post-edit, and emits the rendered MP4. Two LLM calls on the happy path. Everything else is deterministic execution against pre-computed signals.
 
 That's the architectural difference. Legacy editors give you tools. This gives you an editor.
 
@@ -21,64 +21,64 @@ That's the architectural difference. Legacy editors give you tools. This gives y
 
 ## The four-tier intelligence stack
 
-The system answers different classes of question at different tiers. The CI gate enforces that no tier duplicates work the cheaper tier already did.
+The system answers different classes of question at different tiers. A CI gate enforces that no tier duplicates work the cheaper tier already did.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │ L3  LLM narrative      Reasoning, editorial choice    │ "Pick the best clip"
 ├──────────────────────────────────────────────────────────────────────┤
-│ L2  Multimodal embed   What this is about — semantic  │ pgvector RAG
+│ L2  Multimodal embed   What this is about — semantic  │ vector RAG
 ├──────────────────────────────────────────────────────────────────────┤
 │ L1  ASR transcript     What was actually said         │ Verbatim STT
 ├──────────────────────────────────────────────────────────────────────┤
-│ L0  Perception (GPU)   Where, who, when, what's there │ 6 ONNX models
+│ L0  Perception (GPU)   Where, who, when, what's there │ Specialized models
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 | Tier | Answers | How |
 |---|---|---|
-| **L0 — Perception** | Where are the faces? Who's the active speaker? Where do shots cut? What text is on screen? Where's the alpha matte? | Six ONNX models on a warm GPU pod |
+| **L0 — Perception** | Where are the faces? Who's the active speaker? Where do shots cut? What text is on screen? Where's the alpha matte? | Specialized models on a warm GPU pod |
 | **L1 — Transcript** | What was said, word-for-word, with timestamps | STT, diarized via L0 active-speaker × face identity |
-| **L2 — Semantic** | "Find moments where they laugh." "Clips like *this* reference." | Multimodal embeddings indexed in pgvector |
+| **L2 — Semantic** | "Find moments where they laugh." "Clips like *this* reference." | Multimodal embeddings indexed for similarity search |
 | **L3 — Reasoning** | Editorial judgment — what's the climax, which clip is best, what's the narrative arc | LLM — invoked only when L0/L1/L2 can't answer |
 
-The trick is what the LLM sees at dispatch time. By then, the cheap tiers have already produced structural signals — chapters, speaker changes, cut pacing, talk-time distribution, reaction moments, shot kinds, face identity matches, OCR'd chyrons. The LLM reads all of that as context, then picks one canonical action. It doesn't have to *figure out* what's in the video.
+The trick is what the LLM sees at dispatch time. By then, the cheap tiers have already produced structural signals — chapter segmentation, speaker changes, cut pacing, talk-time distribution, reaction moments, shot kinds, face identity matches, on-screen text. The LLM reads all of that as context, then picks one canonical action. It doesn't have to *figure out* what's in the video.
 
 ---
 
-## L0: the six perception models
+## L0: the perception layer
 
-All ONNX, all warmed at boot, all running on a dedicated GPU pod fronted by HTTP. Single-model outputs are commodity. The differentiator is composition — these compose into 12+ editorial signals consumed by every downstream action.
+All models are warmed at boot and run on a dedicated GPU pod fronted by HTTP. Single-model outputs are commodity. The differentiator is composition — these compose into a dozen-plus editorial signals consumed across downstream actions.
 
-| Model | Job | Composes into |
+| Capability | Job | Composes into |
 |---|---|---|
-| **SCRFD-10G** | Face detection + 5-pt landmarks | Eye-level reframe, vertical 9:16 framing |
-| **ArcFace (512-d)** | Identity embedding | Cross-asset "find clips with this person" via pgvector cosine NN |
-| **BoT-SORT** | Multi-object tracking | Persistent track IDs for face/object continuity |
-| **LR-ASD** | Active speaker detection | Talk-time distribution, speaker changes, reaction moments, beat-synced cuts |
-| **TransNetV2** | Shot boundary detection | Chapter segmentation, cut-pacing analysis |
-| **PP-OCRv5 (det + rec)** | Text region + content recognition | Caption-safe cropping, chapter titles from chyrons, sponsor detection (roadmap) |
-| **RVM** | Alpha matting | Background replace, background blur, shot-kind classification |
-| *SAM2 + ProPainter* | Instance segmentation + inpainting (scaffolded) | Object removal (roadmap) |
+| **Face Detect** | Face detection with landmarks | Eye-level reframe, vertical 9:16 framing |
+| **Identity Embed** | Per-face identity vector | Cross-asset "find clips with this person" via vector similarity |
+| **Object Tracker** | Multi-object tracking | Persistent track IDs for face/object continuity |
+| **Active Speaker** | Who's speaking when | Talk-time distribution, speaker changes, reaction moments, beat-synced cuts |
+| **Shot Boundary** | Where shots cut | Chapter segmentation, cut-pacing analysis |
+| **Text Recognition** | Detect + read on-screen text | Caption-safe cropping, chapter titles from chyrons, sponsor detection (roadmap) |
+| **Alpha Matte** | Per-frame foreground / background separation | Background replace, background blur, shot-kind classification |
+| *Segment + Inpaint* | Instance segmentation + inpainting (scaffolded) | Object removal (roadmap) |
 
 ```
-SCRFD ──► face bboxes ──┐
-                        ├──► BoT-SORT ──► persistent face tracks
-ArcFace ─► 512-d emb ───┘                       │
-                                                ├──► pgvector identity store
-LR-ASD  ─► speaking prob ───► talkTime ─────────┤
-                              reactionMoments   │
-                              speakerChanges    │
-                                                ├──► EditorialSignals
-TransNet ► shot boundaries ─► chapters ─────────┤
-                              cutPacing         │
-                                                │
-PP-OCR  ─► chapterTitle ────────────────────────┤
-          caption-safe crop                     │
-                                                │
-RVM     ─► alpha matte ─► BACKGROUND_REPLACE    │
-          shotKind ───────────────────────────► ▼
-                              (one tool dispatch reads any subset)
+Face Detect ──► bboxes ─────────┐
+                                ├──► Object Tracker ──► persistent tracks
+Identity Embed ─► embedding ────┘                              │
+                                                               ├──► identity store (vector)
+Active Speaker ─► speaking prob ───► talk-time distribution ───┤
+                                     reaction moments          │
+                                     speaker changes           │
+                                                               ├──► editorial signals
+Shot Boundary  ─► shot bounds ─────► chapter segmentation ─────┤
+                                     cut pacing                │
+                                                               │
+Text Recognition ► chapter titles ─────────────────────────────┤
+                   caption-safe crop                           │
+                                                               │
+Alpha Matte ──► alpha mask ─► background replace               │
+                shot kind ──────────────────────────────────►  ▼
+                                  (one tool dispatch reads any subset)
 ```
 
 ---
@@ -91,79 +91,79 @@ When you add a video to a project, an async worker fans out the analysis pipelin
                        USER UPLOADS VIDEO
                               │
                               ▼
-                    handlePreProcessVideo
+                  pre-processing pipeline
                               │
         ┌──────────┬──────────┼──────────┬──────────────┐
         ▼          ▼          ▼          ▼              ▼
-       GCS    RAG index   STT (ASR)   Perception   Autonomous
-     download (multimodal  transcript  fan-out       Signals
-              embeddings)              (6 models)    composer
+       blob    RAG index   STT (ASR)   Perception   Editorial
+     storage  (multimodal  transcript   fan-out      Signals
+              embeddings)               (models)     composer
         │          │          │          │              │
         ▼          ▼          ▼          ▼              ▼
-       blob   pgvector    AgentMem    AgentMem      AgentMem
-              chunks      words.json  faces +       scene
-                                      tracks        signals
+      stored   vector      memory      memory        memory
+               index       (words)     (faces +     (scene
+                                       tracks)      signals)
 ```
 
 What gets persisted, where, and why:
 
 | Store | Holds | Access pattern |
 |---|---|---|
-| `scene.visionData` (JSONB) | Hot, scene-local signals every action reads | In-memory while editing |
-| `AgentMemory` (Postgres rows) | Per-(project, asset) blobs — transcript chunks, face tracks, scene signals | Survives session, shared across requests |
-| `pgvector` tables | 1024-d multimodal chunks, 512-d ArcFace identity vectors | Cosine NN, cross-asset joins |
-| `GCS` | Source videos, rendered MP4s, model weights | Append-mostly heavy binaries |
-| `agent_tasks` (Postgres) | Job orchestration — status, progress, last_error | Polled by workers; payload kept small, big blobs offloaded to GCS |
+| Hot scene state | Scene-local signals every action reads | In-memory while editing |
+| Memory service | Per-(project, asset) blobs — transcript chunks, face tracks, scene signals | Survives session, shared across requests |
+| Vector index | Multimodal chunks, identity embeddings | Cosine NN, cross-asset joins |
+| Object storage | Source videos, rendered MP4s, model weights | Append-mostly heavy binaries |
+| Job orchestration | Status, progress, last error | Polled by workers; payload kept small, big blobs offloaded to storage |
 
 ---
 
 ## The agent loop
 
-This is what happens when you send a prompt. Notice the LLM is invoked **exactly twice** — once to classify, once to dispatch. Everything else is deterministic.
+This is what happens when you send a prompt. Notice the LLM is invoked **exactly twice on the happy path** — once to classify, once to dispatch. Everything else is deterministic.
 
 ```
                     USER PROMPT
         "Make 3 viral clips, replace the background with a beach"
                          │
                          ▼
-              GoalClassifier (1× LLM)
+              Intent Classifier (1× LLM)
               → goal: viral_social
               → export_style: viral_clips
               → signals.wantsBgReplace: true
                          │
                          ▼
-              WorkflowDagCompiler   (deterministic)
-              → tasks: [GENERATE_VIRAL_CLIPS, BACKGROUND_REPLACE]
+              DAG Compiler   (deterministic)
+              → tasks: [generate viral clips, background replace]
                          │
                          ▼
-              TrueCentralBrain
+              Central Agent
               composes scene snapshot with all L0/L1 signals:
-                · chapters, reactionMoments, shotKindByChapter
-                · speakerChanges, cutPacing, talkTime
-                · transcript.words[], narrative metadata
+                · chapter segmentation, reaction moments, shot kinds
+                · speaker changes, cut pacing, talk-time distribution
+                · transcript words with timestamps, narrative metadata
                          │
                          ▼
               LLM tool dispatch (1× LLM)
-              picks from CanonicalActionRegistry, fills params
+              picks from action registry, fills params
                          │
               ┌──────────┴──────────┐
               ▼                     ▼
         Action handler        Action handler
-        → autonomyQueue       → autonomyQueue
+        → execution queue     → execution queue
         → renderer pods       → renderer pods
               │                     │
               └──────────┬──────────┘
                          ▼
               Renderer GPU pods
-              (PerceptionState warmed · streaming compositor · NVENC)
+              (warmed perception · streaming compositor · hardware encode)
                          │
                          ▼
-              GCS-uploaded MP4s
-              + APPLY_PENDING scene mutation
+              MP4 outputs in object storage
+              + scene mutation applied
               + streaming progress (SSE)
 ```
 
-Two LLM calls. Hardware-accelerated everything else. That's the architectural game.
+Two LLM calls on the happy path. Hardware-accelerated everything else. That's the architectural game.
 
 ---
 
@@ -228,22 +228,22 @@ This is what the agent can actually do. Every row is a real canonical action bac
 - **Face blur** — all faces or background-only
 - **Image edit** — generative instruction-based
 
-### High-level kits
-Each one is a single canonical action that orchestrates many underlying edits:
+### High-level presets
+Each preset is a single agent action that orchestrates many underlying edits:
 
-| Kit | What it does |
+| Preset | What it does |
 |---|---|
-| `APPLY_VIRAL_KIT` | Vertical reframe + captions + silence removal + motion tracking + word emphasis |
-| `APPLY_CINEMATIC_DIRECTOR` | Energy analysis + dynamic zooms + cinematic color grade + mood-based camera moves |
-| `APPLY_EMPHASIS_SYSTEM` | Keyword detection + coordinated scaling / glow / pulse with captions |
-| `OPTIMIZE_PACING` | Filler-word + silence + low-energy segment removal for retention |
+| Viral preset | Vertical reframe + captions + silence removal + motion tracking + word emphasis |
+| Cinematic director | Energy analysis + dynamic zooms + cinematic color grade + mood-based camera moves |
+| Emphasis system | Keyword detection + coordinated scaling / glow / pulse with captions |
+| Pacing optimizer | Filler-word + silence + low-energy segment removal for retention |
 
 ### Export
-| Action | Output |
+| Capability | Output |
 |---|---|
-| `EXPORT_VIDEO` | MP4 (resolution / codec / quality tier) |
-| `GENERATE_VIRAL_CLIPS` | Auto-segmented short-form clips packaged as ZIP |
-| `GENERATE_MULTI_PLATFORM` | TikTok + Reels + Shorts + YouTube + Instagram aspect ratios in one pass |
+| MP4 export | Single MP4 (resolution / codec / quality tier) |
+| Viral clip batch | Auto-segmented short-form clips packaged as ZIP |
+| Multi-platform pack | TikTok + Reels + Shorts + YouTube + Instagram aspect ratios in one pass |
 
 ---
 
@@ -311,7 +311,7 @@ curl -sS -X POST "$ADSCENE_API_URL/api/v1/misc/openclaw/v1/execute" \
 
 ### 1. Get an API key
 
-Sign up at [https://studio.livecore.ai/](https://studio.livecore.ai/) and generate an OpenClaw API key from the account UI.
+Sign up at [https://studio.levea.ai/](https://studio.levea.ai/) and generate an OpenClaw API key from the account UI.
 
 ### 2. Install the plugin
 
@@ -328,7 +328,7 @@ npm install openclaw-ai-video-editor
 ### 3. Configure
 
 ```bash
-export ADSCENE_API_URL="https://api.livecore.ai"
+export ADSCENE_API_URL="https://api.levea.ai"
 export ADSCENE_API_KEY="your-openclaw-api-key"
 ```
 
@@ -341,7 +341,7 @@ Or in OpenClaw skill config:
       "openclaw_ai_video_editor": {
         "enabled": true,
         "env": {
-          "ADSCENE_API_URL": "https://api.livecore.ai",
+          "ADSCENE_API_URL": "https://api.levea.ai",
           "ADSCENE_API_KEY": "your-openclaw-api-key"
         }
       }
@@ -369,7 +369,7 @@ curl -sS -X POST "$ADSCENE_API_URL/api/v1/misc/openclaw/v1/execute" \
 
 ## API surface
 
-Base URL: `{ADSCENE_API_URL}` (production: `https://api.livecore.ai`)
+Base URL: `{ADSCENE_API_URL}` (production: `https://api.levea.ai`)
 
 | Endpoint | Purpose |
 |---|---|
@@ -384,7 +384,7 @@ Auth header:
 Authorization: Bearer {ADSCENE_API_KEY}
 ```
 
-Do **not** set `ADSCENE_API_URL` to `https://studio.livecore.ai` or the in-product editor route `/api/v1/misc/editor/`. Studio is the user-facing app; OpenClaw requests go to the API-key route on `https://api.livecore.ai`.
+Do **not** set `ADSCENE_API_URL` to `https://studio.levea.ai` or the in-product editor route `/api/v1/misc/editor/`. Studio is the user-facing app; OpenClaw requests go to the API-key route on `https://api.levea.ai`.
 
 ### Request body
 
@@ -434,7 +434,7 @@ Set `Accept: text/event-stream` or `?stream=true`. Notable event types:
 | `mode_select` | `{ mode: "qa" | "action" }` |
 | `thinking`, `tool_call`, `tool_result` | Per-step reasoning visibility |
 | `background_job_completed` | Async job done (B-roll, viral clips, …) |
-| `workflow_completed` | Main brain loop done; verification may continue |
+| `workflow_completed` | Main agent loop done; verification may continue |
 | `success` / `partial_success` | Terminal payload (same shape as JSON above) |
 | `error` | Terminal failure |
 
@@ -476,15 +476,15 @@ Pass `requirePlanApproval: true` to make the agent stop after planning. It retur
 | | Legacy editors (Premiere, DaVinci, CapCut, Descript) | OpenClaw AI Video Editor |
 |---|---|---|
 | **Interface** | Drag, drop, keyframe by hand | One sentence; agent plans the rest |
-| **Per-asset AI prep** | Manual scene detection, manual subtitle generation | Six perception models run on upload — chapters, faces, speakers, OCR, shots, mattes all pre-computed |
-| **"Make this viral"** | You build the workflow | `APPLY_VIRAL_KIT` — single action, planned and executed |
-| **Cross-asset search** | Filename search | pgvector cosine NN — "find every clip where Alex appears" works across the entire library |
-| **Background replace** | Key out manually, find background, composite | RVM alpha matte + `BACKGROUND_REPLACE` — one action |
+| **Per-asset AI prep** | Manual scene detection, manual subtitle generation | Perception layer runs on upload — chapters, faces, speakers, on-screen text, shots, mattes all pre-computed |
+| **"Make this viral"** | You build the workflow | Single agent action — planned and executed |
+| **Cross-asset search** | Filename search | Vector similarity — "find every clip where Alex appears" works across the entire library |
+| **Background replace** | Key out manually, find background, composite | Alpha matte + canonical action — one call |
 | **Beat-synced cuts** | Manually mark beats, manually align | `beat_times` or `bpm` parameter; cuts align automatically |
-| **Editorial reasoning** | You decide what's the climax | L3 narrative agent surfaces narrative peaks, reaction moments, emphasis candidates |
+| **Editorial reasoning** | You decide what's the climax | L3 agent surfaces narrative peaks, reaction moments, emphasis candidates |
 | **Verification** | You eyeball the result | Verifier runs after execution; up to 2 repair loops on failure |
 | **Cost per edit** | Software license + your hours | Per-API-key rate-limited; deterministic actions run on warmed GPU pods |
-| **Extensibility** | Plugins call ffmpeg | Tools are typed canonical actions; the registry is the contract |
+| **Extensibility** | Plugins call external binaries | Tools are typed canonical actions; the registry is the contract |
 
 This isn't an editor with AI features bolted on. It's an autonomous agent whose execution substrate happens to be a video editor.
 
@@ -492,7 +492,7 @@ This isn't an editor with AI features bolted on. It's an autonomous agent whose 
 
 ## Safety, verification, limits
 
-- Every run flows through three deterministic gates: **ActionPermissionGate**, **ArchitectureControlPlane**, **EditorSafetyPolicy**.
+- Every run flows through deterministic safety gates before execution.
 - Destructive actions (`CLEAR`, mass deletes) require explicit confirmation params.
 - The verifier runs after execution and may trigger up to two repair loops; failures surface as `verificationPassed: false` + `verificationIssues[]`.
 - Concurrent identical requests for the same `(user, project, prompt, scene fingerprint)` are deduplicated server-side.
@@ -549,10 +549,10 @@ curl -sS "$ADSCENE_API_URL/api/v1/misc/openclaw/v1/jobs/$JOB_ID" \
 
 - **ClawHub plugin** — [clawhub.ai/plugins/openclaw-ai-video-editor](https://clawhub.ai/plugins/openclaw-ai-video-editor)
 - **ClawHub skill (agentic)** — [clawhub.ai/skills/ai-agentic-video-editor](https://clawhub.ai/skills/ai-agentic-video-editor)
-- **ClawHub skill (Livecore brand)** — [clawhub.ai/skills/livecore-ai-video-editor](https://clawhub.ai/skills/livecore-ai-video-editor)
+- **ClawHub skill (Levea brand)** — [clawhub.ai/skills/levea-ai-video-editor](https://clawhub.ai/skills/levea-ai-video-editor)
 - **npm** — [npmjs.com/package/openclaw-ai-video-editor](https://www.npmjs.com/package/openclaw-ai-video-editor)
-- **Sign up + API keys** — [studio.livecore.ai](https://studio.livecore.ai/)
-- **API base** — `https://api.livecore.ai`
+- **Sign up + API keys** — [studio.levea.ai](https://studio.levea.ai/)
+- **API base** — `https://api.levea.ai`
 
 ## Support
 

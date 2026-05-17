@@ -1,25 +1,25 @@
 {
   "id": "openclaw-ai-video-editor",
   "name": "OpenClaw AI Video Editor",
-  "description": "AI video editor for natural-language edits, viral clips, captions, vertical video, chroma key, audio cleanup, and MP4 export through the Livecore/OpenClaw API.",
+  "description": "AI video editor for natural-language edits, viral clips, captions, vertical video, chroma key, audio cleanup, and MP4 export through the Levea/OpenClaw API.",
   "version": "1.0.0",
   "enabledByDefault": true,
   "skills": [
     "./SKILL.md"
   ],
   "providerAuthEnvVars": {
-    "livecore": [
+    "levea": [
       "ADSCENE_API_KEY"
     ]
   },
   "uiHints": {
     "apiUrl": {
-      "label": "Livecore API Base URL",
-      "help": "Use https://api.livecore.ai or a full /api/v1/misc/openclaw/v1/execute endpoint."
+      "label": "Levea API Base URL",
+      "help": "Use https://api.levea.ai or a full /api/v1/misc/openclaw/v1/execute endpoint."
     },
     "apiKey": {
-      "label": "Livecore API Key",
-      "help": "Create an API key at https://studio.livecore.ai/.",
+      "label": "Levea API Key",
+      "help": "Create an API key at https://studio.levea.ai/.",
       "sensitive": true
     }
   },
