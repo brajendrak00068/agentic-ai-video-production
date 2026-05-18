@@ -1,0 +1,20 @@
+name: leak-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  scan:
+    name: scan for internal markers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run scan-leaks.sh
+        run: |
+          chmod +x scripts/scan-leaks.sh
+          scripts/scan-leaks.sh

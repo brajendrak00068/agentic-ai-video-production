@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# pre-commit — block commits that expose internal architecture details.
+# Activate by running `scripts/install-hooks.sh` once (sets core.hooksPath).
+set -eu
+exec env PRE_COMMIT=1 ./scripts/scan-leaks.sh

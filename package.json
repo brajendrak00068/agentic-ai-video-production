@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build",
+    "scan-leaks": "bash scripts/scan-leaks.sh README.md SKILL.md openclaw.plugin.json",
+    "prepublishOnly": "npm run scan-leaks && npm run build",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [

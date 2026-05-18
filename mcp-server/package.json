@@ -19,7 +19,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "scan-leaks": "bash ../scripts/scan-leaks.sh README.md SKILL.md server.json src/index.ts",
+    "prepublishOnly": "npm run scan-leaks && npm run build"
   },
   "keywords": [
     "mcp",
