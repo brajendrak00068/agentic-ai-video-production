@@ -1,0 +1,57 @@
+{
+  "id": "openclaw-ai-video-editor",
+  "name": "OpenClaw AI Video Editor",
+  "description": "Agentic AI video editor — natural-language video edits end-to-end via a single `autonomous_edit` tool. Viral clips, captions, vertical reframe, chroma key, AI background removal, audio cleanup, motion tracking, B-roll, voiceover, music, and MP4 / multi-platform export.",
+  "version": "1.0.22",
+  "enabledByDefault": true,
+  "skills": [
+    "./SKILL.md"
+  ],
+  "providerAuthEnvVars": {
+    "levea": [
+      "LEVEA_API_KEY"
+    ]
+  },
+  "uiHints": {
+    "apiUrl": {
+      "label": "Levea API Base URL",
+      "help": "Use https://api.livecore.ai or a full /api/v1/misc/openclaw/v1/execute endpoint."
+    },
+    "apiKey": {
+      "label": "Levea API Key",
+      "help": "Create an API key at https://studio.livecore.ai/.",
+      "sensitive": true
+    }
+  },
+  "contracts": {
+    "tools": [
+      "ai-video-editor",
+      "autonomous_edit",
+      "caption_compose",
+      "chroma_key",
+      "clean_audio",
+      "export_video",
+      "music_generate",
+      "scene_insert",
+      "scene_mask",
+      "scene_track",
+      "scene_update",
+      "split_screen"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiUrl": {
+        "type": "string"
+      },
+      "apiKey": {
+        "type": [
+          "string",
+          "object"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "name": "openclaw-ai-video-editor",
+  "version": "1.0.22",
+  "description": "Agentic AI video editor — autonomous agent that plans and executes natural-language video edits end-to-end: viral clips, auto captions, vertical 9:16 reframe, chroma key, silence removal, motion tracking, B-roll, voiceover, music generation, and MP4 / multi-platform export through a single agentic tool.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "index.ts",
+    "dist",
+    "openclaw.plugin.json",
+    "SKILL.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-skill",
+    "clawhub",
+    "agent-skill",
+    "ai-agent",
+    "ai-video-editor",
+    "agentic-video-editing",
+    "natural-language-video-editing",
+    "video-editing",
+    "video-automation",
+    "video-api",
+    "content-creation",
+    "creator-tools",
+    "social-media-video",
+    "short-form-video",
+    "viral-clips",
+    "clip-generator",
+    "video-clips",
+    "tiktok-video",
+    "instagram-reels",
+    "youtube-shorts",
+    "vertical-video",
+    "caption-generator",
+    "auto-captions",
+    "video-captions",
+    "subtitles",
+    "chroma-key",
+    "green-screen",
+    "background-removal",
+    "video-background-removal",
+    "b-roll",
+    "motion-tracking",
+    "audio-cleanup",
+    "silence-removal",
+    "voiceover",
+    "music-generation",
+    "video-export",
+    "mp4-export"
+  ],
+  "author": "brajendrak00068 <brajendrak00068@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brajendrak00068/openclaw-ai-video-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/brajendrak00068/openclaw-ai-video-editor/issues",
+    "email": "brajendrak00068@gmail.com"
+  },
+  "homepage": "https://github.com/brajendrak00068/openclaw-ai-video-editor#readme",
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "runtimeExtensions": [
+      "dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.5.0"
+    },
+    "build": {
+      "openclawVersion": "2026.5.12"
+    },
+    "requires": {
+      "env": [
+        "LEVEA_API_URL",
+        "LEVEA_API_KEY"
+      ]
+    }
+  }
+}

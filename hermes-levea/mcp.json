@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "levea": {
+      "command": "npx",
+      "args": ["-y", "levea-mcp-server"],
+      "env": {
+        "LEVEA_API_URL": "https://api.livecore.ai",
+        "LEVEA_API_KEY": "${LEVEA_API_KEY}"
+      }
+    }
+  }
+}
