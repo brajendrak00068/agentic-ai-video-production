@@ -47,9 +47,19 @@ One-liners for specific clients:
 
 The client appends `/api/v1/misc/openclaw/v1/execute` automatically; never set a full path in `LEVEA_API_URL`.
 
-### Tools the AI sees (10)
+### Tools the AI sees
 
-`autonomous_edit` (primary — free-form prompt) · `generate_viral_clips` · `add_captions` · `remove_silence` · `read_scene` · `query_transcript` · `export_video` · `check_job_status` · `editor_execute` (allowlisted backend escape hatch) · `editor_health`
+**One edit tool. The rest are typed state-management and polling** — so integrators can build full editing experiences through one API key instead of mixing JWT and MCP:
+
+- **Edit (3 variants of one entry point):** `autonomous_edit` (primary, JSON response) · `autonomous_edit_streaming` (SSE — emits per-step MCP progress notifications) · `queue_edit` (async fire-and-forget)
+- **Job / task polling:** `check_job_status` · `check_task_status` · `get_active_task`
+- **Caption templates:** `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (41 builtin templates + your saved ones)
+- **Brand kits:** `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit` (palette · fonts · logo · voice · gradeBias · enforcement)
+- **Projects:** `list_projects` · `get_project` · `create_project` · `delete_project`
+- **Assets:** `asset_upload_url` (signed PUT) · `list_assets` · `delete_asset` · `transcribe_asset`
+- **Diagnostics:** `editor_health`
+
+**No edit shims** (`add_captions`, `generate_viral_clips`, …) and no `editor_execute` escape hatch. The backend's planner is the specialist — fragmenting the editing surface encourages calling LLMs to second-guess the planner and lose multi-step intent. State-management tools (brand / project / asset / caption-template CRUD) are not editing — they don't fragment intent, they just give integrators typed access.
 
 → For AI-agent integration details (schemas, async semantics, error handling, plan approval), see **[AGENTS.md](./AGENTS.md)**.
 
@@ -57,11 +67,11 @@ The client appends `/api/v1/misc/openclaw/v1/execute` automatically; never set a
 
 | Channel | Identifier | Version |
 |---|---|---|
-| npm | [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server) | 0.2.0 (0.3.0 with `LEVEA_*` pending republish) |
-| MCP Registry | `io.github.brajendrak00068/levea-mcp-server` | 0.2.0 |
-| ClawHub plugin | [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor) | 1.0.20 (1.0.21 fix pending republish) |
+| npm | [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server) | 0.5.0 |
+| MCP Registry | `io.github.brajendrak00068/levea-mcp-server` | 0.5.0 |
+| ClawHub plugin | [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor) | 1.1.0 |
 
-> On the currently-published npm v0.2.0 the env vars are named `ADSCENE_API_URL` / `ADSCENE_API_KEY`. v0.3.0 (in this repo, pending republish) accepts both names — `LEVEA_*` is canonical, `ADSCENE_*` kept as silent fallback so existing configs don't break.
+> Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`. Legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` (≤ v0.2.0) still read as a silent fallback so existing configs don't break.
 
 ---
 

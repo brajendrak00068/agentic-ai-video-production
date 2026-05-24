@@ -18,6 +18,19 @@ interface EditorRequest {
   assets?: any[];
   project_id?: string;
   scene?: any;
+  // Typed pass-through params honored by the backend's autonomous_edit route.
+  // See openclaw.routes.ts handler — these are read off req.body (top-level wins
+  // over params) and forwarded to AutonomousEditRunner.
+  requirePlanApproval?: boolean;
+  workingMemory?: Record<string, any>;
+  attachedImages?: string[];
+  flaggedIssues?: string[];
+  captionTemplatePreset?: string;
+  captionTemplateMode?: string;
+  core_only?: boolean;
+  brandId?: string;
+  projectBrandId?: string;
+  editedPlan?: Record<string, any>;
 }
 
 interface EditorResponse {
@@ -49,11 +62,28 @@ export async function handleEditorOperation(
     return { success: false, message: '❌ Missing required parameter: prompt' };
   }
 
+  // Pass-through every typed param the backend honors. Previously this handler
+  // stripped everything except prompt/video_url/assets, which silently dropped
+  // requirePlanApproval / workingMemory / captionTemplatePreset / brandId /
+  // attachedImages / flaggedIssues / core_only / projectBrandId / editedPlan
+  // before they could reach the backend. The backend's openclaw.routes.ts
+  // reads each of these and forwards them to AutonomousEditRunner.
   const params: Record<string, any> = { prompt };
   if (request.video_url) params.video_url = request.video_url;
   if (Array.isArray(request.assets) && request.assets.length > 0) {
     params.assets = request.assets;
   }
+  const topLevel: Record<string, any> = {};
+  if (request.requirePlanApproval !== undefined) topLevel.requirePlanApproval = request.requirePlanApproval;
+  if (request.workingMemory !== undefined) topLevel.workingMemory = request.workingMemory;
+  if (Array.isArray(request.attachedImages) && request.attachedImages.length > 0) topLevel.attachedImages = request.attachedImages;
+  if (Array.isArray(request.flaggedIssues) && request.flaggedIssues.length > 0) topLevel.flaggedIssues = request.flaggedIssues;
+  if (request.captionTemplatePreset) topLevel.captionTemplatePreset = request.captionTemplatePreset;
+  if (request.captionTemplateMode) topLevel.captionTemplateMode = request.captionTemplateMode;
+  if (request.core_only !== undefined) topLevel.core_only = request.core_only;
+  if (request.brandId) topLevel.brandId = request.brandId;
+  if (request.projectBrandId) topLevel.projectBrandId = request.projectBrandId;
+  if (request.editedPlan !== undefined) topLevel.editedPlan = request.editedPlan;
 
   try {
     const response = await axios.post(
@@ -63,6 +93,7 @@ export async function handleEditorOperation(
         params,
         projectId: request.project_id || `openclaw_${Date.now()}`,
         ...(request.scene !== undefined ? { scene: request.scene } : {}),
+        ...topLevel,
       },
       {
         headers: {
@@ -136,6 +167,64 @@ const TOOL_PARAMETERS = {
     project_id: {
       type: 'string',
       description: 'Optional project identifier for tracking / continuity.',
+    },
+    scene: {
+      type: 'object',
+      description:
+        'Optional existing scene/timeline state to continue editing. Advanced — usually omitted; the backend rehydrates from project_id or seeds from video_url/assets.',
+    },
+    requirePlanApproval: {
+      type: 'boolean',
+      description:
+        'If true, the agent stops after planning and returns { status: "awaiting_approval", workingMemory, plan } without mutating. Resume with the returned workingMemory + an approval prompt ("yes", "approve", "do it"). Use for irreversible work the user wants to gate.',
+    },
+    workingMemory: {
+      type: 'object',
+      description:
+        'Durable working-memory snapshot returned by a prior call (typically one that returned status="awaiting_approval"). Re-sending it resumes that run from where it paused.',
+    },
+    attachedImages: {
+      type: 'array',
+      description:
+        'Optional base64-encoded reference images / screenshots the agent should consider while planning (e.g. style references, screenshots of issues).',
+      items: { type: 'string' },
+    },
+    flaggedIssues: {
+      type: 'array',
+      description:
+        'Optional list of specific user-flagged problems to fix in this run (e.g. ["caption #3 is misspelled", "audio cuts out at 0:42"]). Surfaces to the planner alongside the prompt.',
+      items: { type: 'string' },
+    },
+    captionTemplatePreset: {
+      type: 'string',
+      description:
+        'Optional caption template slug to apply when generating/styling captions. One of the 41 builtin templates (e.g. "hormozi", "mrbeast", "viral-pop", "minimal-pro", "karaoke", "neon-pop", "typewriter", "pop-wave", "subtitle-bar", "creator-box"). See SKILL.md for the full list, or pass a user-saved template id.',
+    },
+    captionTemplateMode: {
+      type: 'string',
+      description:
+        'How to apply captionTemplatePreset. "add" = generate fresh, "recreate" = wipe + regenerate, "style" = restyle existing captions, "translate" = translate to a target language (use with the language hint in prompt), "clear" = remove captions, "remove_fillers" = strip filler words.',
+      enum: ['add', 'recreate', 'style', 'translate', 'clear', 'remove_fillers'],
+    },
+    core_only: {
+      type: 'boolean',
+      description:
+        'If true, the response carries only the rendering-essential scene fields (no debug / verifier / workflow metadata). Useful for low-bandwidth integrations.',
+    },
+    brandId: {
+      type: 'string',
+      description:
+        'Optional brand-profile id to apply for this call (palette, fonts, logo, voice, gradeBias). Overrides the project default brand if any. Look up brand ids via the list_brand_kits tool.',
+    },
+    projectBrandId: {
+      type: 'string',
+      description:
+        'Optional default brand for the project. Persists on the project for future calls; brandId overrides per-call.',
+    },
+    editedPlan: {
+      type: 'object',
+      description:
+        'Optional pre-edited plan object returned by a prior awaiting_approval response. Use to resume after the user manually adjusted steps.',
     },
   },
   required: ['prompt'],

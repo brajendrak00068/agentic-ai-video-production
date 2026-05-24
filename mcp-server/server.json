@@ -3,7 +3,7 @@
   "name": "io.github.brajendrak00068/levea-mcp-server",
   "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export",
   "status": "active",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "repository": {
     "url": "https://github.com/brajendrak00068/openclaw-ai-video-editor",
     "source": "github",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "levea-mcp-server",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "transport": {
         "type": "stdio"
       },

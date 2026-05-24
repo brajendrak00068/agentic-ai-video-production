@@ -43,6 +43,6 @@ server directly to your Hermes MCP config (see [`mcp.json`](./mcp.json)):
 
 ## Tools
 
-Same surface as every other client (`autonomous_edit`, `generate_viral_clips`,
-`add_captions`, `export_video`, `check_job_status`, …). See the
-[MCP server README](../mcp-server/README.md).
+Same surface as every other client: a single edit tool (`autonomous_edit`) plus
+two diagnostics (`check_job_status`, `editor_health`). One brain, one entry
+point — see the [MCP server README](../mcp-server/README.md) for the rationale.

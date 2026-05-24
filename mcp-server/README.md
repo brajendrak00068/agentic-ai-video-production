@@ -15,17 +15,26 @@ which allowlists tools server‑side.
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `autonomous_edit` | **Primary.** Natural‑language edit / creative brief, end‑to‑end. |
-| `generate_viral_clips` | Short viral clips from a long video. |
-| `add_captions` | Styled, word‑highlighted captions. |
-| `remove_silence` | Cut silent gaps. |
-| `read_scene` / `query_transcript` | Read‑only inspection. |
-| `export_video` | Export MP4 (optionally block until done). |
-| `check_job_status` | Poll an async job (optionally wait for terminal state). |
-| `editor_execute` | Power‑user escape hatch (allowlisted backend tool + raw params). |
-| `editor_health` | Connectivity diagnostic (unauthenticated). |
+**One edit tool, many management tools.** The editing path is single-tool by design — no `add_captions` / `generate_viral_clips` / `editor_execute` shims. Everything else (brand kits, projects, assets, caption templates) is typed state-management you can drive through the API key.
+
+**Edit (3 variants of one entry point)**
+- `autonomous_edit` — primary. Natural-language brief end-to-end. Planner picks the right actions.
+- `autonomous_edit_streaming` — same input, SSE response. Emits per-step MCP progress notifications.
+- `queue_edit` — fire-and-forget. Returns `taskId` for `check_task_status`.
+
+**Job / task polling** — `check_job_status` · `check_task_status` · `get_active_task`
+
+**Caption templates** — `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template`
+
+**Brand kits** — `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit`
+
+**Projects** — `list_projects` · `get_project` · `create_project` · `delete_project`
+
+**Assets** — `asset_upload_url` (signed PUT URL — upload local files) · `list_assets` · `delete_asset` · `transcribe_asset`
+
+**Diagnostics** — `editor_health`
+
+See [AGENTS.md](../AGENTS.md) for the rationale, full call patterns, and typed param descriptions on `autonomous_edit` (plan approval, brand binding, caption preset, attached screenshots, working-memory resume, …).
 
 ## Configuration
 
