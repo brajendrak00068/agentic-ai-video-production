@@ -114,8 +114,10 @@ Say it in plain language; the agent plans and finishes the edit.
 | "Generate B-roll over the product mention" | AI B-roll generation + placement at the right timestamp |
 | "Color grade this like a Netflix doc" | Color grading with cinematic preset |
 | "Slow-mo the climax, freeze on the reveal" | Retime with ramp curves + freeze-frame |
-| "Reframe to vertical but don't crop the lower-third captions" | Caption-safe 9:16 reframe (preserves on-screen text) |
-| "What text is on screen at 0:42?" | On-screen text extraction (OCR) |
+| "Reframe to vertical but don't crop the lower-third captions" | Caption-safe 9:16 reframe (detects on-screen text regions and reframes around them) |
+| "Pull the key stats from this and animate them as charts" | Transcript-driven charts + stat-callout motion graphics |
+| "Sync these 3 camera angles and cut between them on the active speaker" | Multi-cam sync + automatic angle switching |
+| "Blur the license plates and bleep the swearing" | Privacy redaction + profanity cleanup |
 
 > **Beta caveat:** outputs sometimes need a second pass. Preview before publishing; for anything you can't undo, approve the plan first via the [plan-approval flow](#plan-approval).
 
@@ -127,15 +129,17 @@ The full toolset behind the prompt. Every row is reachable from natural language
 
 | Area | Capabilities |
 |---|---|
-| **Read & inspect** | Timeline / layer / scene state · asset-gallery search (type, duration, name) · CV frame analysis (object, face, scene) · **on-screen text OCR** (chyrons, lower-thirds, slide titles, burned-in captions) · transcript search (keyword, semantic, timestamp) · video intelligence (narrative peaks, diarization, sentiment, pacing) · async job status + schema introspection |
-| **Structural editing** | Insert / update / replace / delete layers (**video, audio, text, image, shape, group, adjustment**) · trim, split, retime (slow-mo 0.5×, fast-forward 2×, freeze-frame, ramp curves) · reposition, sequence, snap to transcript word boundaries · gap healing, audio normalize, duration reconcile (pre-export safety pass) · multi-step undo / redo |
-| **Visual editing** | Color grading (brightness, contrast, saturation, hue, lift/gamma/gain, RGB curves) · **procedural VFX shaders** (smoke, dust, fire, explosion, lightning, snow, glitch, scanlines, grain, glassmorphism, bokeh, lava, corrosion, portal) · chroma key · AI background removal (alpha matte) · AI background blur (depth-aware) · masking (luma, alpha, depth) · geometric clip shapes (circle, dome, star, hexagon, polygon) · crop + 3D rotation/perspective · glow, shadow, gradient fills · **caption-safe** vertical reframe (9:16) + montage · split screen (top/bottom, L/R, PiP, grid) · branding overlays · motion / face tracking with zoom-follow |
+| **Read & inspect** | Timeline / layer / scene state · asset-gallery search (type, duration, name) · CV frame analysis (object, face, scene) · on-screen **text-region detection** (locates chyrons / lower-thirds / burned-in captions so reframing avoids covering them) · transcript search (keyword, semantic, timestamp) · video intelligence (narrative peaks, diarization, sentiment, pacing) · async job status + schema introspection |
+| **Structural editing** | Insert / update / replace / delete layers (**video, audio, text, image, shape, group, adjustment**) · trim, split, retime (slow-mo 0.5×, fast-forward 2×, freeze-frame, ramp curves) · reverse, stabilize · reposition, sequence, snap to transcript word boundaries · **multi-cam** sync + automatic angle switching · slideshow generation · chapter markers · SRT import · gap healing, audio normalize, duration reconcile (pre-export safety pass) · multi-step undo / redo |
+| **Visual editing** | Color grading (brightness, contrast, saturation, hue, lift/gamma/gain, RGB curves) · **procedural VFX shaders** (smoke, dust, fire, explosion, lightning, snow, glitch, scanlines, grain, glassmorphism, bokeh, lava, corrosion, portal) · chroma key · AI background removal (alpha matte) · AI background blur (subject-aware matte) · masking (luma, alpha, depth) · geometric clip shapes (circle, dome, star, hexagon, polygon) · crop + 3D rotation/perspective · glow, shadow, gradient fills · **caption-safe** vertical reframe (9:16) + montage · split screen (top/bottom, L/R, PiP, grid) · branding overlays · motion / face tracking with zoom-follow |
+| **Motion graphics & data viz** | ~30 production-grade animated graphics — **transcript-driven charts** (bar, line, pie), stat callouts, animated counters, lower-thirds, title / chapter cards, flowcharts, timelines, geo callouts, animated subscribe / CTA buttons |
 | **Captions & text** | Auto-generate from transcript · style with built-in templates **or** an AI director that picks/generates a template at runtime · curved text paths (circle, wave, custom SVG) · per-word animations (typewriter, slide, fade, scale, rotate, bounce, flip, swing, elastic, blur, glitch, wave — each with matching exit) · Lottie playback control |
-| **Audio** | Remove silences, breaths, filler words · word-level mute/cut · **auto-ducking** on speech (sidechain music vs voice) · mix / normalize / denoise / EQ (bass-boost, vocal-clarity, warm, bright) · sync external master audio · **beat-synced cuts** (`beat_times` or `bpm`) · SFX · music generation (mood/genre/BPM) · voiceover (TTS or cloned voice) · waveform visualizers (bars, wave, circular) |
-| **Async generation** | AI video / B-roll (duration + aspect) · AI images (single or batch at timestamps) · AI music (prompt + duration + mood + genre + BPM) · AI voiceover (TTS or cloned voice library) · auto-thumbnail extraction · face blur (all or background-only) · generative image edit |
+| **Audio** | Remove silences, breaths, filler words · word-level mute/cut · **auto-ducking** on speech (sidechain music vs voice) · mix / normalize / denoise / crossfade · EQ presets (bass-boost, vocal-clarity, warm, bright) · stem separation · sync external master audio · **beat-synced cuts** (`beat_times` or `bpm`) · SFX · music generation (mood/genre/BPM) · voiceover (TTS or cloned voice) · waveform visualizers (bars, wave, circular) |
+| **Privacy & cleanup** | Face blur (all faces or background-only) · privacy redaction (blur/cover regions) · profanity cleanup (mute / bleep) · safe-zone repair |
+| **Async generation** | AI video / B-roll (duration + aspect) · AI images (single or batch at timestamps) · AI music (prompt + duration + mood + genre + BPM) · AI voiceover (TTS or cloned voice library) · auto-thumbnail extraction · generative image edit |
 | **High-level presets** | **Viral** (vertical + captions + silence removal + tracking + word emphasis) · **Cinematic director** (dynamic zooms + cinematic grade + mood camera moves) · **Emphasis system** (keyword detection + coordinated scaling/glow/pulse) · **Pacing optimizer** (filler + silence + low-energy removal for retention) |
 | **Export** | Single MP4 (resolution / codec / quality tier) · viral-clip batch (auto-segmented short-form, packaged ZIP) · multi-platform pack (TikTok + Reels + Shorts + YouTube + Instagram in one pass) |
-| **Roadmap** | Object removal (AI mask + inpaint) |
+| **Roadmap** | Content-aware object removal (AI mask + inpaint) · reading on-screen text content (OCR recognition — region detection ships today) |
 
 ---
 
@@ -182,12 +186,19 @@ Base URL: `{LEVEA_API_URL}` (production: `https://api.livecore.ai`). Auth on eve
 Authorization: Bearer {LEVEA_API_KEY}
 ```
 
+All paths are under `/api/v1/misc/openclaw`.
+
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/v1/misc/openclaw/v1/execute` | Run `autonomous_edit` or a deterministic tool |
-| `GET  /api/v1/misc/openclaw/v1/jobs/{jobId}` | Poll async render / generation jobs |
-| `GET  /api/v1/misc/openclaw/v1/tools` | List available tool names |
-| `GET  /api/v1/misc/openclaw/v1/health` | Health check |
+| `POST /v1/execute` | Run `autonomous_edit` (the main entry point) |
+| `POST /v1/queue-edit` | Fire-and-forget async edit |
+| `GET  /v1/jobs/{jobId}` · `GET /v1/task-status/{taskId}` | Poll async render / generation jobs |
+| `GET  /v1/projects/{id}/active-task` | The project's in-flight task, if any |
+| `GET  /v1/tools` · `GET /v1/health` | List tool names · health check |
+| `… /v1/brands` · `… /v1/projects` · `… /v1/assets/*` | Brand-kit / project / asset CRUD (list · get · create · update · delete) |
+| `… /v1/caption-templates` · `…/apply` · `…/save-current` | Caption-template CRUD + apply |
+
+Each management group above is also exposed as a typed MCP tool (see [Tools the AI sees](#tools-the-ai-sees)).
 
 > Do **not** point `LEVEA_API_URL` at `studio.livecore.ai` or the in-product editor route `/api/v1/misc/editor/`. Studio is the user-facing app; OpenClaw requests go to the API-key route on `api.livecore.ai`.
 
@@ -208,28 +219,55 @@ curl -sS -X POST "$LEVEA_API_URL/api/v1/misc/openclaw/v1/execute" \
   }'
 ```
 
+`prompt` is the only required field. Everything else is optional:
+
+| Param | Purpose |
+|---|---|
+| `prompt` | The natural-language edit instruction (**required**) |
+| `project_id` | Reuse an existing project's scene + history |
+| `scene` | Inline scene state, as an alternative to `project_id` (round-trip the `scene` from a previous response) |
+| `video_url` | Start from a single video URL with no prior scene |
+| `assets` | Multiple input assets (the first video seeds the scene) |
+| `attachedImages` | Reference / style screenshot image URLs |
+| `flaggedIssues` | Specific problems from a prior output to fix on this pass |
+| `captionTemplatePreset` / `captionTemplateMode` | Force a named caption style + how it's applied |
+| `brandId` / `projectBrandId` | Apply a brand kit (palette · fonts · logo · voice) |
+| `requirePlanApproval` | Stop after planning and wait for approval — see [Plan approval](#plan-approval) |
+| `workingMemory` / `editedPlan` | Resume state + revised plan for the approval loop |
+
 ### Response
 
 ```json
 {
   "type": "success | partial_success",
-  "tool": "<tool-name>",
+  "tool": "autonomous_edit",
   "success": true,
+  "partial": false,
   "status": "completed | failed | awaiting_approval",
   "scene": { },
   "reply": "Human-readable summary of what changed",
+  "message": "Short status message",
   "videoUrl": "https://.../output.mp4",
-  "jobId": "task_...",
+  "jobId": "12345",
   "viral_clips": [ ],
   "zip_url": "https://.../clips.zip",
   "activeTasks": [ ],
   "pendingAsyncJobs": [ ],
   "verificationPassed": true,
   "verificationIssues": [],
+  "quality": {
+    "score": 0.94,
+    "stepsTotal": 7,
+    "stepsFailed": 0,
+    "hasExportedMedia": true,
+    "mediaReachable": true
+  },
   "processingTime": 12.3,
   "workingMemory": { }
 }
 ```
+
+`jobId` is the numeric `task_id` (a string of digits), not a `task_`-prefixed value. `quality` is a calibrated post-run score block; `partial` is the top-level partial-success flag (mirrors `type: "partial_success"`).
 
 ### SSE streaming
 
@@ -238,8 +276,9 @@ Set `Accept: text/event-stream` or `?stream=true`. Notable event types:
 | Event | Meaning |
 |---|---|
 | `heartbeat` | 15s keepalive |
-| `status` | Phase transitions |
-| `thinking`, `tool_call`, `tool_result` | Per-step reasoning visibility |
+| `status` · `phase` | Phase / status transitions |
+| `thought` · `reasoning_chunk` | Per-step reasoning visibility |
+| `tool_call` · `tool_result` | Action started / finished |
 | `background_job_completed` | Async job done |
 | `success` / `partial_success` | Terminal payload |
 | `error` | Terminal failure |
@@ -264,7 +303,7 @@ curl -sS "$LEVEA_API_URL/api/v1/misc/openclaw/v1/jobs/$JOB_ID" \
 
 ### Auto-export
 
-After any **mutating** tool call, if the scene actually changed and an export isn't already queued, the route auto-fires one as a second run. Read-only and conversational `autonomous_edit` calls do **not** trigger auto-export.
+After any **mutating** tool call that changed the scene (including partial successes), if no export is already queued the route auto-fires one **synchronously** — so the response carries a real `videoUrl`. Read-only and conversational `autonomous_edit` calls do **not** trigger auto-export.
 
 ### Plan approval
 
@@ -279,7 +318,7 @@ Pass `requirePlanApproval: true` to make the agent stop after planning. It retur
 | **Creators & influencers** | Long videos → TikToks / Reels / Shorts · auto-captions · viral-clip generation · AI thumbnails |
 | **Podcasters** | Video-podcast highlights · audiograms · multi-cam editing · silence + filler-word removal |
 | **Marketers & agencies** | Ad creation at scale · social-first repurposing · brand-overlay automation · multi-platform exports |
-| **Educators & course creators** | Tutorial editing · auto-chapters · OCR'd slide titles · auto-captions · word-level emphasis |
+| **Educators & course creators** | Tutorial editing · auto-chapters · title / chapter cards · auto-captions · word-level emphasis |
 | **YouTubers** | Long-form → Shorts pipeline · thumbnail generation · intro/outro automation · chapter markers |
 | **Sales & SaaS** | Product demos · walkthrough highlights · cloned-voice narration |
 | **Event teams** | Webinar / conference highlights · multi-cam stitching · speaker spotlight reels |
