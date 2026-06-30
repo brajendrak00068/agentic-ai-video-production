@@ -534,7 +534,6 @@ Pass `requirePlanApproval: true` to make the agent stop after planning. It retur
 | Sign up + API keys | [studio.livecore.ai](https://studio.livecore.ai/) |
 | API base | `https://api.livecore.ai` |
 | Renderer spec | [levea_renderer_spec.html](https://storage.googleapis.com/livecore-assets/decks/levea_renderer_spec.html) |
-| Competitive positioning | [levea_positioning.html](https://storage.googleapis.com/livecore-assets/decks/levea_positioning.html) |
 
 > Versions aren't pinned here — `npx -y levea-mcp-server` and the ClawHub listing always pull the latest.
 
