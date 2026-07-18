@@ -1,7 +1,8 @@
 ---
-name: openclaw_ai_video_editor
-description: OpenClaw AI video editor for natural-language edits: viral clips, captions, vertical video, chroma key, audio cleanup, and MP4 export.
+name: ai_agentic_video_editor
+description: AI agentic video editor: send a prompt, the autonomous editor plans, uses internal tools, exports, and returns the result.
 version: 1.0.0
+license: MIT
 metadata:
   openclaw:
     requires:
@@ -25,11 +26,11 @@ metadata:
 
 # Levea Agentic Video Editor for OpenClaw
 
-A full agentic video editing surface. Send a prompt, get a planned, verified, executed edit — or call a known canonical action directly with structured params. Both modes flow through the same brain + safety gates as the in-product editor.
+A full agentic video editing surface. Send a prompt and get a planned, verified, executed edit. The autonomous editor chooses its own internal tools, applies safety gates, exports when needed, and returns the final scene/video result.
 
-Use this skill when the user asks for OpenClaw video editing, AI video editing, natural-language video edits, viral clips, TikTok videos, Instagram Reels, YouTube Shorts, auto captions, subtitles, chroma key, green screen removal, background removal, B-roll, motion tracking, silence removal, audio cleanup, voiceover, music generation, vertical video, multi-platform export, or MP4 export.
+Use this skill when the user asks for OpenClaw video editing, AI video editing, natural-language video edits, viral clips, TikTok videos, Instagram Reels, YouTube Shorts, auto captions, subtitles, chroma key, green screen removal, background removal, B-roll, motion tracking, motion graphics, multi-cam editing, smart jump cuts, silence cleanup, audio cleanup, voiceover, music generation, object blur / hide, face blur, privacy redaction, beat sync, brand kits, thumbnails, style presets, vertical video, safe-zone repair, final delivery checks, export presets, multi-platform export, or MP4 export.
 
-> **Beta**: This skill is in beta and outputs can be wrong. Before executing any mutating edit on user content (anything beyond `read_*` / `query_*`), describe the planned edit and request explicit confirmation from the user. For destructive or irreversible workflows, pass `requirePlanApproval: true` so the editor halts after planning and the user can approve before execution.
+> **Beta**: This skill is in beta and outputs can be wrong. Before executing any mutating edit on user content, describe the planned edit and request explicit confirmation from the user. For destructive or irreversible workflows, pass `requirePlanApproval: true` so the editor halts after planning and the user can approve before execution.
 
 ## Endpoint
 
@@ -40,13 +41,15 @@ Auth: `Authorization: Bearer {LEVEA_API_KEY}`
 Create an account and generate the OpenClaw API key in Studio: `https://studio.livecore.ai/`.
 Use `https://api.livecore.ai` for `LEVEA_API_URL`; Studio is only for signup, login, and key management.
 
+> `LEVEA_API_URL` / `LEVEA_API_KEY` are canonical. The legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` names are still accepted as a silent fallback for backward compatibility.
+
 Accepts either single-shot JSON (default) or SSE (`Accept: text/event-stream` or `?stream=true`).
 
 Request body:
 
 ```json
 {
-  "tool": "autonomous_edit" | "<allowlisted-tool>",
+  "tool": "autonomous_edit",
   "params": { ... },
   "project_id": "optional-project-id",
   "scene": { /* optional client scene; server-side committed scene wins if newer */ }
@@ -83,7 +86,9 @@ Behind a single `autonomous_edit` call the agent can compose any of:
 **Structural editing**
 - Insert / update / replace / delete layers (video, audio, image, text, shape, solid, adjustment, group, light, vfx, visualizer, lottie)
 - Trim, split, retime layers (slow-mo 0.5×, fast-forward 2×, freeze-frame)
+- Smart jump cuts, filler-word cuts, silence cleanup, low-energy segment removal
 - Reposition on the timeline, sequence layers, snap to transcript
+- Multi-cam sync and angle switching by pacing, speaker priority, or shot size
 - Heal timeline gaps, normalize audio, reconcile durations (pre-export safety pass)
 - Multi-step undo / redo
 
@@ -96,18 +101,21 @@ Behind a single `autonomous_edit` call the agent can compose any of:
 - Glow, shadow, inner shadow, gradient fills, text gradients
 - Vertical reframe (9:16) and vertical-reframe montage
 - Split screen (top/bottom, left/right, picture-in-picture)
-- Branding overlays (logo / watermark) from gallery or AI-generated
+- Branding overlays and brand kits (logo / watermark / colors / fonts / voice) from gallery, project brand settings, or AI-generated; brand-kit limits match Studio billing: Free none, Starter 1, Creator+ unlimited
 - Motion / face tracking with dynamic zoom-follow
+- Object hide / object blur, selective face blur, privacy redaction, safe-zone repair
 
 **Captions & text**
 - Auto-generate captions from transcript
 - Style captions with built-in templates or an AI director that picks/generates a custom template at runtime
+- Motion graphics: kinetic captions, lower thirds, stat callouts, charts, comparison overlays, concept-icon Lottie layers
 - Curved text paths (circle, wave, custom SVG)
 - Per-word entrance / exit animations (typewriter, slide, fade, scale, rotate, bounce, flip, swing, elastic, blur, glitch, wave, plus matching exits)
 - Lottie animation playback control
 
 **Audio**
 - Clean audio: remove silences, breaths, filler words; word-level mute or cut
+- Profanity cleanup: mute, bleep, or cut flagged words
 - Auto-ducking on speech detection (sidechain music vs voice)
 - Mix / normalize / denoise / EQ (bass boost, vocal clarity, warm, bright)
 - Sync external master audio to video (offset, mute camera audio)
@@ -120,7 +128,7 @@ Behind a single `autonomous_edit` call the agent can compose any of:
 - AI images — single or batch at timestamps
 - AI music — prompt + duration + mood + genre + BPM
 - AI voiceover — TTS or cloned voice library
-- Auto-thumbnail extraction
+- Auto-thumbnail extraction or AI-generated thumbnail variants
 - Face blur (all faces or background-only)
 - Image edit (generative instruction-based)
 
@@ -132,12 +140,14 @@ Behind a single `autonomous_edit` call the agent can compose any of:
 
 **Export**
 - `EXPORT_VIDEO` — render to MP4 (resolution / codec / quality tier)
+- `EXPORT_PRESET` — platform / codec / aspect-ratio presets with safe-zone repair
+- `FINAL_DELIVERY_CHECK` — verify safe zones, timeline integrity, captions, media, and export readiness
 - `GENERATE_VIRAL_CLIPS` — auto-segment short-form clips packaged as ZIP
 - `GENERATE_MULTI_PLATFORM` — TikTok + Reels + Shorts + YouTube + Instagram aspect ratios in one pass
 
 ## Auto-export follow-up
 
-After any **mutating** `autonomous_edit` call, if the scene was actually changed and the agent did not already queue an export, the route fires one automatically as a second run. The final response carries `videoUrl` (when ready) or `jobId` (for polling). Read-only and conversational `autonomous_edit` calls do NOT trigger auto-export.
+After an authoritatively **verified mutating** `autonomous_edit` call, if the changed scene was durably committed and the agent did not already queue an export, the route fires one automatically as a second run. The final response carries `videoUrl` (when ready) or `jobId` (for polling). Partial, unverified, conflicted, read-only, and conversational calls do NOT trigger auto-export.
 
 ## Optional input parameters (parity with the in-product editor)
 
@@ -149,6 +159,7 @@ Pass any of these inside `params` (or at the top level of the body) to drive adv
 - `attachedImages` — array of base64 screenshots / reference images
 - `flaggedIssues` — array of strings describing specific problems the user wants fixed
 - `captionTemplatePreset`, `captionTemplateMode` — style preset routing for caption generation
+- `brandId`, `projectBrandId` — optional brand-kit selection for colors, fonts, logo, grade bias, and voice
 - `core_only` (also accepted via `?core_only=true`) — return a minimal scene shape (rendering-only, no debug fields)
 - `assets` — additional asset descriptors to make available to the agent
 
@@ -165,7 +176,7 @@ Pass any of these inside `params` (or at the top level of the body) to drive adv
   "scene": { /* updated scene */ },
   "reply": "Human-readable summary of what changed",
   "videoUrl": "https://.../output.mp4",
-  "jobId": "task_...",
+  "jobId": "1234567",
   "viral_clips": [ /* clip metadata if generated */ ],
   "zip_url": "https://.../clips.zip",
   "activeTasks": [ /* queued background jobs */ ],
@@ -184,7 +195,7 @@ Pass any of these inside `params` (or at the top level of the body) to drive adv
 Failure response (HTTP 4xx/5xx):
 
 ```json
-{ "success": false, "error": "...", "code": "UNKNOWN_TOOL" | "MISSING_TOOL" | "EXECUTION_ERROR" }
+{ "success": false, "error": "...", "code": "MISSING_PROMPT" | "EXECUTION_ERROR" }
 ```
 
 ### SSE (`Accept: text/event-stream` or `?stream=true`)
@@ -212,7 +223,7 @@ Response:
 ```json
 {
   "success": true,
-  "jobId": "task_xxx",
+  "jobId": "1234567",
   "status": "queued" | "processing" | "completed" | "failed",
   "progress": 0.74,
   "message": "Rendering frame 142 of 192",
@@ -253,8 +264,9 @@ Rate-limited per API key. Processing times vary: read-only ~1–3s, structural e
 - **Image in**: JPG, PNG, WebP
 - **Audio in**: MP3, WAV, M4A, AAC (or extracted from video)
 - **Output**: MP4 (export), ZIP (viral clips / multi-platform bundles)
-- **Max video length**: depends on plan; soft limit ~30 min for synchronous edits, async generation handles longer
-- **Recommended resolution**: 1080p or 4K; canvas is configurable per project
+- **Max video length**: up to ~3 hours per asset (plan-dependent); sync edits and async generation both supported
+- **Export caps**: same as Studio billing — Free 720p with Levea watermark, Starter 1080p with no watermark, Creator / Studio / Enterprise 4K with no watermark
+- **Canvas resolution**: 1080p or 4K recommended while editing; final export is capped by the active plan
 
 ## Example: end-to-end viral-clip generation
 
