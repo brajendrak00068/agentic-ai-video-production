@@ -9,8 +9,6 @@
 [![ClawHub Skill](https://img.shields.io/badge/ClawHub-skill-blue)](https://clawhub.ai/skills/ai-agentic-video-editor)
 [![Plugin](https://img.shields.io/badge/ClawHub-plugin-green)](https://clawhub.ai/plugins/openclaw-ai-video-editor)
 
-> **Beta.** The agent can make mistakes. Preview every output before publishing or sharing. For high-stakes or irreversible edits, pass `requirePlanApproval: true` so the agent stops after planning and waits for your approval before anything runs.
-
 ---
 
 ## 🧠 System Architecture: Probabilistic Multimodal Intelligence + Deterministic Video-Production Harness
