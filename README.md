@@ -6,10 +6,9 @@
 
 > **The agentic production environment for video.** Levea combines probabilistic multimodal intelligence with a deterministic production harness to plan, execute, verify, and revise complete video edits from natural-language instructions.
 
-[![ClawHub Skill](https://img.shields.io/badge/ClawHub-skill-blue)](https://clawhub.ai/skills/ai-agentic-video-editor)
-[![Plugin](https://img.shields.io/badge/ClawHub-plugin-green)](https://clawhub.ai/plugins/openclaw-ai-video-editor)
+\
 
-> **Product Distinction:** Unlike one-shot video generators, Levea maintains an editable project containing the timeline, assets, layout, animation, audio, brand rules, and delivery requirements. Generative models become tools inside the workflow—not the owner of the workflow.
+> **Product distinction:** Unlike one-shot video generators, Levea maintains an editable project containing the timeline, assets, layout, animation, audio, brand rules, generative instructions, and delivery requirements. Generative models operate as engines inside the workflow—not as the owner of the workflow.
 
 ---
 
@@ -19,82 +18,109 @@ Levea applies the agentic system pattern to video: probabilistic reasoning opera
 
 ```text
                Creative Intent + Source Media
-                             │
-                             ▼
-         Probabilistic Multimodal Intelligence (Frontier Models)
-                             │
-                             ▼
-         Typed Edit Graph / Media IR (The Scene Graph DAG)
-                             │
-                             ▼
+                            │
+                            ▼
+         Probabilistic Multimodal Intelligence
+                    (Frontier Models)
+                            │
+                            ▼
+          Typed Edit Graph / Media IR
+                  (Scene Graph DAG)
+                            │
+                            ▼
          Deterministic Video-Production Harness
              ├── Timeline and Scene Graph
-             ├── Media Operators (Silence Cuts, Audio Cleanup)
-             ├── Caption and Layout Engine (Shaping, Face Avoidance)
-             ├── Animation System
+             ├── Media Operators
+             ├── Caption and Layout Engine
+             ├── Animation and Motion System
+             ├── Generative Media Adapters
              ├── Renderer (Vulkan / WebGPU)
-             ├── Validators (Safe-Zone & Parity Checks)
-             ├── Project Versioning (Timeline history commits)
-             └── Export Pipeline (FFmpeg / NVENC / H.264)
-                             │
-                             ▼
-                Verification → Bounded Repair → Export
+             ├── Validators
+             ├── Project Versioning
+             └── Export Pipeline
+                            │
+                            ▼
+            Verification → Bounded Repair → Export
 ```
 
 ### 1. The Probabilistic Multimodal Intelligence Layer
-Levea’s planning layer combines frontier multimodal models and reasoning models with domain-specific editing policies, structured media representations, and constrained tool execution. This layer operates probabilistically to handle high-level creative synthesis:
-*   **Planning & Layout Intents:** Translating raw prompts, transcripts, and visual assets into a structured, executable task graph.
-*   **Linguistic & Semantic Segmenting:** Running part-of-speech analysis to divide spoken lines dynamically into natural phrase breaks, setup eyebrow clauses, and punchline highlights.
-*   **Model-Agnostic Orchestration:** Serving as a flexible, model-agnostic orchestration layer across frontier models (such as Gemini, Claude, and OpenAI) and specialized media-generation models.
+
+Levea’s planning layer combines frontier multimodal and reasoning models with domain-specific editing policies, structured media representations, and constrained tool execution.
+
+This layer operates probabilistically to handle high-level creative synthesis:
+
+* **Planning and Layout Intents:** Translates prompts, transcripts, source footage, and visual references into a structured, executable task graph.
+* **Linguistic and Semantic Segmentation:** Divides spoken lines into natural phrase breaks, setup clauses, emphasis words, statistics, questions, and punchlines.
+* **Editorial Reasoning:** Determines cuts, pacing, transitions, B-roll placements, sound-design cues, caption emphasis, and motion-graphics opportunities.
+* **Model and Tool Selection:** Chooses whether an operation should be executed by a deterministic media operator, computer-vision system, or specialised generative model.
+* **Model-Agnostic Orchestration:** Works across frontier models such as Gemini, Claude, and OpenAI, as well as specialised video, image, voice, music, and vision models.
 
 ### 2. The Typed Edit Graph / Media IR
-The strategic core of Levea is its intermediate representation (IR)—a structured, serializable Abstract Syntax Tree (the Scene Graph) representing your editing state. This Typed Edit Graph is the foundation of Levea's editing moat, enabling:
-*   **Editability & Replayability:** Re-rendering and modifying specific elements without needing to regenerate the entire video from scratch.
-*   **Project Versioning & Diffs:** Enabling Git-like, non-destructive timeline commits and seamless Undo/Redo cycles.
-*   **Model Portability & Verification:** Decoupling the creative model's intent from the final render, allowing automated safety verifications before compiling.
+
+The strategic core of Levea is its intermediate representation: a structured and serializable Scene Graph representing the complete editing state.
+
+The Typed Edit Graph enables:
+
+* **Editability and Replayability:** Modify or re-render individual elements without regenerating the entire video.
+* **Persistent Project State:** Natural-language revisions update an existing production rather than starting from an opaque generated file.
+* **Project Versioning and Diffs:** Maintain Git-like, non-destructive timeline history with Undo and Redo.
+* **Model Portability:** Decouple creative intent from any single foundation-model provider.
+* **Partial Regeneration:** Re-run only the affected scene, layer, asset, or operation where possible.
+* **Automated Verification:** Inspect planned and executed edits before final export.
 
 ### 3. The Deterministic Video-Production Harness
-A common misconception is to define a "harness" too narrowly as only the renderer. A true harness is the entire deterministic software environment that surrounds the AI model, giving its probabilistic reasoning persistent state, structured tools, automated verification, and repeatable execution:
-*   **Timeline and Scene Graph:** Maintains the state-of-truth and track-relative alignments.
-*   **Media Operators:** Standardized, repeatable functions to cut silences, sync multi-cam tracks, and crop visual frames.
-*   **Caption and Layout Engine:** Advanced text shaping (`cosmic-text` / HarfBuzz) and real-time bounding box constraints (avoiding faces and social media safe zones).
-*   **Animation System & Renderer (Vulkan / WebGPU):** Computes smooth, 60 FPS velocity-proportional motion blur speed-streaks (`velocity.rs`) and compiles hardware-accelerated layouts.
-*   **Validators & Versioning:** Structural verification loops that run final safe-zone checks and track timeline versioning.
-*   **Export Pipeline:** Handles multi-platform packaging (FFmpeg, NVENC, H.264) for final delivery.
+
+The harness is not only the renderer. It is the complete deterministic software environment surrounding the probabilistic intelligence layer.
+
+It gives the system persistent state, typed production tools, verification, bounded repair, and repeatable execution:
+
+* **Timeline and Scene Graph:** Maintains the source of truth for layers, tracks, scenes, timing, nesting, and relative alignment.
+* **Media Operators:** Executes silence removal, filler-word cleanup, cutting, trimming, retiming, multicamera synchronisation, cropping, reframing, compositing, and audio operations.
+* **Caption and Layout Engine:** Handles Unicode-aware text shaping, multilingual typography, line breaking, face avoidance, bounding constraints, and social-media safe zones.
+* **Animation and Motion System:** Executes keyframes, transitions, kinetic typography, procedural motion graphics, tracking, camera movement, and velocity-aware motion effects.
+* **Generative Media Adapters:** Invokes video, image, voice, music, inpainting, OCR, and computer-vision models through structured interfaces.
+* **Renderer:** Compiles GPU-accelerated compositions through native Vulkan and browser WebGPU rendering paths.
+* **Validators and Versioning:** Runs structural checks, safe-zone validation, requirement tracking, timeline history, and bounded repair loops.
+* **Export Pipeline:** Handles FFmpeg, NVENC, H.264, and multi-platform delivery packaging.
 
 ---
 
 ## Operating Model Comparison
 
-| Workflow Aspect | Traditional Editing | Levea Agentic Production |
-| :--- | :--- | :--- |
-| **User Interaction** | Human directly manipulates the timeline | Agent manipulates a typed project on the user’s behalf |
-| **Workflow Coordination** | User coordinates individual, isolated tools | Agent plans and orchestrates the complete workflow |
-| **Primary Output** | Final exported flat file is the sole output | Editable project state and rendered media are both outputs |
-| **Quality Control** | Quality control and bounds checks are manual | Automated verification checks run before delivery |
-| **Revisions** | Revisions require manually reopening the timeline | Natural-language revisions modify persistent project state |
+| Workflow Aspect           | Traditional Editing                                            | Levea Agentic Production                                            |
+| ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **User Interaction**      | Human directly manipulates the timeline                        | Agent manipulates a typed project on the user’s behalf              |
+| **Workflow Coordination** | User coordinates individual tools and operations               | Agent plans and orchestrates the complete workflow                  |
+| **Production State**      | State is primarily managed through the editor interface        | State is represented as a structured and serializable media program |
+| **Primary Output**        | Final exported flat file is usually the main output            | Editable project state and rendered media are both outputs          |
+| **Quality Control**       | Timing, layout, and delivery checks are primarily manual       | Automated verification runs before delivery                         |
+| **Revisions**             | Revisions require manually reopening and changing the timeline | Natural-language revisions modify persistent project state          |
+| **Generative Models**     | Used as separate asset-generation tools                        | Operate as engines within a controlled production workflow          |
 
 ---
 
 ## Contents
 
 1. [Quickstart](#quickstart) — running in 60 seconds
-2. [What it does](#what-it-does) — say it, get it
-3. [Capability surface](#capability-surface) — the full toolset
-4. [Goals & briefs](#goals--briefs) — from one line to a full creative brief
-5. [API reference](#api-reference) — endpoints, request/response, streaming, async
-6. [Who it's for](#who-its-for) · [Safety](#safety--limits) · [Media](#supported-media)
-7. [Links & channels](#links--channels)
+2. [What it does](#what-it-does) — describe the outcome
+3. [Capability surface](#capability-surface) — implemented production tools
+4. [Goals and briefs](#goals--briefs) — from a direct command to a creative brief
+5. [API reference](#api-reference) — endpoints and execution visibility
+6. [Links and channels](#links--channels)
 
 ---
 
 ## Quickstart
 
-The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)** MCP server — one server, every MCP client (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes), one tool surface, one backend contract, so nothing drifts per platform.
+The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)** MCP server—one server for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes, and other MCP-compatible clients.
 
-**1. Get an API key** — sign up at **[studio.livecore.ai](https://studio.livecore.ai)** and generate an OpenClaw API key.
+Every integration uses the same tool surface and backend contract, preventing editing behaviour from drifting between platforms.
 
-**2. Add the MCP server** — the same `npx` line works for every MCP client:
+### 1. Get an API key
+
+Sign up at **[studio.livecore.ai](https://studio.livecore.ai)** and generate a Levea API key.
+
+### 2. Add the MCP server
 
 ```jsonc
 {
@@ -111,112 +137,222 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
 }
 ```
 
-**3. Use it** — describe the desired outcome. Levea plans, edits, verifies, and exports the video—without requiring manual timeline work, keyframing, or plugin orchestration.
+### 3. Use it
+
+Describe the desired outcome:
+
+> “Use Levea to turn this video into five viral clips, remove silences, add captions, reframe each clip vertically, track the active speaker, and export for Reels and Shorts.”
+
+Levea plans, edits, verifies, and exports the video without requiring manual timeline work, keyframing, or plugin orchestration.
 
 ### Per-client setup
 
-| Client | How |
-|---|---|
-| Claude Desktop | Add to `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Claude Code | Run `claude mcp add levea npx -y levea-mcp-server` |
-| Cursor | Add in Settings → Features → MCP as a standard command tool |
-| Cline | Configure in settings or add to your Cline MCP servers list |
-| OpenClaw | Install via terminal: `clawhub install ai-agentic-video-editor` |
+| Client             | How                                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Desktop** | Add the `levea` configuration to `~/Library/Application Support/Claude/claude_desktop_config.json`                          |
+| **Claude Code**    | Run `claude mcp add levea npx -y levea-mcp-server`                                                                          |
+| **Cursor**         | Add Levea under Settings → Features → MCP as a command-based server                                                         |
+| **Cline**          | Add the same configuration to the Cline MCP server list                                                                     |
+| **OpenClaw**       | Run `clawhub install ai-agentic-video-editor`                                                                               |
+| **Hermes**         | Register `levea-mcp-server` as an MCP server verifiable video projects rather than returning only an opaque generated clip. |
+
+* **TikTok and Reels Pr**
+
+  |   |
+  | - |
+
+  ---
+
+  ## What it does
+
+  Levea produces editable and**eparation:**
+  *“Make this clip vertical, remove silences, add bold captions, and keep the speaker centred.”*
+
+* **Viral Clip Batching:**
+  *“Turn this long video into five 15–30 second viral clips.”*
+
+* **Background Replacement:**
+  *“Remove the background, add a modern studio, and preserve the speaker’s edges and framing.”*
+
+* **Contextual B-Roll Placement:**
+  *“Add relevant B-roll over the product mention, generate missing footage, and duck the music under speech.”*
+
+* **Multicamera Angle Switching:**
+  *“Synchronise the podcast cameras and switch between them according to the active speaker.”*
+
+* **Object Removal:**
+  *“Remove the microphone stand, track the affected region, and reconstruct the background.”*
+
+* **Brand Styling:**
+  *“Apply our fonts, colours, logo, captions, lower thirds, and motion-graphics system.”*
+
+* **Multilingual Captions:**
+  *“Add Arabic and English captions with correct bidirectional layout and word-level highlighting.”*
+
+* **Compliance and Redaction:**
+  *“Blur background faces, hide the licence plate, bleep profanity, repair safe zones, and run a final delivery check.”*
 
 ---
 
-## What it does
+## Capability Surface
 
-Levea produces editable, verifiable video projects in minutes rather than returning an opaque generated clip. Here are some examples of what you can accomplish:
+The implemented production toolset behind the prompt. Generative and computer-vision models act as execution engines inside Levea—not as the owners of the workflow.
 
-*   **TikTok / Reels Prep:** *"Make this clip vertical, remove silences, and add bold captions."*
-*   **Viral Clip Batching:** *"Turn this long video into five 15-30 second viral clips."*
-*   **AI Green-Screen Replacement:** *"Key out the green screen, add a studio background, and keep the speaker centered."*
-*   **Contextual B-Roll Placement:** *"Add B-roll over the product mention and duck the music under speech."*
-*   **Multi-Cam Angle Switching:** *"Sync the podcast angles and cut between cameras based on the active speaker."*
-*   **Brand Styling:** *"Add motion graphics, lower thirds, stat callouts, and brand colors."*
-*   **Compliance & Redaction:** *"Blur background faces, hide the license plate, repair safe zones, and run a final delivery check."*
+### ✅ Implemented Capabilities
 
----
+* **Timeline State and Structural Editing** — insert, update, replace, duplicate, group, or delete video, audio, image, text, shape, solid, adjustment, light, VFX, Lottie, and Rive layers; supports nesting, trimming, splitting, sequencing, retiming, track-relative alignment, and non-destructive project history.
 
-## Capability surface
+* **Footage Understanding and Search** — scene detection, shot segmentation, speaker diarisation, active-speaker detection, face and object detection, narrative-peak discovery, transcript search, sentiment analysis, and cross-asset identity search.
 
-The full toolset behind the prompt. Generative models act as engines inside Levea—not the owners of the workflow:
+* **Caption and Multilingual Text Engine** — automatic captions, word-level timing, keyword emphasis, kinetic typography, curved text paths, Unicode-aware shaping, and rendering for Latin, non-Latin, CJK, bidirectional, and right-to-left scripts.
 
-### 🟢 Production-Ready
-*   **Timeline State & Layers** — insert, update, replace, or delete layers (video, audio, image, text, shape, solid, adjustment, group, light, vfx, lottie); track-relative alignments and nesting.
-*   **Caption & Text Engines** — auto-generate captions from the transcript; shape text along curved paths (circle, wave, custom SVG); dual-font visual contrast (Inter setup + Display punchline).
-*   **Audio & Music** — parametric EQ, loudness (LUFS) normalization, EQ presets, crossfades, background music loops, and auto-ducking.
-*   **Color Grading & Compositing** — LUT filters, lift/gamma/gain wheels, neural matting, chroma key, mask blocks, and vignettes.
-*   **Privacy & Compliance** — face blur, privacy redaction, and profanity muting.
-*   **High-Level Presets** — vertical reframing, viral clips generation, active-word keyword emphasis, and silence cleanup.
+* **Motion Tracking and Reframing** — face-aware and subject-aware tracking, automatic zoom-follow framing, active-speaker camera movement, caption-safe vertical reframing, tracked overlays, and text-region-aware cropping.
 
-### 🟡 Beta / Model-Dependent
-*   **AI B-Roll & Generative Media** — prompt-driven stock footage retrieval, generative voiceovers (TTS and cloned voices), and procedural image-to-video expansions.
-*   **Motion Tracking** — face-aware motion tracking and automatic zoom-follow framing.
-*   **Lottie & Rive Runtimes** — interactive vector rendering and procedural Lottie chart builders.
+* **Lottie, Rive, and Motion Graphics** — Lottie and Rive runtime rendering, procedural property control, animated charts, counters, lower thirds, title cards, timelines, diagrams, geographic callouts, and transcript-driven visualisations.
 
-### 🔴 Roadmap
-*   Content-aware object removal (AI mask + inpaint).
-*   On-screen text content OCR recognition (region detection is fully supported today).
-*   Non-Latin, CJK, and RTL caption rendering (currently optimized for Latin-ASCII scripts).
+* **AI B-Roll and Generative Media** — contextual stock-footage retrieval, AI-generated B-roll, image generation and editing, image-to-video expansion, video generation, generative voiceovers, cloned voices, music, and sound effects.
+
+* **Object Removal and Background Processing** — neural matting, background removal and replacement, chroma keying, content-aware object removal, AI-generated masks, mask tracking, inpainting, and background reconstruction.
+
+* **On-Screen Text Intelligence** — detects text regions, recognises visible content through OCR, and uses spatial metadata for search, reframing, replacement, redaction, and layout avoidance.
+
+* **Audio Production** — silence and filler-word removal, word-level muting, parametric EQ, noise reduction, LUFS normalisation, true-peak limiting, crossfades, background-music looping, voiceovers, and automatic speech/music ducking.
+
+* **Colour Grading and Compositing** — LUTs, lift/gamma/gain controls, curves, blend modes, masks, neural mattes, gradients, glow, shadows, vignettes, adjustment layers, and GPU-accelerated visual effects.
+
+* **Animation and Rendering** — keyframes, transitions, per-word animations, procedural camera movement, velocity-aware effects, motion blur, native Vulkan rendering, browser WebGPU rendering, and deterministic scene compilation.
+
+* **Privacy and Compliance** — face blurring, background-face blurring, licence-plate redaction, region-based privacy masking, profanity cleanup, protected-region avoidance, safe-zone validation, and final delivery checks.
+
+* **High-Level Production Workflows** — viral-clip generation, long-form repurposing, podcast editing, multicamera switching, vertical reframing, branded motion graphics, generative B-roll placement, thumbnail generation, and multi-platform exports.
 
 ---
 
-## Goals & briefs
+## Goals & Briefs
 
-`autonomous_edit` accepts anything from a five-word command to a five-hundred-word creative brief.
+`autonomous_edit` accepts anything from a short command to a detailed creative brief.
 
-**1. Direct commands** — a single edit, single result. The [What it does](#what-it-does) examples above are all direct commands.
+### 1. Direct commands
 
-**2. Open-ended goals** — hand the agent a *goal* instead of a command; it inspects the asset, then proposes a plan:
+A direct command requests a specific edit:
 
 ```text
-"Watch this and propose edits to make it more engaging for TikTok"
-"Look at the first 30 seconds and suggest 3 ways to hook the viewer"
-"Review this footage and propose edits to tighten the pacing"
+Remove the silences, add captions, and export vertically.
 ```
 
-Pair these with `requirePlanApproval: true` for propose-only mode — the agent stops after planning and waits for your approval before execution.
+```text
+Remove the background and replace it with a modern studio.
+```
+
+```text
+Generate B-roll over each product mention.
+```
+
+### 2. Open-ended goals
+
+An open-ended goal asks Levea to inspect the footage and propose an editing strategy:
+
+```text
+Watch this and propose edits to make it more engaging for TikTok.
+```
+
+```text
+Review the opening 30 seconds and suggest three stronger hooks.
+```
+
+```text
+Analyse the footage and propose a tighter narrative structure.
+```
+
+Pair these requests with `requirePlanApproval: true` for propose-only mode. The agent stops after planning and waits for approval before execution.
+
+### 3. Full creative briefs
+
+A creative brief can combine many production requirements into one planned workflow:
+
+```text
+Transform this interview into a polished social documentary.
+
+Remove the opening dead air and tighten pauses throughout the conversation.
+Find the strongest 45-second narrative section and create a vertical version.
+Keep the active speaker centred without covering the existing lower thirds.
+Add multilingual captions with phrase-aware emphasis.
+Insert contextual B-roll over product and location references.
+Generate missing B-roll where suitable footage is unavailable.
+Apply our brand fonts, logo, colours, and lower-third system.
+Add subtle background music with automatic ducking.
+Remove the microphone stand using tracked masking and inpainting.
+Blur background faces and visible licence plates.
+Animate the two most important statistics as callouts.
+Export versions for TikTok, Reels, Shorts, and YouTube.
+Run final timing, layout, safe-zone, and delivery checks.
+```
+
+The agent converts the brief into a Typed Edit Graph, executes it through the production harness, verifies the resulting project, and exports every requested format.
 
 ---
 
-## API reference
+## API Reference
 
-Base URL: `{LEVEA_API_URL}` (production: `https://api.livecore.ai`). Auth on every request:
+Base URL:
+
+```text
+https://api.livecore.ai
+```
+
+Authentication:
 
 ```http
 Authorization: Bearer {LEVEA_API_KEY}
 ```
 
-All paths are under `/api/v1/misc/openclaw`. For complete internal schemas, payload contracts, deduplication rules, and response objects, please refer to **[AGENTS.md](./AGENTS.md)**.
+All paths are under:
+
+```text
+/api/v1/misc/openclaw
+```
+
+For complete schemas, payload contracts, deduplication rules, approval-loop semantics, and response objects, see **[AGENTS.md](./AGENTS.md)**.
 
 ### Core endpoints
 
-| Verb | Path | What it does |
-|---|---|---|
-| `POST` | `/v1/execute` | Primary endpoint. Executes a prompt and returns the results. |
-| `POST` | `/v1/execute_streaming` | SSE stream of step-by-step progress updates. |
-| `POST` | `/v1/queue-edit` | Enqueues background render or generation jobs. |
-| `GET`  | `/v1/jobs/{jobId}` | Polls async job or render statuses. |
+| Verb   | Path                    | What it does                                                 |
+| ------ | ----------------------- | ------------------------------------------------------------ |
+| `POST` | `/v1/execute`           | Primary endpoint for executing an autonomous edit            |
+| `POST` | `/v1/execute_streaming` | SSE stream of structured execution progress                  |
+| `POST` | `/v1/queue-edit`        | Enqueues asynchronous editing, generation, or rendering work |
+| `GET`  | `/v1/jobs/{jobId}`      | Returns asynchronous job or render status                    |
 
-### Progressive Execution Visibility (SSE Streaming)
+### Progressive Execution Visibility
 
-The `/v1/execute_streaming` endpoint returns a Server-Sent Events (SSE) stream of structured events representing the editor's live execution progress. These events expose useful API concepts:
+The `/v1/execute_streaming` endpoint returns a Server-Sent Events stream containing useful execution information:
 
-*   **`plan_step`:** Details the structured task list compiled by the DAG layout planner.
-*   **`progress`:** Numeric execution progress percentage.
-*   **`decision_summary`:** Concise structural rationale behind tool selections.
-*   **`execution_update`:** Specific real-time updates of running media operators.
+* **`plan_step`** — a planned operation in the compiled task graph
+* **`progress`** — current execution progress
+* **`decision_summary`** — concise explanation of a workflow or tool selection
+* **`execution_update`** — real-time update from a running media operator
+* **`tool_call`** — structured production-tool invocation
+* **`tool_result`** — result returned by the invoked tool
+* **`background_job_completed`** — completion of asynchronous generation or rendering
+* **`success`** — verified terminal success
+* **`partial_success`** — completed workflow with explicitly unresolved requirements
+* **`error`** — terminal execution failure
+
+These events expose execution state and concise decision summaries, not private model reasoning.
 
 ---
 
-## Links & channels
+## Links & Channels
 
-| Asset | Link |
-|---|---|
-| Playwright Test Matrix | [all-kinetic-matrix.html](./all-kinetic-matrix.html) |
-| Sign up + API keys | [studio.livecore.ai](https://studio.livecore.ai/) |
-| API base | `https://api.livecore.ai` |
+| Asset                  | Link                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| npm MCP server         | [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)              |
+| ClawHub plugin         | [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor) |
+| ClawHub skill          | [`ai-agentic-video-editor`](https://clawhub.ai/skills/ai-agentic-video-editor)    |
+| Playwright Test Matrix | [all-kinetic-matrix.html](./all-kinetic-matrix.html)                              |
+| Sign up and API keys   | [studio.livecore.ai](https://studio.livecore.ai/)                                 |
+| API base               | `https://api.livecore.ai`                                                         |
 
 **Support** — setup help, integration questions, or issue reports: `brajendrak00068@gmail.com`
+
+**Licence** — MIT
