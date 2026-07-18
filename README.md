@@ -6,7 +6,6 @@
 
 > **The agentic production environment for video.** Levea combines probabilistic multimodal intelligence with a deterministic production harness to plan, execute, verify, and revise complete video edits from natural-language instructions.
 
-\
 
 > **Product distinction:** Unlike one-shot video generators, Levea maintains an editable project containing the timeline, assets, layout, animation, audio, brand rules, generative instructions, and delivery requirements. Generative models operate as engines inside the workflow—not as the owner of the workflow.
 
