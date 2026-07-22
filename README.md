@@ -49,12 +49,12 @@ The planning layer interprets prompts, transcripts, project state, source footag
 
 The hosted planner currently uses Gemini through Google AI or Vertex AI. The surrounding contracts are designed to remain provider-portable, and Claude, OpenAI, Cursor, Cline, OpenClaw, Hermes, and other MCP-capable systems can call Levea as clients.
 
-### 2. Workflow DAG and Scene v4 IR
+### 2. Workflow DAG and Scene IR
 
 These are related but distinct structures:
 
 - The **Workflow DAG** represents the ordered editing work, dependencies, execution state, verification requirements, and asynchronous jobs.
-- The **Scene v4 IR** is the serializable media program: canvas, timeline, layers, timing, transforms, effects, captions, animation, audio, and asset references.
+- The **Scene IR** is the serializable media program: canvas, timeline, layers, timing, transforms, effects, captions, animation, audio, and asset references.
 
 Keeping intent, execution, and renderable state separate makes edits inspectable, replayable, and independently repairable.
 
@@ -62,7 +62,7 @@ Keeping intent, execution, and renderable state separate makes edits inspectable
 
 Typed production operators apply the plan to the scene. Structural and perceptual verification runs during the workflow, and bounded repair can correct supported failures before the project is committed.
 
-The renderer compiles Scene v4 compositions through native Vulkan and browser WebGPU paths. Cross-renderer parity is tested, but pixel-identical output should not be assumed for every effect or device.
+The renderer compiles Scene compositions through native Vulkan and browser WebGPU paths. Cross-renderer parity is tested, but pixel-identical output should not be assumed for every effect or device.
 
 ### 4. Versioning and export
 
@@ -135,7 +135,7 @@ Capability availability varies by deployment, enabled models, media type, and ac
 
 ### Supported production paths
 
-- **Project and timeline state:** Scene v4 projects, layer insertion and updates, grouping, trimming, splitting, sequencing, retiming, track-relative alignment, and durable undo/redo.
+- **Project and timeline state:** Scene projects, layer insertion and updates, grouping, trimming, splitting, sequencing, retiming, track-relative alignment, and durable undo/redo.
 - **Captions and motion graphics:** automatic captions, word timing, keyword emphasis, caption templates, lower thirds, title cards, charts, counters, diagrams, Lottie, Rive, and procedural animation.
 - **Layout and perception:** scene and shot analysis, face detection, active-speaker workflows, on-screen text-region detection, protected regions, social safe zones, and explicit-region tracking or masking.
 - **Compositing:** chroma key, masks, blend modes, colour controls, adjustment layers, alpha-matte background replacement, and GPU effects.
