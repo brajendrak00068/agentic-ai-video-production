@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.brajendrak00068/levea-mcp-server",
-  "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export",
+  "description": "Open-source MCP client for Levea autonomous AI video editor: viral clips, captions, reframe, chroma key, cloud MP4 export",
   "status": "active",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "repository": {
     "url": "https://github.com/brajendrak00068/agentic-ai-video-production",
     "source": "github",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "levea-mcp-server",
-      "version": "0.5.0",
+      "version": "0.5.2",
       "transport": {
         "type": "stdio"
       },
