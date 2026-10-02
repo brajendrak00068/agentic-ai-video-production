@@ -1,0 +1,19 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Levea AI Video Editor",
+  "name_for_model": "levea_ai_video_editor",
+  "description_for_human": "Autonomous AI video editor. Create viral clips, 40+ caption styles, vertical 9:16 reframe, motion graphics & voiceovers.",
+  "description_for_model": "Autonomous AI video editor that turns natural language creative direction into finished MP4 videos. Can generate viral clips, add 40+ caption styles with word-by-word animation, reframe to 9:16 vertical with active speaker tracking, remove silences, add motion graphics, and export video deliverables.",
+  "auth": {
+    "type": "user_http",
+    "authorization_type": "bearer"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://studio.livecore.ai/openapi.json",
+    "is_user_authenticated": true
+  },
+  "logo_url": "https://studio.livecore.ai/favicon.svg",
+  "contact_email": "support@livecore.ai",
+  "legal_info_url": "https://studio.livecore.ai/privacy"
+}
