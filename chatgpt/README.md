@@ -20,8 +20,8 @@ This folder contains the complete configuration and OpenAPI specification for pu
 3. **Authentication**:
    - **Type**: `API Key`
    - **Auth Type**: `Bearer`
-   - **API Key**: Enter a Levea API key (from [studio.livecore.ai](https://studio.livecore.ai/)).
-4. **Privacy Policy**: `https://studio.livecore.ai/privacy`.
+   - **API Key**: Enter a Levea API key (from [livecore.ai](https://livecore.ai/)).
+4. **Privacy Policy**: `https://livecore.ai/privacy`.
 
 ## 3. Publish to the GPT Store
 

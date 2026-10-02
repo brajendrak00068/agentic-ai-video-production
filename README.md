@@ -7,9 +7,16 @@
 [![ClawHub Plugin](https://img.shields.io/badge/ClawHub-Plugin-blue)](https://clawhub.ai/plugins/openclaw-ai-video-editor)
 [![ClawHub Skill](https://img.shields.io/badge/ClawHub-Skill-orange)](https://clawhub.ai/skills/levea-ai-video-editor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
-[![Listed on Claude AI Directory](https://www.claudeai.directory/badge/levea?theme=dark)](https://www.claudeai.directory/launches/levea)
 
-> **Beta Notice:** Agentic edits can make mistakes. Always preview every output before publishing. For production-safe and high-impact workflows, use `requirePlanApproval: true` to halt execution after the planning phase and inspect the proposed edit list.
+<p align="left">
+  <a href="https://www.claudeai.directory/launches/levea" target="_blank" rel="noopener">
+    <img src="https://www.claudeai.directory/badge/levea?theme=dark" alt="Levea - Listed on Claude AI Directory" width="220" height="54" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://livecore.ai/openapi.json" target="_blank" rel="noopener">
+    <img src="https://raw.githubusercontent.com/brajendrak00068/agentic-ai-video-production/main/chatgpt/chatgpt-badge.svg" alt="Levea - Available on ChatGPT Store" width="220" height="54" />
+  </a>
+</p>
 
 ---
 

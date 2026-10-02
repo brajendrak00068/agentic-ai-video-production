@@ -10,10 +10,10 @@
   },
   "api": {
     "type": "openapi",
-    "url": "https://studio.livecore.ai/openapi.json",
+    "url": "https://livecore.ai/openapi.json",
     "is_user_authenticated": true
   },
-  "logo_url": "https://studio.livecore.ai/favicon.svg",
+  "logo_url": "https://livecore.ai/favicon.svg",
   "contact_email": "support@livecore.ai",
-  "legal_info_url": "https://studio.livecore.ai/privacy"
+  "legal_info_url": "https://livecore.ai/privacy"
 }
