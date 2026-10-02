@@ -42,9 +42,15 @@ async function main() {
       throw new Error('TOOLS array is missing or invalid in compiled dist/index.js');
     }
 
-    log(`Found ${TOOLS.length} tools. Syncing schemas into manifest._meta...`);
+    log(`Found ${TOOLS.length} tools. Syncing schemas into manifest.tools and manifest._meta...`);
 
-    // Format tools to fit the object dictionary schema expected by MCPB spec
+    // 1. Sync array of tools for MCPB / Smithery capability inspection
+    manifest.tools = TOOLS.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+    }));
+
+    // 2. Format tools to fit the object dictionary schema expected by MCPB spec
     const toolsObj = {};
     for (const tool of TOOLS) {
       toolsObj[tool.name] = {
@@ -68,6 +74,39 @@ async function main() {
   log('Packaging bundle into server.mcpb...');
   const packResult = runCmd('npx -y @anthropic-ai/mcpb pack . server.mcpb');
   if (!packResult.success) {
+    process.exit(1);
+  }
+
+  // 3b. Inject full inputSchema into manifest.json inside server.mcpb for Smithery capability indexing
+  // Note: @anthropic-ai/mcpb validate rejects inputSchema in manifest.tools, but Smithery API requires it.
+  log('Injecting full inputSchema into server.mcpb for Smithery capability introspection...');
+  const pyInjectCmd = `python3 -c "
+import zipfile, json, os
+mcpb_path = os.path.join(os.getcwd(), 'server.mcpb')
+with zipfile.ZipFile(mcpb_path, 'r') as zin:
+    manifest = json.loads(zin.read('manifest.json').decode('utf-8'))
+with open('manifest.json') as f:
+    local_manifest = json.load(f)
+manifest['tools'] = [
+    {
+        'name': name,
+        'description': info.get('description', ''),
+        'inputSchema': info.get('inputSchema', {'type': 'object', 'properties': {}})
+    }
+    for name, info in local_manifest.get('_meta', {}).get('tools', {}).items()
+]
+tmp_path = mcpb_path + '.tmp'
+with zipfile.ZipFile(mcpb_path, 'r') as zin:
+    with zipfile.ZipFile(tmp_path, 'w') as zout:
+        for item in zin.infolist():
+            if item.filename == 'manifest.json':
+                zout.writestr(item, json.dumps(manifest, indent=2))
+            else:
+                zout.writestr(item, zin.read(item.filename))
+os.replace(tmp_path, mcpb_path)
+"`;
+  const injectResult = runCmd(pyInjectCmd);
+  if (!injectResult.success) {
     process.exit(1);
   }
 

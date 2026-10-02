@@ -14,8 +14,8 @@ configSchema:
 
 commandFunction: |-
   (config) => ({
-    command: 'node',
-    args: ['dist/index.js'],
+    command: 'npx',
+    args: ['-y', 'levea-mcp-server'],
     env: {
       LEVEA_API_URL: config?.LEVEA_API_URL || 'https://api.livecore.ai',
       LEVEA_API_KEY: config?.LEVEA_API_KEY || ''

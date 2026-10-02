@@ -7,6 +7,7 @@
 [![ClawHub Plugin](https://img.shields.io/badge/ClawHub-Plugin-blue)](https://clawhub.ai/plugins/openclaw-ai-video-editor)
 [![ClawHub Skill](https://img.shields.io/badge/ClawHub-Skill-orange)](https://clawhub.ai/skills/levea-ai-video-editor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+[![Listed on Claude AI Directory](https://www.claudeai.directory/badge/levea?theme=dark)](https://www.claudeai.directory/launches/levea)
 
 > **Beta Notice:** Agentic edits can make mistakes. Always preview every output before publishing. For production-safe and high-impact workflows, use `requirePlanApproval: true` to halt execution after the planning phase and inspect the proposed edit list.
 
