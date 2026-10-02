@@ -1,6 +1,6 @@
 {
   "name": "levea-mcp-server",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Open-source MCP client for Levea autonomous AI video editor — natural-language video editing (viral clips, captions, vertical reframe, chroma key, audio cleanup, motion tracking, B-roll, voiceover, music, cloud MP4 export) for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, and Hermes.",
   "mcpName": "io.github.brajendrak00068/levea-mcp-server",
   "main": "dist/index.js",
