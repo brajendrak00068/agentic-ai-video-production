@@ -44,18 +44,43 @@ async function main() {
 
     log(`Found ${TOOLS.length} tools. Syncing schemas into manifest.tools and manifest._meta...`);
 
-    // 1. Sync array of tools for MCPB / Smithery capability inspection
+    delete manifest.prompts;
+    delete manifest.resources;
+    manifest.homepage = 'https://livecore.ai/';
+    manifest.repository = {
+      type: 'git',
+      url: 'https://github.com/brajendrak00068/agentic-ai-video-production'
+    };
+    manifest.icon = 'icon.png';
+
+    // 1. Sync array of tools for MCPB validator (must only have name & description)
     manifest.tools = TOOLS.map((tool) => ({
       name: tool.name,
       description: tool.description,
     }));
 
-    // 2. Format tools to fit the object dictionary schema expected by MCPB spec
+    // 2. Format tools to fit the object dictionary schema with inputSchema, outputSchema, annotations
     const toolsObj = {};
     for (const tool of TOOLS) {
+      const isReadOnly = ['list_assets', 'list_projects', 'get_brand_kit', 'list_brand_kits', 'list_caption_templates', 'check_job_status', 'check_task_status', 'get_active_task', 'editor_health'].includes(tool.name);
       toolsObj[tool.name] = {
         description: tool.description,
-        inputSchema: tool.inputSchema
+        inputSchema: tool.inputSchema,
+        outputSchema: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', description: 'Whether the operation succeeded' },
+            export_url: { type: 'string', description: 'Direct URL to finished MP4 render' },
+            jobId: { type: 'string', description: 'Asynchronous job ID' },
+            summary: { type: 'string', description: 'Summary of actions executed' },
+            result: { type: 'object', description: 'Execution outcome payload' },
+            error: { type: 'string', description: 'Error message if failed' }
+          }
+        },
+        annotations: {
+          readOnlyHint: isReadOnly,
+          audience: ['user', 'assistant']
+        }
       };
     }
 
@@ -87,11 +112,18 @@ with zipfile.ZipFile(mcpb_path, 'r') as zin:
     manifest = json.loads(zin.read('manifest.json').decode('utf-8'))
 with open('manifest.json') as f:
     local_manifest = json.load(f)
+manifest['homepage'] = 'https://livecore.ai/'
+manifest['repository'] = 'https://github.com/brajendrak00068/agentic-ai-video-production'
+manifest['icon'] = 'icon.png'
+manifest['prompts'] = local_manifest.get('prompts', [])
+manifest['resources'] = local_manifest.get('resources', [])
 manifest['tools'] = [
     {
         'name': name,
         'description': info.get('description', ''),
-        'inputSchema': info.get('inputSchema', {'type': 'object', 'properties': {}})
+        'inputSchema': info.get('inputSchema', {'type': 'object', 'properties': {}}),
+        'outputSchema': info.get('outputSchema', {'type': 'object', 'properties': {}}),
+        'annotations': info.get('annotations', {'readOnlyHint': False})
     }
     for name, info in local_manifest.get('_meta', {}).get('tools', {}).items()
 ]
