@@ -8,6 +8,7 @@ This folder contains the complete configuration and OpenAPI specification for pu
 
 1. Go to **[https://chatgpt.com/gpts/editor](https://chatgpt.com/gpts/editor)** (or your profile → **My GPTs** → **Create a GPT**).
 2. Switch to the **Configure** tab:
+   - **Logo / Avatar**: Click the circle icon at the top and upload `logo.png` (from this folder).
    - **Name**: `Levea — AI Video Editor`
    - **Description**: `Autonomous prompt-to-video editor. Generate viral clips, 40+ caption styles, vertical 9:16 reframe, motion graphics, voiceovers & B-roll.`
    - **Instructions**: Copy & paste from `INSTRUCTIONS.md`.
