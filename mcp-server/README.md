@@ -29,7 +29,7 @@
 
 The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)** MCP server — one server, every MCP client (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes), one tool surface, one backend contract, so nothing drifts per platform.
 
-**1. Get an API key** — sign up at **[studio.livecore.ai](https://studio.livecore.ai)** and generate an OpenClaw API key.
+**1. Get an API key** — sign up at **[livecore.ai](https://livecore.ai)** and generate an OpenClaw API key.
 
 **2. Add the MCP server** — the same `npx` line works for every MCP client:
 
@@ -41,7 +41,7 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
       "args": ["-y", "levea-mcp-server"],
       "env": {
         "LEVEA_API_URL": "https://api.livecore.ai",
-        "LEVEA_API_KEY": "your-key-from-studio.livecore.ai"
+        "LEVEA_API_KEY": "your-key-from-livecore.ai"
       }
     }
   }
@@ -68,7 +68,7 @@ Every client calls the **same backend** — the MCP server, this ClawHub listing
 | Host | Use |
 |---|---|
 | **https://api.livecore.ai** | Functional API. Set as `LEVEA_API_URL`. The client appends `/api/v1/misc/openclaw/v1/execute` automatically — never put a full path here. |
-| **https://studio.livecore.ai** | API-key portal (UI). Get your key here. Do **not** use as `LEVEA_API_URL`. |
+| **https://livecore.ai** | API-key portal (UI). Get your key here. Do **not** use as `LEVEA_API_URL`. |
 
 > Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`.
 
@@ -249,7 +249,7 @@ All paths are under `/api/v1/misc/openclaw`.
 
 Each management group above is also exposed as a typed MCP tool (see [Tools the AI sees](#tools-the-ai-sees)).
 
-> `LEVEA_API_URL` is the bare host `https://api.livecore.ai` — not a full path, not `studio.livecore.ai`, and not the in-product `/api/v1/misc/editor/` route.
+> `LEVEA_API_URL` is the bare host `https://api.livecore.ai` — not a full path, not `livecore.ai`, and not the in-product `/api/v1/misc/editor/` route.
 
 ### Request
 
@@ -427,7 +427,7 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 | ClawHub plugin | [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor) |
 | ClawHub skill (agentic) | [ai-agentic-video-editor](https://clawhub.ai/skills/ai-agentic-video-editor) |
 | ClawHub skill (Levea brand) | [levea-ai-video-editor](https://clawhub.ai/skills/levea-ai-video-editor) |
-| Sign up + API keys | [studio.livecore.ai](https://studio.livecore.ai/) |
+| Sign up + API keys | [livecore.ai](https://livecore.ai/) |
 | API base | `https://api.livecore.ai` |
 
 > Versions aren't pinned here — `npx -y levea-mcp-server` and the ClawHub listing always pull the latest, and the linked npm / ClawHub pages show the current version. You never need a specific number.

@@ -10,7 +10,7 @@ configSchema:
       description: "The API endpoint for Levea Video Editor."
     LEVEA_API_KEY:
       type: string
-      description: "Your Levea API key generated from https://studio.livecore.ai/ (required to execute edits)"
+      description: "Your Levea API key generated from https://livecore.ai/ (required to execute edits)"
 
 commandFunction: |-
   (config) => ({

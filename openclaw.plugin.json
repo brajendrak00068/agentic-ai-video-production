@@ -20,7 +20,7 @@
     },
     "apiKey": {
       "label": "Levea API Key",
-      "help": "Create an API key at https://studio.livecore.ai/.",
+      "help": "Create an API key at https://livecore.ai/.",
       "sensitive": true
     }
   },

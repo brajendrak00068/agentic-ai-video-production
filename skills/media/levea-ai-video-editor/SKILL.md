@@ -30,7 +30,7 @@ Required binaries: `curl`, `jq`.
 Required environment variables:
 
 - `ADSCENE_API_URL` — base URL for the Levea API, e.g. `https://api.livecore.ai`. Do **not** use the Studio URL or the in-product `/api/v1/misc/editor` route.
-- `ADSCENE_API_KEY` — API key generated from Studio at `https://studio.livecore.ai/` (sign up / sign in, then create a key). Studio is only for signup, login, and key management.
+- `ADSCENE_API_KEY` — API key generated from Studio at `https://livecore.ai/` (sign up / sign in, then create a key). Studio is only for signup, login, and key management.
 
 ```bash
 export ADSCENE_API_URL="https://api.livecore.ai"

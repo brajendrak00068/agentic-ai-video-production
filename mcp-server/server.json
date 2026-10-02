@@ -27,7 +27,7 @@
         },
         {
           "name": "LEVEA_API_KEY",
-          "description": "Levea API key. Generate one at https://studio.livecore.ai/",
+          "description": "Levea API key. Generate one at https://livecore.ai/",
           "isRequired": true,
           "format": "string",
           "isSecret": true

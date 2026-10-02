@@ -19,7 +19,7 @@ Unlike traditional one-shot AI video generators that output locked, un-editable 
 
 - **Frontier LLMs for Planning:** We use probabilistic Frontier LLMs solely for planning, semantic analysis, and parameter parsing.
 - **Cloud-Accelerated Production Harness:** Heavy computation (Vulkan rendering, GPU WhisperX transcription, active-speaker face tracking, and HyperFrames motion graphics) executes on our remote cloud GPU cluster. You get instant 4K and vertical reel exports without melting your local laptop CPU or installing CUDA.
-- **Open-Source Client, Hosted Engine:** The client-side MCP server wrapper (`levea-mcp-server`), OpenClaw plugins, and skills are open-source (MIT). They connect to our hosted video production engine via API key. You can generate an API key with free starter credits at [studio.livecore.ai](https://studio.livecore.ai/).
+- **Open-Source Client, Hosted Engine:** The client-side MCP server wrapper (`levea-mcp-server`), OpenClaw plugins, and skills are open-source (MIT). They connect to our hosted video production engine via API key. You can generate an API key with free starter credits at [livecore.ai](https://livecore.ai/).
 
 ---
 
@@ -97,7 +97,7 @@ Whether you are an AI developer looking to integrate automated editing into your
 Expose Levea as a client-side Model Context Protocol (MCP) server stdio wrapper (`levea-mcp-server`) in your favorite AI editors (Cursor, Cline, Windsurf, or Claude Desktop).
 
 #### 1. Get an API Key
-Sign up at [studio.livecore.ai](https://studio.livecore.ai/) and generate a Levea API key.
+Sign up at [livecore.ai](https://livecore.ai/) and generate a Levea API key.
 
 #### 2. Register the MCP Server
 Add the following configuration block to your editor's MCP settings:
@@ -110,7 +110,7 @@ Add the following configuration block to your editor's MCP settings:
       "args": ["-y", "levea-mcp-server"],
       "env": {
         "LEVEA_API_URL": "https://api.livecore.ai",
-        "LEVEA_API_KEY": "your-key-from-studio.livecore.ai"
+        "LEVEA_API_KEY": "your-key-from-livecore.ai"
       }
     }
   }
@@ -295,7 +295,7 @@ Absolutely. Using our **Brand Kits API and tools**, you can declare custom typog
 
 ## 🔗 Links & Resources
 
-- **Levea Studio and API Keys:** [studio.livecore.ai](https://studio.livecore.ai/)
+- **Levea Studio and API Keys:** [livecore.ai](https://livecore.ai/)
 - **npm MCP Server Wrapper:** [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)
 - **MCP Registry:** [`io.github.brajendrak00068/levea-mcp-server`](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server)
 - **OpenClaw Plugin Page:** [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor)

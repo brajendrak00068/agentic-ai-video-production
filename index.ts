@@ -129,7 +129,7 @@ function formatMessage(message?: string, videoUrl?: string, jobId?: number | str
 function handleError(error: any): EditorResponse {
   const status = error.response?.status;
   if (status === 401 || status === 403) {
-    return { success: false, message: '❌ Authentication failed. Check LEVEA_API_KEY at https://studio.livecore.ai/.' };
+    return { success: false, message: '❌ Authentication failed. Check LEVEA_API_KEY at https://livecore.ai/.' };
   }
   if (status === 400) {
     return { success: false, message: `❌ ${error.response?.data?.message || error.response?.data?.error || 'Invalid request'}` };

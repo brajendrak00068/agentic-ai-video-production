@@ -14,7 +14,7 @@ instead of a bespoke Hermes codebase that drifts.
 Set your key once:
 
 ```bash
-export LEVEA_API_KEY="your-levea-api-key"   # from https://studio.livecore.ai/
+export LEVEA_API_KEY="your-levea-api-key"   # from https://livecore.ai/
 ```
 
 ## Register with Hermes

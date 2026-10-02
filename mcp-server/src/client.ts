@@ -93,7 +93,7 @@ function apiKey(): string {
   const key = process.env.LEVEA_API_KEY || process.env.ADSCENE_API_KEY;
   if (!key) {
     throw new Error(
-      'LEVEA_API_KEY is required. Generate one at https://studio.livecore.ai/ ' +
+      'LEVEA_API_KEY is required. Generate one at https://livecore.ai/ ' +
         'and set it in the MCP client env / mcpServers config.'
     );
   }
@@ -118,7 +118,7 @@ function describeError(err: unknown, label: string): never {
   if (code === 401 || code === 403) {
     throw new Error(
       `${label} failed: authentication rejected (HTTP ${code}). ` +
-        `Check LEVEA_API_KEY — generate a fresh key at https://studio.livecore.ai/.`
+        `Check LEVEA_API_KEY — generate a fresh key at https://livecore.ai/.`
     );
   }
   throw new Error(`${label} failed${code ? ` (HTTP ${code})` : ''}: ${upstream}`);

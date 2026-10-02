@@ -19,7 +19,7 @@ metadata:
         description: Base URL for the Levea API, for example https://api.livecore.ai. Do not use the studio URL or the /api/v1/misc/editor route.
       - name: LEVEA_API_KEY
         required: true
-        description: OpenClaw API key generated from the Studio app at https://studio.livecore.ai/.
+        description: OpenClaw API key generated from the Studio app at https://livecore.ai/.
     skillKey: openclaw_ai_video_editor
     homepage: https://github.com/brajendrak00068/agentic-ai-video-production#readme
 ---
@@ -38,7 +38,7 @@ Use this skill when the user asks for OpenClaw video editing, AI video editing, 
 
 Auth: `Authorization: Bearer {LEVEA_API_KEY}`
 
-Create an account and generate the OpenClaw API key in Studio: `https://studio.livecore.ai/`.
+Create an account and generate the OpenClaw API key in Studio: `https://livecore.ai/`.
 Use `https://api.livecore.ai` for `LEVEA_API_URL`; Studio is only for signup, login, and key management.
 
 > `LEVEA_API_URL` / `LEVEA_API_KEY` are canonical. The legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` names are still accepted as a silent fallback for backward compatibility.

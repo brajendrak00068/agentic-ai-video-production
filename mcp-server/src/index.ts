@@ -18,7 +18,7 @@
  *
  * Config (env, set via the MCP client's `mcpServers` entry):
  *   LEVEA_API_URL   e.g. https://api.livecore.ai   (required)
- *   LEVEA_API_KEY   from https://studio.livecore.ai/ (required)
+ *   LEVEA_API_KEY   from https://livecore.ai/ (required)
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

@@ -75,7 +75,7 @@ Set via the MCP client's `mcpServers[].env`. Canonical (v0.3.0+):
 | Var | Required | Value |
 |---|---|---|
 | `LEVEA_API_URL` | yes | `https://api.livecore.ai` |
-| `LEVEA_API_KEY` | yes | Generate at https://studio.livecore.ai |
+| `LEVEA_API_KEY` | yes | Generate at https://livecore.ai |
 
 Backward compat: `ADSCENE_API_URL` / `ADSCENE_API_KEY` still read as a silent fallback (v0.2.0 only honors these — `LEVEA_*` arrives in v0.3.0).
 
@@ -85,7 +85,7 @@ The client never accepts a *full path* in `LEVEA_API_URL` — set only the host.
 
 | Signal | What it means | What to do |
 |---|---|---|
-| `isError: true` + 401/403 in message | Bad/expired `LEVEA_API_KEY` | Surface to user; tell them to regenerate at studio.livecore.ai. **Do not retry.** |
+| `isError: true` + 401/403 in message | Bad/expired `LEVEA_API_KEY` | Surface to user; tell them to regenerate at livecore.ai. **Do not retry.** |
 | `isError: true` + "is required" | Env var missing | Surface; do not retry. |
 | `isError: true` + 5xx / network | Transient backend | Retry **once** with backoff. Then surface. |
 | `success: true`, `jobId` present | Async work running | Poll `check_job_status` — don't re-invoke `autonomous_edit`. |
