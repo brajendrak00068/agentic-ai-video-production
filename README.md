@@ -21,7 +21,7 @@
     <img src="https://www.claudeai.directory/badge/levea?theme=dark" alt="Levea - Listed on Claude AI Directory" width="220" height="54" />
   </a>
   &nbsp;&nbsp;
-  <a href="https://livecore.ai/openapi.json" target="_blank" rel="noopener">
+  <a href="https://chatgpt.com/gpts" target="_blank" rel="noopener">
     <img src="https://raw.githubusercontent.com/brajendrak00068/agentic-ai-video-production/main/chatgpt/chatgpt-badge.svg" alt="Levea - Available on ChatGPT Store" width="220" height="54" />
   </a>
 </p>
