@@ -30,7 +30,8 @@
     "levea_api_key": {
       "type": "string",
       "title": "Levea API Key",
-      "description": "Your Levea API key generated from https://livecore.ai/ (required to execute edits)",
+      "description": "Your Levea API key generated from https://livecore.ai/ (optional for discovery/health, required to execute edits)",
+      "default": "",
       "sensitive": true
     }
   },
