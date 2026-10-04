@@ -50,7 +50,7 @@ Levea separates probabilistic creative reasoning from deterministic project exec
                       (Gemini / Frontier LLMs)
                                   │
                                   ▼
-               CanonicalActionIR (179 Typed Actions)
+                CanonicalActionIR (179 Typed Actions)
                                   │
                                   ▼
                         CanonicalPlanCompiler
@@ -66,7 +66,7 @@ Levea separates probabilistic creative reasoning from deterministic project exec
                    ├── Perception Engine (Face Tracking, Active Speaker, Shot Cuts)
                    ├── Timeline and Scene Graph (Tracks, Layers, Geometry)
                    ├── Media Operators (Silence Cuts, Slip/Slide, Ripple, Split-Screen)
-                   ├── Caption & Typography Engine (39 MSDF Fonts, 39 Templates, Kinetic Word Sync)
+                    ├── Caption & Typography Engine (39 MSDF Fonts, 41 Templates, Kinetic Word Sync)
                    ├── Animation & Motion Physics (Damped Spring Solvers, 17 Blend Modes)
                    ├── Audio Mastering (EBU R128 Loudness, Google Cloud TTS, Auto-Duck)
                    ├── Composition & Asset Execution
@@ -262,17 +262,17 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ### Supported Production Paths
 - **Project and timeline state:** Full NLE track and clip operations (insert, overwrite, lift, extract, ripple delete/trim, slip, slide, freeze frame, reverse), multi-track management, nesting containers, and durable linear undo/redo.
-- **Captions and motion graphics:** automatic captions, word timing, keyword emphasis, 41+ caption templates (Hormozi, Minimal-Pro, Karaoke, Typewriter...), lower thirds, title cards, charts, counters, and diagrams through verified HyperFrames motion composites, supported native fallbacks, verified Lottie assets, and procedural animation.
-- **Layout and perception:** multi-cam synchronization and active-speaker cuts, scene and shot cut analysis, face detection and tracking, cross-clip face identity search, on-screen text-region detection, safe zones, and explicit-region tracking or masking.
-- **Compositing:** chroma key, masks, blend modes (17 modes), adjustment layers, alpha-matte background replacement (Robust Video Matting), and GPU volumetric shaders (smoke, fire, glitch, portal, lightning).
-- **Audio:** silence and filler-word cleanup, word-level muting, crossfades, EQ, denoise, ITU-R BS.1770 / EBU R128 loudness normalization, Google Cloud TTS voiceover, speech-aware ducking, musical beat sync (`pacing_beat_sync`), and AI stem separation (`separate_stems`).
+- **Captions and motion graphics:** automatic captions, word timing, keyword emphasis, 41 caption templates (Hormozi, Minimal-Pro, Karaoke, Typewriter...), lower thirds, title cards, charts, counters, and diagrams through verified HyperFrames motion composites, supported native fallbacks, verified Lottie assets, and procedural animation.
+- **Layout and perception:** multi-cam synchronization and active-speaker cuts, scene and shot cut analysis, face detection and tracking, cross-clip face identity search, on-screen text-region **detection and OCR recognition** (PP-OCRv5 det + rec), safe zones, and explicit-region tracking or masking.
+- **Compositing:** chroma key, masks, blend modes (17 modes), adjustment layers, alpha-matte background replacement (Robust Video Matting), content-aware inpainting (LaMa) for on-screen text / logo / watermark removal, and GPU volumetric shaders (smoke, fire, glitch, portal, lightning).
+- **Audio:** silence and filler-word cleanup, word-level muting, crossfades, EQ, denoise, ITU-R BS.1770 / EBU R128 loudness normalization, Google Cloud TTS voiceover, **voice cloning** (Chirp 3 Instant Custom Voice), speech-aware ducking, musical beat sync (`pacing_beat_sync`), and AI stem separation (`separate_stems`, Demucs).
 - **Autonomous Directing:** automated cold-open hook extraction, podcast polish macros, contextual B-roll placement, auto lower thirds, and slideshow generation.
 - **Verification:** typed task contracts, structural validation, perceptual checks, requirement tracking, bounded repair, and partial-success reporting.
 
 ### Model- or Deployment-Dependent
-- Generated video, images, B-roll, music, sound effects, voiceover, and voice cloning.
+- Generated video, images, B-roll, music, sound effects, voiceover, and voice cloning quality/availability vary by model tier and quota (all are wired as canonical actions in production).
 - Neural alpha matting and background replacement quality.
-- OCR **recognition** of visible text.
+- **CJK / RTL caption rendering:** cosmic-text bidi shaping and RTL language handling ship in production; the 39-font MSDF atlas is Latin-ASCII, so CJK/RTL glyph coverage depends on system-font fallback when `preserveUnicode` is enabled.
 
 ---
 

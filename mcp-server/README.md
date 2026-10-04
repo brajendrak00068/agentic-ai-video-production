@@ -192,9 +192,9 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 - **Viral-clip batch** — auto-segmented short-form, packaged as a ZIP
 - **Multi-platform pack** — TikTok + Reels + Shorts + YouTube + Instagram in one pass
 
-### 🗺️ Roadmap
-- Content-aware object removal (AI mask + inpaint)
-- Reading on-screen text content (OCR recognition — region detection ships today)
+### ✅ Also shipped
+- Content-aware inpainting (LaMa) — removes on-screen text, logos, and watermarks via `REPLACE_ON_SCREEN_TEXT` and overlay-removal powers
+- On-screen text OCR recognition — PP-OCRv5 detection + recognition populate `TextRegion.text`, enabling find-and-replace on burned-in text
 
 ---
 
