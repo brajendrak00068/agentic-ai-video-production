@@ -87,8 +87,6 @@ Behind a single `autonomous_edit` call the agent can compose any of:
 
 **Async generation** — AI video / B-roll, AI images (single or batch at timestamps), AI music, AI voiceover, auto-thumbnail or AI thumbnail variants, face blur, instruction-based image edit.
 
-**High-level kits** (each one canonical action orchestrating many edits) — `APPLY_VIRAL_KIT`, `APPLY_CINEMATIC_DIRECTOR`, `APPLY_EMPHASIS_SYSTEM`, `OPTIMIZE_PACING`.
-
 **Export** — `EXPORT_VIDEO` (MP4), `EXPORT_PRESET` (platform / codec / aspect presets + safe-zone repair), `FINAL_DELIVERY_CHECK`, `GENERATE_VIRAL_CLIPS` (auto-segment short-form clips as ZIP), `GENERATE_MULTI_PLATFORM` (TikTok + Reels + Shorts + YouTube + Instagram in one pass).
 
 ## Auto-export follow-up

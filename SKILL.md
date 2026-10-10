@@ -132,12 +132,6 @@ Behind a single `autonomous_edit` call the agent can compose any of:
 - Face blur (all faces or background-only)
 - Image edit (generative instruction-based)
 
-**High-level kits** (each is a single canonical action that orchestrates many underlying edits)
-- `APPLY_VIRAL_KIT` — vertical reframe + captions + silence removal + motion tracking + emphasis
-- `APPLY_CINEMATIC_DIRECTOR` — energy analysis + dynamic zooms + cinematic color grade + mood-based camera moves
-- `APPLY_EMPHASIS_SYSTEM` — keyword detection + scaling / glow / pulse coordinated with captions
-- `OPTIMIZE_PACING` — filler-word + silence + low-energy segment removal for retention
-
 **Export**
 - `EXPORT_VIDEO` — render to MP4 (resolution / codec / quality tier)
 - `EXPORT_PRESET` — platform / codec / aspect-ratio presets with safe-zone repair
