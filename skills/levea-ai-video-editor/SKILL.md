@@ -1,14 +1,22 @@
 ---
 name: levea-ai-video-editor
-description: "OpenClaw AI video editor & MCP: turn raw video or YouTube links into viral clips, TikTok, Reels & Shorts with auto captions, subtitles, 9:16 vertical reframe, silence removal, B-roll, motion graphics, multicam, chroma key, color grading, voiceover & MP4 export."
-version: 1.0.26
+description: "Levea OpenClaw AI video editor & natural language video editing MCP: turn raw video or YouTube links into viral clips, TikTok video, Instagram Reels & YouTube Shorts with auto captions, subtitles, 9:16 vertical reframe, silence removal, audio cleanup, smart jump cuts, B-roll, motion graphics, multi-cam multicam podcast sync, chroma key green screen, background removal, color grading, voiceover, music generation, face blur privacy redaction, brand kit, thumbnails, CapCut alternative & MP4 export."
+version: 1.1.5
 author: brajendrak00068
-license: MIT-0
+license: MIT
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
-    tags: [video, video-editor, video-editing, ai-video-editor, ai-video-editing, openclaw-video-editor, agentic-video-editor, viral-clips, captions, auto-captions, subtitles, tiktok, reels, shorts, vertical-video, vertical-reframe, chroma-key, green-screen, background-removal, audio-cleanup, silence-removal, motion-graphics, motion-tracking, multi-cam, multicam, podcast, jump-cuts, color-grading, face-blur, privacy-redaction, brand-kit, thumbnail, export, mp4-export, faceless-video, auto-reels, automated-shorts, capcut-alternative, b-roll, prompt-to-video, voiceover, music-generation]
-    homepage: https://github.com/brajendrak00068/agentic-ai-video-production#readme
+  openclaw:
+    requires:
+      env:
+        - LEVEA_API_URL
+        - LEVEA_API_KEY
+      bins:
+        - curl
+        - jq
+    primaryEnv: LEVEA_API_KEY
+    skillKey: openclaw_ai_video_editor
+    homepage: "https://github.com/brajendrak00068/agentic-ai-video-production#readme"
 ---
 
 # Levea Agentic Video Editor

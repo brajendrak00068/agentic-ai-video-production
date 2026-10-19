@@ -8,12 +8,12 @@
     "index.ts",
     "dist",
     "openclaw.plugin.json",
-    "SKILL.md",
+    "skills",
     "README.md"
   ],
   "scripts": {
     "build": "tsc",
-    "scan-leaks": "bash scripts/scan-leaks.sh README.md SKILL.md openclaw.plugin.json",
+    "scan-leaks": "bash scripts/scan-leaks.sh README.md skills/openclaw-ai-video-editor/SKILL.md openclaw.plugin.json",
     "prepublishOnly": "npm run scan-leaks && npm run build",
     "test": "echo \"No tests yet\" && exit 0"
   },
