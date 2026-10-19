@@ -1,5 +1,5 @@
 ---
-name: ai_agentic_video_editor
+name: ai-agentic-video-editor
 description: "OpenClaw AI agentic video editor & natural language video editing MCP: turn raw video or YouTube links into viral clips, TikTok video, Instagram Reels & YouTube Shorts with auto captions, subtitles, 9:16 vertical reframe, silence removal, audio cleanup, smart jump cuts, B-roll, motion graphics, multi-cam multicam podcast sync, chroma key green screen, background removal, color grading, voiceover, music generation, face blur privacy redaction, brand kit, thumbnails, CapCut alternative & MP4 export (AI 视频剪辑 短视频 自动字幕)."
 version: 1.0.25
 license: MIT
