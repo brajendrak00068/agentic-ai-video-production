@@ -1,13 +1,13 @@
 ---
 name: levea-ai-video-editor
-description: "Agentic AI video editor: send a prompt and an autonomous editor plans, executes, verifies, and exports the edit — viral clips, captions, vertical reframe, chroma key, audio cleanup, B-roll, motion graphics, MP4 export."
-version: 1.0.1
+description: "OpenClaw AI video editor & MCP: turn raw video or YouTube links into viral clips, TikTok, Reels & Shorts with auto captions, subtitles, 9:16 vertical reframe, silence removal, B-roll, motion graphics, multicam, chroma key, color grading, voiceover & MP4 export."
+version: 1.0.26
 author: brajendrak00068
 license: MIT-0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [video, ai-video-editor, viral-clips, captions, vertical-video, chroma-key, audio-cleanup, motion-graphics, multi-cam, brand-kit, thumbnail, export, faceless-video, auto-reels, automated-shorts, capcut-alternative, b-roll, prompt-to-video, voiceover, music-generation]
+    tags: [video, video-editor, video-editing, ai-video-editor, ai-video-editing, openclaw-video-editor, agentic-video-editor, viral-clips, captions, auto-captions, subtitles, tiktok, reels, shorts, vertical-video, vertical-reframe, chroma-key, green-screen, background-removal, audio-cleanup, silence-removal, motion-graphics, motion-tracking, multi-cam, multicam, podcast, jump-cuts, color-grading, face-blur, privacy-redaction, brand-kit, thumbnail, export, mp4-export, faceless-video, auto-reels, automated-shorts, capcut-alternative, b-roll, prompt-to-video, voiceover, music-generation]
     homepage: https://github.com/brajendrak00068/agentic-ai-video-production#readme
 ---
 

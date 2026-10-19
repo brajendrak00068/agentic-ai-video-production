@@ -1,7 +1,7 @@
 ---
 name: ai_agentic_video_editor
-description: AI agentic video editor: send a prompt, the autonomous editor plans, uses internal tools, exports, and returns the result.
-version: 1.0.0
+description: "OpenClaw AI agentic video editor & natural language video editing MCP: turn raw video or YouTube links into viral clips, TikTok video, Instagram Reels & YouTube Shorts with auto captions, subtitles, 9:16 vertical reframe, silence removal, audio cleanup, smart jump cuts, B-roll, motion graphics, multi-cam multicam podcast sync, chroma key green screen, background removal, color grading, voiceover, music generation, face blur privacy redaction, brand kit, thumbnails, CapCut alternative & MP4 export (AI 视频剪辑 短视频 自动字幕)."
+version: 1.0.25
 license: MIT
 metadata:
   openclaw:
@@ -16,12 +16,12 @@ metadata:
     envVars:
       - name: LEVEA_API_URL
         required: true
-        description: Base URL for the Levea API, for example https://api.livecore.ai. Do not use the studio URL or the /api/v1/misc/editor route.
+        description: "Base URL for the Levea API, for example https://api.livecore.ai. Do not use the studio URL or the /api/v1/misc/editor route."
       - name: LEVEA_API_KEY
         required: true
-        description: OpenClaw API key generated from the Studio app at https://livecore.ai/.
+        description: "OpenClaw API key generated from the Studio app at https://livecore.ai/."
     skillKey: openclaw_ai_video_editor
-    homepage: https://github.com/brajendrak00068/agentic-ai-video-production#readme
+    homepage: "https://github.com/brajendrak00068/agentic-ai-video-production#readme"
 ---
 
 # Levea Agentic Video Editor for OpenClaw

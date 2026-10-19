@@ -1,8 +1,8 @@
 {
   "id": "openclaw-ai-video-editor",
-  "name": "OpenClaw AI Video Editor",
-  "description": "Agentic AI video editor — natural-language video edits end-to-end via a single `autonomous_edit` tool. Viral clips, captions, vertical reframe, chroma key, AI background removal, audio cleanup, motion tracking, B-roll, voiceover, music, and MP4 / multi-platform export.",
-  "version": "1.1.4",
+  "name": "OpenClaw AI Video Editor & Video Editing — Viral Clips, Captions, Reels, Shorts, TikTok, B-Roll & Motion Graphics",
+  "description": "OpenClaw AI video editor & natural language video editing plugin — autonomous agent for viral clips, TikTok video, Instagram Reels, YouTube Shorts, auto captions, subtitles, 9:16 vertical reframe, silence removal, audio cleanup, smart jump cuts, B-roll, motion graphics, multi-cam multicam podcast sync, chroma key green screen, background removal, color grading, voiceover, music generation, face blur privacy redaction, brand kit, thumbnails, CapCut alternative & MP4 export.",
+  "version": "1.1.5",
   "enabledByDefault": true,
   "skills": [
     "./SKILL.md"
