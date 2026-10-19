@@ -2,27 +2,24 @@
   "id": "openclaw-ai-video-editor",
   "name": "OpenClaw AI Video Editor",
   "description": "OpenClaw plugin for timeline video editing, 9:16 vertical reframing, synchronized captions, B-roll, multicam podcast sync, audio cleanup, and MP4 export.",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "enabledByDefault": true,
   "skills": [
     "./skills/openclaw-ai-video-editor/SKILL.md"
   ],
-  "providerAuthEnvVars": {
-    "levea": [
-      "LEVEA_API_URL",
-      "LEVEA_API_KEY"
+  "setup": {
+    "providers": [
+      {
+        "id": "levea",
+        "authMethods": [
+          "api-key"
+        ],
+        "envVars": [
+          "LEVEA_API_URL",
+          "LEVEA_API_KEY"
+        ]
+      }
     ]
-  },
-  "uiHints": {
-    "apiUrl": {
-      "label": "Levea API Base URL",
-      "help": "Use https://api.livecore.ai or a full /api/v1/misc/openclaw/v1/execute endpoint."
-    },
-    "apiKey": {
-      "label": "Levea API Key",
-      "help": "Create an API key at https://livecore.ai/.",
-      "sensitive": true
-    }
   },
   "contracts": {
     "tools": [
