@@ -526,6 +526,9 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       if (!str(a.prompt)) return fail('❌ `prompt` is required for queue_edit.');
       const r = await queueEdit({
         tool: 'autonomous_edit',
+        prompt: a.prompt,
+        ...(a.video_url ? { video_url: a.video_url } : {}),
+        ...(Array.isArray(a.assets) ? { assets: a.assets } : {}),
         params: { prompt: a.prompt, ...(a.video_url ? { video_url: a.video_url } : {}), ...(Array.isArray(a.assets) ? { assets: a.assets } : {}) },
         projectId: str(a.project_id) || `mcp_${Date.now()}`,
         ...(a.scene !== undefined ? { scene: a.scene } : {}),
@@ -566,6 +569,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       const tid = str(a.template_id);
       if (!tid) return fail('❌ `template_id` is required.');
       const r = await applyCaptionTemplate({
+        templateSlug: tid,
         templateId: tid,
         projectId: str(a.project_id),
         scene: a.scene,
