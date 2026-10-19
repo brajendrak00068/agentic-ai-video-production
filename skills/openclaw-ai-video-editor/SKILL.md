@@ -1,7 +1,7 @@
 ---
 name: openclaw-ai-video-editor
 description: "Official OpenClaw AI video editor skill & MCP integration: edit videos in plain English with viral clips, auto captions, subtitles, 9:16 vertical reframe, silence removal, smart jump cuts, B-roll, motion graphics, multicam podcast editing, chroma key, color grading, voiceover & cloud MP4 export."
-version: 1.1.5
+version: 1.1.6
 author: brajendrak00068
 license: MIT
 platforms: [linux, macos, windows]
