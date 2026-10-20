@@ -16,6 +16,11 @@ Reframe horizontal 16:9 footage into 9:16 vertical short-form videos with subjec
 - Keeping the active speaker centered within the vertical frame across camera cuts.
 - Trimming a long clip into a 15-to-60 second vertical short with captions.
 
+## Setup & Authentication
+
+1. Generate a free API key at `https://www.livecore.ai/?openclaw=1` and set `LEVEA_API_KEY` in your environment or OpenClaw plugin config (`LEVEA_API_URL` defaults to `https://api.livecore.ai`).
+2. Ensure the OpenClaw plugin (`openclaw plugins install openclaw-ai-video-editor`) or MCP server (`npx -y levea-mcp-server`) is installed so the `ai-video-editor` / `autonomous_edit` tool is registered.
+
 ## Tool interface
 
 Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.

@@ -59,6 +59,8 @@ export interface SSEEvent {
 }
 
 const DEFAULT_TIMEOUT_MS = 300_000;
+const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
+const MCP_CLIENT_VERSION = '0.5.4';
 
 function trimTrailingSlashes(s: string): string {
   let end = s.length;
@@ -66,17 +68,26 @@ function trimTrailingSlashes(s: string): string {
   return s.slice(0, end);
 }
 
+function normalizeHostUrl(rawInput: string): string {
+  let raw = trimTrailingSlashes(rawInput.trim());
+  if (!raw) return DEFAULT_LEVEA_API_URL;
+  if (raw === 'https://livecore.ai' || raw === 'https://www.livecore.ai' || raw === 'http://livecore.ai' || raw === 'http://www.livecore.ai') {
+    return DEFAULT_LEVEA_API_URL;
+  }
+  if (raw.startsWith('https://livecore.ai/')) {
+    raw = DEFAULT_LEVEA_API_URL + raw.slice('https://livecore.ai'.length);
+  } else if (raw.startsWith('https://www.livecore.ai/')) {
+    raw = DEFAULT_LEVEA_API_URL + raw.slice('https://www.livecore.ai'.length);
+  }
+  return raw;
+}
+
 function baseRoot(): string {
   // LEVEA_API_URL is canonical; ADSCENE_API_URL kept as silent backward-compat fallback.
-  const raw = trimTrailingSlashes(
-    String(process.env.LEVEA_API_URL || process.env.ADSCENE_API_URL || '')
+  // Defaults to https://api.livecore.ai when omitted so users only need LEVEA_API_KEY.
+  const raw = normalizeHostUrl(
+    String(process.env.LEVEA_API_URL || process.env.ADSCENE_API_URL || DEFAULT_LEVEA_API_URL)
   );
-  if (!raw) {
-    throw new Error(
-      'LEVEA_API_URL is required (e.g. https://api.livecore.ai). ' +
-        'Set it in the MCP client env / mcpServers config.'
-    );
-  }
   if (raw.endsWith('/api/v1/misc/openclaw/v1/execute')) {
     return raw.slice(0, -'/v1/execute'.length);
   }
@@ -89,12 +100,27 @@ function v1(path: string): string {
   return `${baseRoot()}/v1${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function sendMcpFunnelTelemetry(event: string, hasApiKey: boolean): void {
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return;
+  try {
+    const telemetryUrl = `${baseRoot()}-keys/telemetry`;
+    void axios.post(
+      telemetryUrl,
+      { event, client: 'levea-mcp-server', version: MCP_CLIENT_VERSION, hasApiKey },
+      { timeout: 3000, validateStatus: () => true },
+    ).catch(() => {});
+  } catch {
+    // Non-blocking telemetry
+  }
+}
+
 function apiKey(): string {
   const key = process.env.LEVEA_API_KEY || process.env.ADSCENE_API_KEY;
   if (!key) {
+    sendMcpFunnelTelemetry('auth_missing_local', false);
     throw new Error(
-      'LEVEA_API_KEY is required. Generate one at https://livecore.ai/ ' +
-        'and set it in the MCP client env / mcpServers config.'
+      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://www.livecore.ai/?openclaw=1 ' +
+        'and set LEVEA_API_KEY in your MCP client env / mcpServers config.'
     );
   }
   return key;
@@ -105,6 +131,7 @@ function http2(): AxiosInstance {
     headers: {
       Authorization: `Bearer ${apiKey()}`,
       'Content-Type': 'application/json',
+      'X-Levea-Client': `levea-mcp-server/${MCP_CLIENT_VERSION}`,
     },
     timeout: DEFAULT_TIMEOUT_MS,
     validateStatus: (s) => s < 500,

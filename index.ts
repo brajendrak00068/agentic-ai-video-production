@@ -91,11 +91,43 @@ function sanitizeRequestId(value: unknown): string | undefined {
   return normalized || undefined;
 }
 
+const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
+const PLUGIN_VERSION = '1.1.9';
+
+let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
+
+function extractConfigString(val: unknown): string | undefined {
+  if (typeof val === 'string') return val.trim() || undefined;
+  if (val && typeof val === 'object') {
+    const obj = val as Record<string, unknown>;
+    return firstString(obj.value, obj.key, obj.apiKey, obj.token, obj.secret);
+  }
+  return undefined;
+}
+
+function normalizeHostUrl(rawInput: string): string {
+  let raw = rawInput.trim().replace(/\/+$/, '');
+  if (!raw) return DEFAULT_LEVEA_API_URL;
+  // Auto-heal common user mistake: setting https://livecore.ai or https://www.livecore.ai (the web UI host)
+  // instead of https://api.livecore.ai (the backend API host).
+  if (raw === 'https://livecore.ai' || raw === 'https://www.livecore.ai' || raw === 'http://livecore.ai' || raw === 'http://www.livecore.ai') {
+    return DEFAULT_LEVEA_API_URL;
+  }
+  if (raw.startsWith('https://livecore.ai/')) {
+    raw = DEFAULT_LEVEA_API_URL + raw.slice('https://livecore.ai'.length);
+  } else if (raw.startsWith('https://www.livecore.ai/')) {
+    raw = DEFAULT_LEVEA_API_URL + raw.slice('https://www.livecore.ai'.length);
+  }
+  return raw;
+}
+
 function openClawV1Root(): string {
-  const raw = String(
-    process.env.LEVEA_API_URL || process.env.ADSCENE_API_URL || ''
-  ).replace(/\/+$/, '');
-  if (!raw) throw new Error('LEVEA_API_URL is required');
+  const configured = firstString(
+    process.env.LEVEA_API_URL,
+    process.env.ADSCENE_API_URL,
+    runtimePluginConfig.apiUrl,
+  );
+  const raw = normalizeHostUrl(configured || DEFAULT_LEVEA_API_URL);
   if (raw.endsWith('/api/v1/misc/openclaw/v1/execute')) {
     return raw.slice(0, -'/execute'.length);
   }
@@ -109,9 +141,36 @@ function openClawUrl(path: string): string {
   return `${openClawV1Root()}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function resolveOptionalApiKey(): string | undefined {
+  return firstString(
+    process.env.LEVEA_API_KEY,
+    process.env.ADSCENE_API_KEY,
+    runtimePluginConfig.apiKey,
+  );
+}
+
+function sendFunnelTelemetry(event: string, hasApiKey: boolean): void {
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return;
+  try {
+    const root = openClawV1Root().replace(/\/openclaw\/v1$/, '/openclaw-keys/telemetry');
+    void axios.post(
+      root,
+      { event, client: 'openclaw-plugin', version: PLUGIN_VERSION, hasApiKey },
+      { timeout: 3000, validateStatus: () => true },
+    ).catch(() => {});
+  } catch {
+    // Non-blocking telemetry
+  }
+}
+
 function apiKey(): string {
-  const key = firstString(process.env.LEVEA_API_KEY, process.env.ADSCENE_API_KEY);
-  if (!key) throw new Error('LEVEA_API_KEY is required');
+  const key = resolveOptionalApiKey();
+  if (!key) {
+    sendFunnelTelemetry('auth_missing_local', false);
+    throw new Error(
+      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://www.livecore.ai/?openclaw=1 and set LEVEA_API_KEY in your environment or OpenClaw plugin config.'
+    );
+  }
   return key;
 }
 
@@ -119,6 +178,7 @@ function requestHeaders(context: OperationContext): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey()}`,
     'Content-Type': 'application/json',
+    'X-Levea-Client': `openclaw-plugin/${PLUGIN_VERSION}`,
   };
   const requestId = sanitizeRequestId(context.toolCallId);
   if (requestId) {
@@ -587,6 +647,17 @@ export default definePluginEntry({
   description:
     'Agentic video editing through one high-level edit tool plus durable queue and polling state.',
   register(api) {
+    const rawCfg = (api as any)?.config || (api as any)?.pluginConfig || (typeof (api as any)?.getConfig === 'function' ? (api as any).getConfig() : null) || {};
+    const cfgUrl = extractConfigString(rawCfg?.apiUrl || rawCfg?.LEVEA_API_URL);
+    const cfgKey = extractConfigString(rawCfg?.apiKey || rawCfg?.LEVEA_API_KEY);
+    if (cfgUrl || cfgKey) {
+      runtimePluginConfig = {
+        ...(cfgUrl ? { apiUrl: cfgUrl } : {}),
+        ...(cfgKey ? { apiKey: cfgKey } : {}),
+      };
+    }
+    sendFunnelTelemetry('plugin_boot', Boolean(resolveOptionalApiKey()));
+
     api.registerTool({
       name: 'ai-video-editor',
       label: 'AI Video Editor',

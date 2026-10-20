@@ -16,6 +16,11 @@ Remove dead air, pauses, and filler words from video and audio timelines with au
 - Trimming filler words and tightening conversational pacing.
 - Balancing dialogue loudness and ducking background music under speech.
 
+## Setup & Authentication
+
+1. Generate a free API key at `https://www.livecore.ai/?openclaw=1` and set `LEVEA_API_KEY` in your environment or OpenClaw plugin config (`LEVEA_API_URL` defaults to `https://api.livecore.ai`).
+2. Ensure the OpenClaw plugin (`openclaw plugins install openclaw-ai-video-editor`) or MCP server (`npx -y levea-mcp-server`) is installed so the `ai-video-editor` / `autonomous_edit` tool is registered.
+
 ## Tool interface
 
 Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.
