@@ -34,5 +34,19 @@
         }
       ]
     }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.livecore.ai/api/v1/misc/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <your Levea API key>. Generate one at https://livecore.ai/?openclaw=1&utm_source=mcp-registry&utm_medium=hosted-mcp&utm_campaign=levea-mcp-server",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
   ]
 }
