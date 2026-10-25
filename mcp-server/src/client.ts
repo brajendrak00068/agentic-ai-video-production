@@ -119,7 +119,7 @@ function apiKey(): string {
   if (!key) {
     sendMcpFunnelTelemetry('auth_missing_local', false);
     throw new Error(
-      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://www.livecore.ai/?openclaw=1 ' +
+      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-server&utm_medium=missing-key&utm_campaign=levea-mcp-server ' +
         'and set LEVEA_API_KEY in your MCP client env / mcpServers config.'
     );
   }
@@ -145,7 +145,7 @@ function describeError(err: unknown, label: string): never {
   if (code === 401 || code === 403) {
     throw new Error(
       `${label} failed: authentication rejected (HTTP ${code}). ` +
-        `Check LEVEA_API_KEY — generate a fresh key at https://livecore.ai/.`
+        `Check LEVEA_API_KEY — generate a fresh key at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-server&utm_medium=auth-failed&utm_campaign=levea-mcp-server .`
     );
   }
   throw new Error(`${label} failed${code ? ` (HTTP ${code})` : ''}: ${upstream}`);

@@ -1,7 +1,7 @@
 ---
 name: levea-ai-video-editor
 description: "Plan, execute, and verify timeline video edits through the autonomous_edit MCP tool."
-version: 1.1.7
+version: 1.0.29
 author: brajendrak00068
 license: MIT
 ---
@@ -10,16 +10,21 @@ license: MIT
 
 Plan, execute, and verify timeline video edits through the autonomous_edit MCP tool.
 
+## Setup
+
+This skill calls the Levea (livecore.ai) editing service, which requires a Levea account and API key.
+
+1. Sign up and generate an API key at https://livecore.ai/?openclaw=1&utm_source=clawhub&utm_medium=skill&utm_campaign=levea-ai-video-editor
+2. Provide the key to the tool you use:
+   - OpenClaw plugin `openclaw-ai-video-editor` (ClawHub): set `apiKey` in the plugin config.
+   - MCP server `levea-mcp-server` (npm): set `LEVEA_API_KEY` in the MCP server config. `LEVEA_API_URL` is optional and defaults to `https://api.livecore.ai`.
+3. Describe the edit you want in plain language; the tool returns a project ID and, after export, an MP4 URL.
+
 ## When to use
 
 - Performing timeline edits such as trimming, reframing, captioning, and color grading.
 - Composing text titles, overlays, and audio adjustments on a project scene.
 - Exporting a verified timeline scene to MP4.
-
-## Setup & Authentication
-
-1. Generate a free API key at `https://www.livecore.ai/?openclaw=1` and set `LEVEA_API_KEY` in your environment or OpenClaw plugin config (`LEVEA_API_URL` defaults to `https://api.livecore.ai`).
-2. Ensure the OpenClaw plugin (`openclaw plugins install openclaw-ai-video-editor`) or MCP server (`npx -y levea-mcp-server`) is installed so the `ai-video-editor` / `autonomous_edit` tool is registered.
 
 ## Tool interface
 

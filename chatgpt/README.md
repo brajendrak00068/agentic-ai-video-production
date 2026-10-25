@@ -21,7 +21,7 @@ This folder contains the complete configuration and OpenAPI specification for pu
 3. **Authentication**:
    - **Type**: `API Key`
    - **Auth Type**: `Bearer`
-   - **API Key**: Enter a Levea API key (from [livecore.ai](https://livecore.ai/)).
+   - **API Key**: Enter a Levea API key (from [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=chatgpt&utm_medium=gpt-action&utm_campaign=levea)).
 4. **Privacy Policy**: `https://livecore.ai/privacy`.
 
 ## 3. Publish to the GPT Store

@@ -2,7 +2,7 @@
   "id": "openclaw-ai-video-editor",
   "name": "OpenClaw AI Video Editor",
   "description": "OpenClaw plugin for timeline video editing, 9:16 vertical reframing, synchronized captions, B-roll, multicam podcast sync, audio cleanup, and MP4 export.",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "enabledByDefault": true,
   "skills": [
     "./skills/openclaw-ai-video-editor/SKILL.md"

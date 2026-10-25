@@ -75,7 +75,7 @@ Set via the MCP client's `mcpServers[].env`. Canonical (v0.3.0+):
 | Var | Required | Value |
 |---|---|---|
 | `LEVEA_API_URL` | yes | `https://api.livecore.ai` |
-| `LEVEA_API_KEY` | yes | Generate at https://livecore.ai |
+| `LEVEA_API_KEY` | yes | Generate at https://livecore.ai/?openclaw=1&utm_source=openclaw&utm_medium=plugin&utm_campaign=openclaw-ai-video-editor |
 
 Backward compat: `ADSCENE_API_URL` / `ADSCENE_API_KEY` still read as a silent fallback (v0.2.0 only honors these — `LEVEA_*` arrives in v0.3.0).
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "levea-mcp-server",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "MCP server for the Levea autonomous AI video editor — natural-language video editing (viral clips, captions, vertical reframe, chroma key, audio cleanup, motion tracking, B-roll, voiceover, music, MP4 export) for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, and Hermes.",
   "author": {
     "name": "brajendrak00068"
@@ -30,7 +30,7 @@
     "levea_api_key": {
       "type": "string",
       "title": "Levea API Key",
-      "description": "Your Levea API key generated from https://livecore.ai/ (optional for discovery/health, required to execute edits)",
+      "description": "Your Levea API key generated from https://livecore.ai/?openclaw=1&utm_source=claude-desktop&utm_medium=mcpb&utm_campaign=levea-mcp-server (optional for discovery/health, required to execute edits)",
       "default": "",
       "sensitive": true
     }

@@ -11,7 +11,7 @@ configSchema:
     LEVEA_API_KEY:
       type: string
       default: ""
-      description: "Your Levea API key generated from https://livecore.ai/ (optional for discovery/health, required to execute edits)"
+      description: "Your Levea API key generated from https://livecore.ai/?openclaw=1&utm_source=smithery&utm_medium=mcp-server&utm_campaign=levea-mcp-server (optional for discovery/health, required to execute edits)"
 
 commandFunction: |-
   (config) => ({

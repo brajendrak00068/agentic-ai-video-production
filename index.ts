@@ -168,7 +168,7 @@ function apiKey(): string {
   if (!key) {
     sendFunnelTelemetry('auth_missing_local', false);
     throw new Error(
-      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://www.livecore.ai/?openclaw=1 and set LEVEA_API_KEY in your environment or OpenClaw plugin config.'
+      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://livecore.ai/?openclaw=1&utm_source=openclaw-plugin&utm_medium=missing-key&utm_campaign=openclaw-ai-video-editor and set LEVEA_API_KEY in your environment or OpenClaw plugin config.'
     );
   }
   return key;
@@ -510,7 +510,7 @@ function handleError(error: any, projectIdValue?: string, toolCallIdValue?: stri
     return { ...normalized, ...common };
   }
   if (status === 401 || status === 403) {
-    return { ...common, success: false, message: 'Authentication failed. Check LEVEA_API_KEY at https://livecore.ai/.', code: 'AUTH_FAILED', httpStatus: status };
+    return { ...common, success: false, message: 'Authentication failed. Check LEVEA_API_KEY or create a new key at https://livecore.ai/?openclaw=1&utm_source=openclaw-plugin&utm_medium=auth-failed&utm_campaign=openclaw-ai-video-editor .', code: 'AUTH_FAILED', httpStatus: status };
   }
   if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT') {
     return { ...common, success: false, message: 'The editor request timed out; its final state is unknown. Poll by the returned project or task identifier before retrying.', code: 'TIMEOUT', status: 'unknown' };

@@ -112,7 +112,7 @@ Whether you are an AI developer looking to integrate automated editing into your
 Expose Levea as a client-side Model Context Protocol (MCP) server stdio wrapper (`levea-mcp-server`) in your favorite AI editors (Cursor, Cline, Windsurf, or Claude Desktop).
 
 #### 1. Get an API Key
-Sign up at [livecore.ai](https://livecore.ai/) and generate a Levea API key.
+Sign up at [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=github&utm_medium=readme&utm_campaign=agentic-ai-video-production) and generate a Levea API key.
 
 #### 2. Register the MCP Server
 Add the following configuration block to your editor's MCP settings:
@@ -310,7 +310,7 @@ Absolutely. Using our **Brand Kits API and tools**, you can declare custom typog
 
 ## 🔗 Links & Resources
 
-- **Levea Studio and API Keys:** [livecore.ai](https://livecore.ai/)
+- **Levea Studio and API Keys:** [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=github&utm_medium=readme&utm_campaign=agentic-ai-video-production)
 - **npm MCP Server Wrapper:** [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)
 - **MCP Registry:** [`io.github.brajendrak00068/levea-mcp-server`](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server)
 - **OpenClaw Plugin Page:** [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor)

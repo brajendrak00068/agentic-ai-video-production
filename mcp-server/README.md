@@ -29,7 +29,7 @@
 
 The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)** MCP server — one server, every MCP client (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes), one tool surface, one backend contract, so nothing drifts per platform.
 
-**1. Get an API key** — sign up at **[livecore.ai](https://livecore.ai)** and generate an OpenClaw API key.
+**1. Get an API key** — sign up at **[livecore.ai](https://livecore.ai/?openclaw=1&utm_source=npm&utm_medium=mcp-server&utm_campaign=levea-mcp-server)** and generate an OpenClaw API key.
 
 **2. Add the MCP server** — the same `npx` line works for every MCP client:
 
@@ -427,7 +427,7 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 | ClawHub plugin | [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor) |
 | ClawHub skill (agentic) | [ai-agentic-video-editor](https://clawhub.ai/skills/ai-agentic-video-editor) |
 | ClawHub skill (Levea brand) | [levea-ai-video-editor](https://clawhub.ai/skills/levea-ai-video-editor) |
-| Sign up + API keys | [livecore.ai](https://livecore.ai/) |
+| Sign up + API keys | [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=npm&utm_medium=mcp-server&utm_campaign=levea-mcp-server) |
 | API base | `https://api.livecore.ai` |
 
 > Versions aren't pinned here — `npx -y levea-mcp-server` and the ClawHub listing always pull the latest, and the linked npm / ClawHub pages show the current version. You never need a specific number.
