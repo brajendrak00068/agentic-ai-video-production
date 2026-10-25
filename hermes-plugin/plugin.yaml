@@ -1,0 +1,18 @@
+name: levea-video-editor
+version: 1.0.0
+description: "Agentic AI video editing via Levea: one natural-language edit tool (trim, 9:16 reframe, captions, B-roll, multicam, audio cleanup, color, motion graphics, MP4 export) plus durable queue and status polling."
+author: brajendrak00068
+license: MIT
+homepage: https://livecore.ai
+requires_hermes: ">=0.21.6"
+provides_tools:
+  - levea_video_edit
+  - levea_queue_edit
+  - levea_job_status
+  - levea_task_status
+  - levea_active_task
+requires_env:
+  - name: LEVEA_API_KEY
+    description: "Levea API key (sign in at livecore.ai and generate one from your account)"
+    url: "https://livecore.ai/?utm_source=hermes-plugin"
+    secret: true
