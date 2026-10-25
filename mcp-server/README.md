@@ -61,6 +61,17 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
 
 > **This package on npm:** `npx -y levea-mcp-server` — no global install needed.
 
+### Hosted endpoint — no install
+
+Clients that connect to a remote MCP server by URL (Smithery, Claude / ChatGPT connectors, Cursor remote servers) can skip `npx` entirely:
+
+```
+URL:    https://api.livecore.ai/api/v1/misc/mcp      (Streamable HTTP, stateless)
+Header: Authorization: Bearer your-key-from-livecore.ai
+```
+
+Same tools, same backend. Clients that can't set headers may pass `?apiKey=...` instead. Tool listing works without a key; edits need one.
+
 Every client calls the **same backend** — the MCP server, this ClawHub listing, and every other surface share one tool contract.
 
 ### Two hosts — don't confuse them

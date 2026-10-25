@@ -27,7 +27,7 @@ async function main() {
   }
 
   // 2. Programmatically load compiled tools & extract metadata
-  log('Extracting compiled tool schemas from dist/index.js...');
+  log('Extracting compiled tool schemas from dist/server.js...');
   const manifestPath = path.join(__dirname, 'manifest.json');
   if (!fs.existsSync(manifestPath)) {
     console.error('❌ manifest.json not found!');
@@ -37,9 +37,9 @@ async function main() {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
   try {
-    const { TOOLS } = require('./dist/index.js');
+    const { TOOLS } = require('./dist/server.js');
     if (!TOOLS || !Array.isArray(TOOLS)) {
-      throw new Error('TOOLS array is missing or invalid in compiled dist/index.js');
+      throw new Error('TOOLS array is missing or invalid in compiled dist/server.js');
     }
 
     log(`Found ${TOOLS.length} tools. Syncing schemas into manifest.tools and manifest._meta...`);

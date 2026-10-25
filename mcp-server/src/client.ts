@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import { AsyncLocalStorage } from 'async_hooks';
 
 /**
  * Thin HTTP client for the Levea editor backend.
@@ -60,7 +61,34 @@ export interface SSEEvent {
 
 const DEFAULT_TIMEOUT_MS = 300_000;
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const MCP_CLIENT_VERSION = '0.5.4';
+const MCP_CLIENT_VERSION = '0.6.0';
+
+/**
+ * Per-request backend config for hosted (multi-tenant) MCP transports.
+ *
+ * The stdio binary serves exactly one user, so it reads LEVEA_API_URL /
+ * LEVEA_API_KEY from the process env. A hosted HTTP transport serves many
+ * users from one process, so each request runs inside `runWithLeveaConfig`
+ * with the caller's own key. Inside a scoped request the process env is never
+ * consulted for the key — a hosted server must not fall back to a shared key.
+ */
+export interface LeveaClientConfig {
+  apiKey?: string | undefined;
+  apiUrl?: string | undefined;
+  /** Free-form label sent as X-Levea-Client, e.g. "levea-mcp-hosted". */
+  clientLabel?: string | undefined;
+}
+
+const requestConfig = new AsyncLocalStorage<LeveaClientConfig>();
+
+export function runWithLeveaConfig<T>(config: LeveaClientConfig, fn: () => T): T {
+  return requestConfig.run(config, fn);
+}
+
+function clientHeader(): string {
+  const label = requestConfig.getStore()?.clientLabel || 'levea-mcp-server';
+  return `${label}/${MCP_CLIENT_VERSION}`;
+}
 
 function trimTrailingSlashes(s: string): string {
   let end = s.length;
@@ -85,8 +113,13 @@ function normalizeHostUrl(rawInput: string): string {
 function baseRoot(): string {
   // LEVEA_API_URL is canonical; ADSCENE_API_URL kept as silent backward-compat fallback.
   // Defaults to https://api.livecore.ai when omitted so users only need LEVEA_API_KEY.
+  const scoped = requestConfig.getStore();
   const raw = normalizeHostUrl(
-    String(process.env.LEVEA_API_URL || process.env.ADSCENE_API_URL || DEFAULT_LEVEA_API_URL)
+    String(
+      scoped
+        ? scoped.apiUrl || DEFAULT_LEVEA_API_URL
+        : process.env.LEVEA_API_URL || process.env.ADSCENE_API_URL || DEFAULT_LEVEA_API_URL
+    )
   );
   if (raw.endsWith('/api/v1/misc/openclaw/v1/execute')) {
     return raw.slice(0, -'/v1/execute'.length);
@@ -115,6 +148,16 @@ function sendMcpFunnelTelemetry(event: string, hasApiKey: boolean): void {
 }
 
 function apiKey(): string {
+  const scoped = requestConfig.getStore();
+  if (scoped) {
+    if (!scoped.apiKey) {
+      throw new Error(
+        'A Levea API key is required. Generate a free API key in 1 click at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-hosted&utm_medium=missing-key&utm_campaign=levea-mcp-server ' +
+          'and send it as `Authorization: Bearer <key>` (or the `apiKey` connection setting) when connecting to the hosted MCP endpoint.'
+      );
+    }
+    return scoped.apiKey;
+  }
   const key = process.env.LEVEA_API_KEY || process.env.ADSCENE_API_KEY;
   if (!key) {
     sendMcpFunnelTelemetry('auth_missing_local', false);
@@ -131,7 +174,7 @@ function http2(): AxiosInstance {
     headers: {
       Authorization: `Bearer ${apiKey()}`,
       'Content-Type': 'application/json',
-      'X-Levea-Client': `levea-mcp-server/${MCP_CLIENT_VERSION}`,
+      'X-Levea-Client': clientHeader(),
     },
     timeout: DEFAULT_TIMEOUT_MS,
     validateStatus: (s) => s < 500,
@@ -228,6 +271,7 @@ export async function executeStreaming(
           Authorization: `Bearer ${apiKey()}`,
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
+          'X-Levea-Client': clientHeader(),
           'Content-Length': Buffer.byteLength(body),
         },
       },

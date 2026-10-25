@@ -1,10 +1,10 @@
 {
   "name": "levea-mcp-server",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "Open-source MCP client for Levea autonomous AI video editor — natural-language video editing (viral clips, captions, vertical reframe, chroma key, audio cleanup, motion tracking, B-roll, voiceover, music, cloud MP4 export) for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, and Hermes.",
   "mcpName": "io.github.brajendrak00068/levea-mcp-server",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
   "bin": {
     "levea-mcp-server": "dist/index.js"
   },
@@ -20,7 +20,7 @@
     "start": "node dist/index.js",
     "dev": "tsc --watch",
     "publish-sync": "node mcp-publish-sync.js",
-    "scan-leaks": "bash ../scripts/scan-leaks.sh README.md SKILL.md server.json src/index.ts",
+    "scan-leaks": "bash ../scripts/scan-leaks.sh README.md SKILL.md server.json src/index.ts src/server.ts src/http.ts src/client.ts",
     "prepublishOnly": "npm run scan-leaks && npm run build"
   },
   "keywords": [
