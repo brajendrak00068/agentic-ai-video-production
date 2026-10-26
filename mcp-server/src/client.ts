@@ -61,7 +61,7 @@ export interface SSEEvent {
 
 const DEFAULT_TIMEOUT_MS = 300_000;
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const MCP_CLIENT_VERSION = '0.6.1';
+const MCP_CLIENT_VERSION = '0.6.2';
 
 /**
  * Per-request backend config for hosted (multi-tenant) MCP transports.

@@ -25,6 +25,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type Tool,
+  type ToolAnnotations,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   execute,
@@ -147,7 +148,7 @@ const AUTONOMOUS_EDIT_SCHEMA = {
   required: ['prompt'],
 } as const;
 
-export const TOOLS: Tool[] = [
+const TOOL_DEFS: Tool[] = [
   // ── Editing — single tool ────────────────────────────────────────────────
   {
     name: 'autonomous_edit',
@@ -412,6 +413,57 @@ export const TOOLS: Tool[] = [
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
 ];
+
+// Human-readable titles + safety hints for every tool (MCP tool annotations).
+// Keyed by tool name; `satisfies` keeps this exhaustive against TOOL_DEFS.
+type ToolName =
+  | 'autonomous_edit' | 'autonomous_edit_streaming' | 'queue_edit'
+  | 'check_job_status' | 'check_task_status' | 'get_active_task'
+  | 'list_caption_templates' | 'apply_caption_template' | 'save_caption_template'
+  | 'save_current_caption_template' | 'delete_caption_template'
+  | 'list_brand_kits' | 'get_brand_kit' | 'create_brand_kit' | 'update_brand_kit' | 'delete_brand_kit'
+  | 'list_projects' | 'get_project' | 'create_project' | 'delete_project'
+  | 'asset_upload_url' | 'list_assets' | 'delete_asset' | 'transcribe_asset'
+  | 'editor_health';
+
+const read = (title: string): ToolAnnotations => ({ title, readOnlyHint: true, openWorldHint: false });
+const write = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: false, openWorldHint: false });
+const destructive = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+
+const TOOL_ANNOTATIONS = {
+  // Edits can cut, replace, or remove content in the project, so they are marked destructive.
+  autonomous_edit: destructive('Edit video'),
+  autonomous_edit_streaming: destructive('Edit video (live progress)'),
+  queue_edit: destructive('Queue video edit'),
+  check_job_status: read('Check job status'),
+  check_task_status: read('Check task status'),
+  get_active_task: read('Get active task'),
+  list_caption_templates: read('List caption templates'),
+  apply_caption_template: write('Apply caption template'),
+  save_caption_template: write('Save caption template'),
+  save_current_caption_template: write('Save current captions as template'),
+  delete_caption_template: destructive('Delete caption template'),
+  list_brand_kits: read('List brand kits'),
+  get_brand_kit: read('Get brand kit'),
+  create_brand_kit: write('Create brand kit'),
+  update_brand_kit: destructive('Update brand kit'),
+  delete_brand_kit: destructive('Delete brand kit'),
+  list_projects: read('List projects'),
+  get_project: read('Get project'),
+  create_project: write('Create project'),
+  delete_project: destructive('Delete project'),
+  asset_upload_url: write('Get asset upload URL'),
+  list_assets: read('List assets'),
+  delete_asset: destructive('Delete asset'),
+  transcribe_asset: write('Transcribe asset'),
+  editor_health: read('Check editor health'),
+} satisfies Record<ToolName, ToolAnnotations>;
+
+export const TOOLS: Tool[] = TOOL_DEFS.map((tool) => {
+  const annotations = (TOOL_ANNOTATIONS as Record<string, ToolAnnotations>)[tool.name];
+  if (!annotations) throw new Error(`Missing annotations for MCP tool "${tool.name}"`);
+  return { ...tool, title: annotations.title, annotations };
+});
 
 // ───────────────────────────────────────────────────────────────────────────
 // Helpers

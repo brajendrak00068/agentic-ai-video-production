@@ -62,7 +62,6 @@ async function main() {
     // 2. Format tools to fit the object dictionary schema with inputSchema, outputSchema, annotations
     const toolsObj = {};
     for (const tool of TOOLS) {
-      const isReadOnly = ['list_assets', 'list_projects', 'get_brand_kit', 'list_brand_kits', 'list_caption_templates', 'check_job_status', 'check_task_status', 'get_active_task', 'editor_health'].includes(tool.name);
       toolsObj[tool.name] = {
         description: tool.description,
         inputSchema: tool.inputSchema,
@@ -77,8 +76,9 @@ async function main() {
             error: { type: 'string', description: 'Error message if failed' }
           }
         },
+        // Single source: the annotations declared on each tool in src/server.ts.
         annotations: {
-          readOnlyHint: isReadOnly,
+          ...tool.annotations,
           audience: ['user', 'assistant']
         }
       };

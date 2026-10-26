@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "levea-mcp-server",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "MCP server for the Levea autonomous AI video editor — natural-language video editing (viral clips, captions, vertical reframe, chroma key, audio cleanup, motion tracking, B-roll, voiceover, music, MP4 export) for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, and Hermes.",
   "author": {
     "name": "brajendrak00068"
@@ -154,7 +154,10 @@
           }
         },
         "annotations": {
+          "title": "Edit video",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -278,7 +281,10 @@
           }
         },
         "annotations": {
+          "title": "Edit video (live progress)",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -402,7 +408,10 @@
           }
         },
         "annotations": {
+          "title": "Queue video edit",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -457,7 +466,9 @@
           }
         },
         "annotations": {
+          "title": "Check job status",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -508,7 +519,9 @@
           }
         },
         "annotations": {
+          "title": "Check task status",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -559,7 +572,9 @@
           }
         },
         "annotations": {
+          "title": "Get active task",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -603,7 +618,9 @@
           }
         },
         "annotations": {
+          "title": "List caption templates",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -673,7 +690,10 @@
           }
         },
         "annotations": {
+          "title": "Apply caption template",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -736,7 +756,10 @@
           }
         },
         "annotations": {
+          "title": "Save caption template",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -795,7 +818,10 @@
           }
         },
         "annotations": {
+          "title": "Save current captions as template",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -845,7 +871,10 @@
           }
         },
         "annotations": {
+          "title": "Delete caption template",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -889,7 +918,9 @@
           }
         },
         "annotations": {
+          "title": "List brand kits",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -939,7 +970,9 @@
           }
         },
         "annotations": {
+          "title": "Get brand kit",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1024,7 +1057,10 @@
           }
         },
         "annotations": {
+          "title": "Create brand kit",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1101,7 +1137,10 @@
           }
         },
         "annotations": {
+          "title": "Update brand kit",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1151,7 +1190,10 @@
           }
         },
         "annotations": {
+          "title": "Delete brand kit",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1195,7 +1237,9 @@
           }
         },
         "annotations": {
+          "title": "List projects",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1245,7 +1289,9 @@
           }
         },
         "annotations": {
-          "readOnlyHint": false,
+          "title": "Get project",
+          "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1301,7 +1347,10 @@
           }
         },
         "annotations": {
+          "title": "Create project",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1351,7 +1400,10 @@
           }
         },
         "annotations": {
+          "title": "Delete project",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1413,7 +1465,10 @@
           }
         },
         "annotations": {
+          "title": "Get asset upload URL",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1465,7 +1520,9 @@
           }
         },
         "annotations": {
+          "title": "List assets",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1515,7 +1572,10 @@
           }
         },
         "annotations": {
+          "title": "Delete asset",
           "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1570,7 +1630,10 @@
           }
         },
         "annotations": {
+          "title": "Transcribe asset",
           "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
@@ -1614,7 +1677,9 @@
           }
         },
         "annotations": {
+          "title": "Check editor health",
           "readOnlyHint": true,
+          "openWorldHint": false,
           "audience": [
             "user",
             "assistant"
