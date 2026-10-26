@@ -436,8 +436,8 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 | npm (MCP server) | [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server) |
 | MCP Registry | `io.github.brajendrak00068/levea-mcp-server` ([registry](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server)) |
 | ClawHub plugin | [`openclaw-ai-video-editor`](https://clawhub.ai/plugins/openclaw-ai-video-editor) |
-| ClawHub skill (agentic) | [ai-agentic-video-editor](https://clawhub.ai/skills/ai-agentic-video-editor) |
-| ClawHub skill (Levea brand) | [levea-ai-video-editor](https://clawhub.ai/skills/levea-ai-video-editor) |
+| ClawHub skill (agentic) | [ai-agentic-video-editor](https://clawhub.ai/brajendrak00068/skills/ai-agentic-video-editor) |
+| ClawHub skill (Levea brand) | [levea-ai-video-editor](https://clawhub.ai/brajendrak00068/skills/levea-ai-video-editor) |
 | Sign up + API keys | [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=npm&utm_medium=mcp-server&utm_campaign=levea-mcp-server) |
 | API base | `https://api.livecore.ai` |
 
