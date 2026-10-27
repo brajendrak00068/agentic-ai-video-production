@@ -301,7 +301,7 @@ The MCP server exposes one high-level editing entry point plus typed management 
 | --- | --- | --- |
 | **Edit** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Single-entry edit prompts, SSE progress streaming, and asynchronous queuing. |
 | **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, B-roll generation, tracking status, and active tasks. |
-| **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template` | CRUD operations for 41+ styling templates (Hormozi, Minimal-Pro, typewriter...). |
+| **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template` | CRUD operations for styling templates (Hormozi, MrBeast, Viral Pop, Karaoke, …); `list_caption_templates` returns the exact ids. |
 | **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit` | Manage brand colors, fonts, logos, speaker voice clones, and grading rules. |
 | **Projects** | `list_projects`, `get_project`, `create_project` | Project workspace management. |
 | **Assets** | `asset_upload_url`, `list_assets`, `transcribe_asset` | Request signed upload URLs, list assets, and request fast Whisper transcriptions. |

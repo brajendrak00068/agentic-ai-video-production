@@ -15,7 +15,7 @@ small tool calls.
 ## When to use
 
 - Trimming, cutting, 9:16 vertical reframing, viral clips from long videos.
-- Captions (caption templates such as `hormozi`, `viral-pop`, `karaoke`, `minimal-pro`), titles, overlays, motion graphics.
+- Captions (caption templates such as `hormozi`, `viral-pop`, `karaoke`, `subtitle-bar`; `list_caption_templates` lists them all), titles, overlays, motion graphics.
 - B-roll, multicam podcast sync, audio cleanup, music, voiceover, color grading.
 - Exporting the verified timeline to MP4.
 

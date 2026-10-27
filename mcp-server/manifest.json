@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "levea-mcp-server",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "MCP server for the Levea autonomous AI video editor — natural-language video editing (viral clips, captions, vertical reframe, chroma key, audio cleanup, motion tracking, B-roll, voiceover, music, MP4 export) for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, and Hermes.",
   "author": {
     "name": "brajendrak00068"
@@ -89,7 +89,7 @@
             },
             "captionTemplatePreset": {
               "type": "string",
-              "description": "Optional caption template slug to apply when (re)generating captions. One of 41 builtins (hormozi, mrbeast, viral-pop, minimal-pro, karaoke, neon-pop, typewriter, pop-wave, subtitle-bar, creator-box, …) or a user-saved template id from list_caption_templates."
+              "description": "Optional caption template slug to apply when (re)generating captions. A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
             },
             "captionTemplateMode": {
               "type": "string",
@@ -216,7 +216,7 @@
             },
             "captionTemplatePreset": {
               "type": "string",
-              "description": "Optional caption template slug to apply when (re)generating captions. One of 41 builtins (hormozi, mrbeast, viral-pop, minimal-pro, karaoke, neon-pop, typewriter, pop-wave, subtitle-bar, creator-box, …) or a user-saved template id from list_caption_templates."
+              "description": "Optional caption template slug to apply when (re)generating captions. A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
             },
             "captionTemplateMode": {
               "type": "string",
@@ -343,7 +343,7 @@
             },
             "captionTemplatePreset": {
               "type": "string",
-              "description": "Optional caption template slug to apply when (re)generating captions. One of 41 builtins (hormozi, mrbeast, viral-pop, minimal-pro, karaoke, neon-pop, typewriter, pop-wave, subtitle-bar, creator-box, …) or a user-saved template id from list_caption_templates."
+              "description": "Optional caption template slug to apply when (re)generating captions. A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
             },
             "captionTemplateMode": {
               "type": "string",
