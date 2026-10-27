@@ -1,0 +1,16 @@
+{
+  "name": "levea",
+  "description": "Levea AI video editing plugins for Claude Code",
+  "owner": {
+    "name": "Levea (livecore.ai)",
+    "url": "https://livecore.ai"
+  },
+  "plugins": [
+    {
+      "name": "levea-video-editor",
+      "source": "./",
+      "description": "Autonomous natural-language video editing (viral clips, captions, vertical reframe, B-roll, multicam, MP4 export) via the hosted Levea MCP server with OAuth sign-in.",
+      "category": "productivity"
+    }
+  ]
+}
