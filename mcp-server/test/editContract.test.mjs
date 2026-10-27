@@ -77,3 +77,30 @@ test('every edit tool sends every contract field to the backend', async () => {
     }
   }
 });
+
+async function toolResultFor(responseStatus, responseBody, name, args) {
+  const backend = http.createServer((req, res) => {
+    req.resume(); req.on('end', () => { res.statusCode = responseStatus; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(responseBody)); });
+  });
+  await new Promise((r) => backend.listen(0, '127.0.0.1', r));
+  const child = spawn(process.execPath, [new URL('../dist/index.js', import.meta.url).pathname], {
+    env: { ...process.env, LEVEA_API_URL: `http://127.0.0.1:${backend.address().port}`, LEVEA_API_KEY: 'test-key-123456' }, stdio: ['pipe', 'pipe', 'ignore'],
+  });
+  const send = (m) => child.stdin.write(`${JSON.stringify(m)}\n`);
+  send({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } });
+  send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+  send({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+  const line = await new Promise((resolve) => { let out = ''; child.stdout.on('data', (d) => { out += d; const l = out.split('\n').find((x) => x.includes('"id":1')); if (l) resolve(l); }); setTimeout(() => resolve(''), 8000); });
+  child.kill(); backend.close();
+  return JSON.parse(line).result;
+}
+
+test('a backend failure is reported as an MCP tool error (isError)', async () => {
+  const r = await toolResultFor(400, { success: false, error: 'CAPTION_TEMPLATE_UNRESOLVED' }, 'queue_edit', { prompt: 'x', project_id: 'p', captionTemplatePreset: 'nope' });
+  assert.equal(r.isError, true);
+});
+
+test('a paused plan (awaiting_approval) is not an error', async () => {
+  const r = await toolResultFor(200, { success: false, type: 'awaiting_approval', workingMemory: { plan: [] }, reply: 'Approve this plan?' }, 'autonomous_edit', { prompt: 'x' });
+  assert.notEqual(r.isError, true);
+});
