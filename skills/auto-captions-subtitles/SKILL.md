@@ -35,7 +35,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `prompt` (string, required): Description of the video edit to perform.
 - `project_id` (string, optional): Project identifier returned by a prior call for multi-turn continuity.
 - `video_url` (string, optional): Source video URL when starting a new project.
-- `captionTemplatePreset` (string, optional): Built-in caption style slug (for example `hormozi`, `viral-pop`, `karaoke`, `minimal-pro`).
+- `captionTemplatePreset` (string, optional): Built-in caption style slug (for example `hormozi`, `viral-pop`, `karaoke`, `subtitle-bar`); call `list_caption_templates` for the exact ids.
 - `captionTemplateMode` (string, optional): One of `add`, `recreate`, `style`, `translate`, `clear`, `remove_fillers`.
 - `requirePlanApproval` (boolean, optional): When `true`, pauses after planning and returns `workingMemory` for user confirmation.
 - `workingMemory` (object, optional): State object from a paused plan-approval call.
@@ -52,7 +52,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Speech-to-text word timing alignment on the active timeline.
-- Built-in caption templates including karaoke, word-pill, typewriter, and minimal subtitle bars.
+- Built-in caption templates including karaoke, word-pill, viral-pop, and subtitle bars.
 - Safe-zone placement that avoids covering faces and lower-third graphics.
 - Multi-language subtitle translation.
 

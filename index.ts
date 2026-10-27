@@ -398,6 +398,8 @@ export async function handleQueueEditOperation(
     ...(Array.isArray(request.assets) ? { assets: request.assets } : {}),
     ...(Array.isArray(request.platforms) ? { platforms: request.platforms } : {}),
     ...(request.autoExport !== undefined ? { autoExport: request.autoExport } : {}),
+    ...(request.captionTemplatePreset ? { captionTemplatePreset: request.captionTemplatePreset } : {}),
+    ...(request.captionTemplateMode ? { captionTemplateMode: request.captionTemplateMode } : {}),
   }, context, {
     label: 'queue_edit',
     requireMessage: true,
@@ -611,6 +613,8 @@ const QUEUE_PARAMETERS = {
     assets: TOOL_PARAMETERS.properties.assets,
     platforms: { type: 'array', items: { type: 'string' }, description: 'Optional export platforms.' },
     autoExport: { type: 'boolean', description: 'Automatically export after the queued edit.' },
+    captionTemplatePreset: TOOL_PARAMETERS.properties.captionTemplatePreset,
+    captionTemplateMode: TOOL_PARAMETERS.properties.captionTemplateMode,
   },
   required: ['prompt', 'project_id'],
   additionalProperties: false,

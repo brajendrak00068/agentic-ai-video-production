@@ -72,7 +72,7 @@
                       },
                       "captionTemplatePreset": {
                         "type": "string",
-                        "description": "Optional caption template preset name (e.g. 'mrbeast', 'hormozi', 'neon-pop', 'typewriter')."
+                        "description": "Optional caption template preset name (e.g. 'mrbeast', 'hormozi', 'neon-pop', 'karaoke')."
                       },
                       "project_id": {
                         "type": "string",

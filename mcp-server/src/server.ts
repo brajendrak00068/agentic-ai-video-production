@@ -119,7 +119,7 @@ const AUTONOMOUS_EDIT_SCHEMA = {
       type: 'string',
       description:
         'Optional caption template slug to apply when (re)generating captions. ' +
-        'One of 41 builtins (hormozi, mrbeast, viral-pop, minimal-pro, karaoke, neon-pop, typewriter, pop-wave, subtitle-bar, creator-box, …) or a user-saved template id from list_caption_templates.',
+        'A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available.',
     },
     captionTemplateMode: {
       type: 'string',
@@ -585,6 +585,8 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
         params: { prompt: a.prompt, ...(a.video_url ? { video_url: a.video_url } : {}), ...(Array.isArray(a.assets) ? { assets: a.assets } : {}) },
         projectId: str(a.project_id) || `mcp_${Date.now()}`,
         ...(a.scene !== undefined ? { scene: a.scene } : {}),
+        ...(a.captionTemplatePreset ? { captionTemplatePreset: String(a.captionTemplatePreset) } : {}),
+        ...(a.captionTemplateMode ? { captionTemplateMode: String(a.captionTemplateMode) } : {}),
       });
       return ok(summarizeAny('queue_edit', r), r);
     }
