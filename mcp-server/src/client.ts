@@ -11,23 +11,8 @@ import { AsyncLocalStorage } from 'async_hooks';
  * (API-key auth). The MCP tool surface here mirrors what the route exposes.
  */
 
-export interface ExecuteArgs {
-  tool?: string;
-  params?: Record<string, unknown>;
-  project_id?: string;
-  scene?: unknown;
-  // Top-level typed params honored by the backend's autonomous_edit route.
-  requirePlanApproval?: boolean;
-  workingMemory?: Record<string, unknown>;
-  attachedImages?: string[];
-  flaggedIssues?: string[];
-  captionTemplatePreset?: string;
-  captionTemplateMode?: string;
-  core_only?: boolean;
-  brandId?: string;
-  projectBrandId?: string;
-  editedPlan?: Record<string, unknown>;
-}
+/** Backend edit request body, built from the edit contract (editContract.buildEditBody). */
+export type EditRequestBody = Record<string, unknown>;
 
 export interface ExecuteResult {
   success: boolean;
@@ -194,25 +179,10 @@ function describeError(err: unknown, label: string): never {
   throw new Error(`${label} failed${code ? ` (HTTP ${code})` : ''}: ${upstream}`);
 }
 
-function buildExecuteBody(args: ExecuteArgs): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    tool: args.tool || 'autonomous_edit',
-    params: args.params || {},
-    projectId: args.project_id || `mcp_${Date.now()}`,
-  };
-  if (args.scene !== undefined) body.scene = args.scene;
-  // Top-level typed pass-through (backend reads these directly).
-  if (args.requirePlanApproval !== undefined) body.requirePlanApproval = args.requirePlanApproval;
-  if (args.workingMemory !== undefined) body.workingMemory = args.workingMemory;
-  if (Array.isArray(args.attachedImages) && args.attachedImages.length > 0) body.attachedImages = args.attachedImages;
-  if (Array.isArray(args.flaggedIssues) && args.flaggedIssues.length > 0) body.flaggedIssues = args.flaggedIssues;
-  if (args.captionTemplatePreset) body.captionTemplatePreset = args.captionTemplatePreset;
-  if (args.captionTemplateMode) body.captionTemplateMode = args.captionTemplateMode;
-  if (args.core_only !== undefined) body.core_only = args.core_only;
-  if (args.brandId) body.brandId = args.brandId;
-  if (args.projectBrandId) body.projectBrandId = args.projectBrandId;
-  if (args.editedPlan !== undefined) body.editedPlan = args.editedPlan;
-  return body;
+function withProjectId(body: EditRequestBody): EditRequestBody {
+  if (body.projectId) return body;
+  const projectId = `mcp_${Date.now()}`;
+  return { ...body, projectId, project_id: projectId };
 }
 
 function flattenResult(d: Record<string, unknown>): ExecuteResult {
@@ -230,8 +200,8 @@ function flattenResult(d: Record<string, unknown>): ExecuteResult {
 }
 
 /** Execute autonomous_edit (or any allowed tool) — single JSON response. */
-export async function execute(args: ExecuteArgs): Promise<ExecuteResult> {
-  const body = buildExecuteBody(args);
+export async function execute(edit: EditRequestBody): Promise<ExecuteResult> {
+  const body = withProjectId(edit);
   try {
     const res = await http2().post(v1('/execute'), body);
     const d = (res.data || {}) as Record<string, unknown>;
@@ -241,7 +211,7 @@ export async function execute(args: ExecuteArgs): Promise<ExecuteResult> {
     }
     return flattenResult(d);
   } catch (err) {
-    return describeError(err, `execute(${args.tool || 'autonomous_edit'})`);
+    return describeError(err, `execute(${String(body.tool || 'autonomous_edit')})`);
   }
 }
 
@@ -253,10 +223,10 @@ export async function execute(args: ExecuteArgs): Promise<ExecuteResult> {
  * stream closes.
  */
 export async function executeStreaming(
-  args: ExecuteArgs,
+  edit: EditRequestBody,
   onEvent: (ev: SSEEvent) => void
 ): Promise<ExecuteResult> {
-  const body = JSON.stringify(buildExecuteBody(args));
+  const body = JSON.stringify(withProjectId(edit));
   const url = new URL(v1('/execute'));
   const isHttps = url.protocol === 'https:';
   const transport = isHttps ? https : http;
@@ -453,9 +423,9 @@ export async function deleteCaptionTemplate(templateId: string): Promise<unknown
 // Queue / task status  (already exposed)
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function queueEdit(body: Record<string, unknown>): Promise<unknown> {
+export async function queueEdit(edit: EditRequestBody): Promise<unknown> {
   try {
-    const res = await http2().post(v1('/queue-edit'), body);
+    const res = await http2().post(v1('/queue-edit'), withProjectId(edit));
     return res.data;
   } catch (err) {
     return describeError(err, 'queueEdit');

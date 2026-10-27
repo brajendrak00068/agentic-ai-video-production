@@ -21,7 +21,9 @@
     "dev": "tsc --watch",
     "publish-sync": "node mcp-publish-sync.js",
     "scan-leaks": "bash ../scripts/scan-leaks.sh README.md SKILL.md server.json src/index.ts src/server.ts src/http.ts src/client.ts",
-    "prepublishOnly": "npm run scan-leaks && npm run build"
+    "prepublishOnly": "node ../scripts/sync-contract.mjs --check && npm run scan-leaks && npm run build",
+    "test": "node --test test/*.test.mjs",
+    "sync-contract": "node ../scripts/sync-contract.mjs"
   },
   "keywords": [
     "mcp",

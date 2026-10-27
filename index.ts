@@ -1,3 +1,4 @@
+import { buildEditBody, editInputSchema } from './contract/editContract';
 import axios from 'axios';
 import { definePluginEntry } from 'openclaw/plugin-sdk/core';
 
@@ -326,27 +327,6 @@ async function callBackend(
   }
 }
 
-function copyTypedEditParams(request: EditorRequest): {
-  params: Record<string, any>;
-  topLevel: Record<string, any>;
-} {
-  const params: Record<string, any> = { prompt: firstString(request.prompt) };
-  if (request.video_url) params.video_url = request.video_url;
-  if (Array.isArray(request.assets) && request.assets.length > 0) params.assets = request.assets;
-
-  const topLevel: Record<string, any> = {};
-  if (request.requirePlanApproval !== undefined) topLevel.requirePlanApproval = request.requirePlanApproval;
-  if (request.workingMemory !== undefined) topLevel.workingMemory = request.workingMemory;
-  if (Array.isArray(request.attachedImages) && request.attachedImages.length > 0) topLevel.attachedImages = request.attachedImages;
-  if (Array.isArray(request.flaggedIssues) && request.flaggedIssues.length > 0) topLevel.flaggedIssues = request.flaggedIssues;
-  if (request.captionTemplatePreset) topLevel.captionTemplatePreset = request.captionTemplatePreset;
-  if (request.captionTemplateMode) topLevel.captionTemplateMode = request.captionTemplateMode;
-  if (request.core_only !== undefined) topLevel.core_only = request.core_only;
-  if (request.brandId) topLevel.brandId = request.brandId;
-  if (request.projectBrandId) topLevel.projectBrandId = request.projectBrandId;
-  if (request.editedPlan !== undefined) topLevel.editedPlan = request.editedPlan;
-  return { params, topLevel };
-}
 
 export async function handleEditorOperation(
   request: EditorRequest,
@@ -358,14 +338,8 @@ export async function handleEditorOperation(
   }
 
   const projectId = firstString(request.project_id);
-  const { params, topLevel } = copyTypedEditParams({ ...request, prompt });
-  const body: Record<string, any> = {
-    tool: 'autonomous_edit',
-    params,
-    ...(projectId ? { projectId, project_id: projectId } : {}),
-    ...(request.scene !== undefined ? { scene: request.scene } : {}),
-    ...topLevel,
-  };
+  // Every field comes from the edit contract (contract/edit-contract.json).
+  const body = buildEditBody({ ...request, prompt }, 'all');
 
   return callBackend('POST', '/execute', body, context, {
     label: 'autonomous_edit',
@@ -390,17 +364,7 @@ export async function handleQueueEditOperation(
     };
   }
 
-  return callBackend('POST', '/queue-edit', {
-    prompt,
-    projectId,
-    project_id: projectId,
-    ...(request.scene !== undefined ? { scene: request.scene } : {}),
-    ...(Array.isArray(request.assets) ? { assets: request.assets } : {}),
-    ...(Array.isArray(request.platforms) ? { platforms: request.platforms } : {}),
-    ...(request.autoExport !== undefined ? { autoExport: request.autoExport } : {}),
-    ...(request.captionTemplatePreset ? { captionTemplatePreset: request.captionTemplatePreset } : {}),
-    ...(request.captionTemplateMode ? { captionTemplateMode: request.captionTemplateMode } : {}),
-  }, context, {
+  return callBackend('POST', '/queue-edit', buildEditBody({ ...request, prompt, project_id: projectId }, 'queue'), context, {
     label: 'queue_edit',
     requireMessage: true,
     fallbackProjectId: projectId,
@@ -564,61 +528,15 @@ export function toOpenClawToolResult(result: EditorResponse) {
   };
 }
 
-const TOOL_PARAMETERS = {
-  type: 'object',
-  properties: {
-    prompt: {
-      type: 'string',
-      minLength: 1,
-      description:
-        'Natural-language description of the desired video edit. Send the complete user intent in one prompt; the backend owns decomposition, execution, and verification.',
-    },
-    video_url: { type: 'string', description: 'Optional source video URL for a new project.' },
-    assets: {
-      type: 'array',
-      description: 'Optional asset descriptors used to seed a new scene.',
-      items: { type: 'object' },
-    },
-    project_id: {
-      type: 'string',
-      minLength: 1,
-      description: 'Stable project identifier. Reuse the projectId returned by the first call for every continuation.',
-    },
-    scene: { type: 'object', description: 'Optional scene used only to bootstrap a project without a committed scene.' },
-    requirePlanApproval: { type: 'boolean', description: 'Pause after planning and return workingMemory for approval.' },
-    workingMemory: { type: 'object', description: 'Working memory returned by an awaiting-approval call; resend it to resume.' },
-    attachedImages: { type: 'array', items: { type: 'string' }, description: 'Reference images for planning.' },
-    flaggedIssues: { type: 'array', items: { type: 'string' }, description: 'Specific issues the editor must repair.' },
-    captionTemplatePreset: { type: 'string', description: 'Caption template slug or saved template id.' },
-    captionTemplateMode: {
-      type: 'string',
-      enum: ['add', 'recreate', 'style', 'translate', 'clear', 'remove_fillers'],
-      description: 'Caption-template operation mode.',
-    },
-    core_only: { type: 'boolean', description: 'Return rendering-essential scene fields only.' },
-    brandId: { type: 'string', description: 'Per-call brand profile id.' },
-    projectBrandId: { type: 'string', description: 'Default brand profile for this project.' },
-    editedPlan: { type: 'object', description: 'User-edited plan returned by a prior approval pause.' },
-  },
-  required: ['prompt'],
-  additionalProperties: false,
-} as const;
+// Tool input schemas come from the edit contract (contract/edit-contract.json).
+const TOOL_PARAMETERS = { ...editInputSchema('all'), additionalProperties: false };
 
 const QUEUE_PARAMETERS = {
-  type: 'object',
-  properties: {
-    prompt: TOOL_PARAMETERS.properties.prompt,
-    project_id: TOOL_PARAMETERS.properties.project_id,
-    scene: TOOL_PARAMETERS.properties.scene,
-    assets: TOOL_PARAMETERS.properties.assets,
-    platforms: { type: 'array', items: { type: 'string' }, description: 'Optional export platforms.' },
-    autoExport: { type: 'boolean', description: 'Automatically export after the queued edit.' },
-    captionTemplatePreset: TOOL_PARAMETERS.properties.captionTemplatePreset,
-    captionTemplateMode: TOOL_PARAMETERS.properties.captionTemplateMode,
-  },
+  ...editInputSchema('queue'),
+  // A queued edit must attach to a known project, never a shared default.
   required: ['prompt', 'project_id'],
   additionalProperties: false,
-} as const;
+};
 
 const JOB_STATUS_PARAMETERS = {
   type: 'object',

@@ -44,52 +44,56 @@
           "properties": {
             "prompt": {
               "type": "string",
-              "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose into multiple calls."
+              "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose."
             },
             "project_id": {
               "type": "string",
-              "description": "Optional project id for tracking / continuity."
+              "description": "Optional project id for tracking and continuity. Reuse the projectId returned by the first call for every continuation."
             },
             "video_url": {
               "type": "string",
-              "description": "Optional source video URL. Auto-seeded as the starting layer when no scene is provided."
+              "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. Local file paths are not supported."
             },
             "assets": {
               "type": "array",
-              "description": "Optional asset descriptors. Each item: { id?, type: \"video\"|\"image\"|\"audio\", url|src, mimeType?, duration? }.",
+              "description": "Optional input media assets. URLs must be public HTTP/HTTPS links.",
               "items": {
-                "type": "object"
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Publicly accessible HTTP/HTTPS URL to the video, image, or audio asset."
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "video",
+                      "audio",
+                      "image"
+                    ]
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                }
               }
             },
             "scene": {
               "type": "object",
               "description": "Optional existing scene/timeline state to continue editing (advanced)."
             },
-            "requirePlanApproval": {
-              "type": "boolean",
-              "description": "If true, the agent stops after planning and returns { status: \"awaiting_approval\", workingMemory, plan } without mutating. Resume by re-calling with the returned workingMemory + an approval prompt (\"yes\", \"approve\", \"do it\")."
-            },
-            "workingMemory": {
-              "type": "object",
-              "description": "Working-memory snapshot returned by a prior call (typically one that returned awaiting_approval). Re-sending resumes that run."
-            },
-            "attachedImages": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional base64-encoded reference images the agent should consider while planning."
-            },
-            "flaggedIssues": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional list of specific user-flagged problems for this run (e.g. [\"caption #3 misspelled\"])."
-            },
             "captionTemplatePreset": {
               "type": "string",
-              "description": "Optional caption template slug to apply when (re)generating captions. A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
+              "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
             },
             "captionTemplateMode": {
               "type": "string",
@@ -103,21 +107,43 @@
               ],
               "description": "How to apply captionTemplatePreset."
             },
-            "core_only": {
+            "requirePlanApproval": {
               "type": "boolean",
-              "description": "If true, response carries only rendering-essential scene fields (no debug metadata)."
+              "description": "If true, the backend stops after planning and returns workingMemory for user approval. Resend with workingMemory (and optionally editedPlan) to continue."
+            },
+            "workingMemory": {
+              "type": "object",
+              "description": "Working memory returned by an awaiting-approval call; resend it to resume."
+            },
+            "editedPlan": {
+              "type": "object",
+              "description": "Optional pre-edited plan object returned by a prior awaiting_approval response."
+            },
+            "attachedImages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional reference image URLs used for planning."
+            },
+            "flaggedIssues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of specific user-flagged problems for this run (e.g. [\"caption #3 misspelled\"])."
             },
             "brandId": {
               "type": "string",
-              "description": "Optional brand-profile id to apply for this call (palette, fonts, logo, voice, gradeBias). Look up ids via list_brand_kits. Overrides project default brand."
+              "description": "Optional per-call brand profile id (see list_brand_kits)."
             },
             "projectBrandId": {
               "type": "string",
               "description": "Optional default brand for the project. Persists; per-call brandId overrides."
             },
-            "editedPlan": {
-              "type": "object",
-              "description": "Optional pre-edited plan object returned by a prior awaiting_approval response."
+            "core_only": {
+              "type": "boolean",
+              "description": "Return rendering-essential scene fields only (smaller payloads)."
             }
           },
           "required": [
@@ -171,52 +197,56 @@
           "properties": {
             "prompt": {
               "type": "string",
-              "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose into multiple calls."
+              "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose."
             },
             "project_id": {
               "type": "string",
-              "description": "Optional project id for tracking / continuity."
+              "description": "Optional project id for tracking and continuity. Reuse the projectId returned by the first call for every continuation."
             },
             "video_url": {
               "type": "string",
-              "description": "Optional source video URL. Auto-seeded as the starting layer when no scene is provided."
+              "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. Local file paths are not supported."
             },
             "assets": {
               "type": "array",
-              "description": "Optional asset descriptors. Each item: { id?, type: \"video\"|\"image\"|\"audio\", url|src, mimeType?, duration? }.",
+              "description": "Optional input media assets. URLs must be public HTTP/HTTPS links.",
               "items": {
-                "type": "object"
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Publicly accessible HTTP/HTTPS URL to the video, image, or audio asset."
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "video",
+                      "audio",
+                      "image"
+                    ]
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                }
               }
             },
             "scene": {
               "type": "object",
               "description": "Optional existing scene/timeline state to continue editing (advanced)."
             },
-            "requirePlanApproval": {
-              "type": "boolean",
-              "description": "If true, the agent stops after planning and returns { status: \"awaiting_approval\", workingMemory, plan } without mutating. Resume by re-calling with the returned workingMemory + an approval prompt (\"yes\", \"approve\", \"do it\")."
-            },
-            "workingMemory": {
-              "type": "object",
-              "description": "Working-memory snapshot returned by a prior call (typically one that returned awaiting_approval). Re-sending resumes that run."
-            },
-            "attachedImages": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional base64-encoded reference images the agent should consider while planning."
-            },
-            "flaggedIssues": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional list of specific user-flagged problems for this run (e.g. [\"caption #3 misspelled\"])."
-            },
             "captionTemplatePreset": {
               "type": "string",
-              "description": "Optional caption template slug to apply when (re)generating captions. A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
+              "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
             },
             "captionTemplateMode": {
               "type": "string",
@@ -230,21 +260,43 @@
               ],
               "description": "How to apply captionTemplatePreset."
             },
-            "core_only": {
+            "requirePlanApproval": {
               "type": "boolean",
-              "description": "If true, response carries only rendering-essential scene fields (no debug metadata)."
+              "description": "If true, the backend stops after planning and returns workingMemory for user approval. Resend with workingMemory (and optionally editedPlan) to continue."
+            },
+            "workingMemory": {
+              "type": "object",
+              "description": "Working memory returned by an awaiting-approval call; resend it to resume."
+            },
+            "editedPlan": {
+              "type": "object",
+              "description": "Optional pre-edited plan object returned by a prior awaiting_approval response."
+            },
+            "attachedImages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional reference image URLs used for planning."
+            },
+            "flaggedIssues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of specific user-flagged problems for this run (e.g. [\"caption #3 misspelled\"])."
             },
             "brandId": {
               "type": "string",
-              "description": "Optional brand-profile id to apply for this call (palette, fonts, logo, voice, gradeBias). Look up ids via list_brand_kits. Overrides project default brand."
+              "description": "Optional per-call brand profile id (see list_brand_kits)."
             },
             "projectBrandId": {
               "type": "string",
               "description": "Optional default brand for the project. Persists; per-call brandId overrides."
             },
-            "editedPlan": {
-              "type": "object",
-              "description": "Optional pre-edited plan object returned by a prior awaiting_approval response."
+            "core_only": {
+              "type": "boolean",
+              "description": "Return rendering-essential scene fields only (smaller payloads)."
             }
           },
           "required": [
@@ -298,52 +350,56 @@
           "properties": {
             "prompt": {
               "type": "string",
-              "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose into multiple calls."
+              "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose."
             },
             "project_id": {
               "type": "string",
-              "description": "Optional project id for tracking / continuity."
+              "description": "Optional project id for tracking and continuity. Reuse the projectId returned by the first call for every continuation."
             },
             "video_url": {
               "type": "string",
-              "description": "Optional source video URL. Auto-seeded as the starting layer when no scene is provided."
+              "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. Local file paths are not supported."
             },
             "assets": {
               "type": "array",
-              "description": "Optional asset descriptors. Each item: { id?, type: \"video\"|\"image\"|\"audio\", url|src, mimeType?, duration? }.",
+              "description": "Optional input media assets. URLs must be public HTTP/HTTPS links.",
               "items": {
-                "type": "object"
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Publicly accessible HTTP/HTTPS URL to the video, image, or audio asset."
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "video",
+                      "audio",
+                      "image"
+                    ]
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                }
               }
             },
             "scene": {
               "type": "object",
               "description": "Optional existing scene/timeline state to continue editing (advanced)."
             },
-            "requirePlanApproval": {
-              "type": "boolean",
-              "description": "If true, the agent stops after planning and returns { status: \"awaiting_approval\", workingMemory, plan } without mutating. Resume by re-calling with the returned workingMemory + an approval prompt (\"yes\", \"approve\", \"do it\")."
-            },
-            "workingMemory": {
-              "type": "object",
-              "description": "Working-memory snapshot returned by a prior call (typically one that returned awaiting_approval). Re-sending resumes that run."
-            },
-            "attachedImages": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional base64-encoded reference images the agent should consider while planning."
-            },
-            "flaggedIssues": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional list of specific user-flagged problems for this run (e.g. [\"caption #3 misspelled\"])."
-            },
             "captionTemplatePreset": {
               "type": "string",
-              "description": "Optional caption template slug to apply when (re)generating captions. A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
+              "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
             },
             "captionTemplateMode": {
               "type": "string",
@@ -357,21 +413,16 @@
               ],
               "description": "How to apply captionTemplatePreset."
             },
-            "core_only": {
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional export platforms for the queued edit."
+            },
+            "autoExport": {
               "type": "boolean",
-              "description": "If true, response carries only rendering-essential scene fields (no debug metadata)."
-            },
-            "brandId": {
-              "type": "string",
-              "description": "Optional brand-profile id to apply for this call (palette, fonts, logo, voice, gradeBias). Look up ids via list_brand_kits. Overrides project default brand."
-            },
-            "projectBrandId": {
-              "type": "string",
-              "description": "Optional default brand for the project. Persists; per-call brandId overrides."
-            },
-            "editedPlan": {
-              "type": "object",
-              "description": "Optional pre-edited plan object returned by a prior awaiting_approval response."
+              "description": "Automatically export after the queued edit."
             }
           },
           "required": [

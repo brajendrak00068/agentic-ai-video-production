@@ -5,17 +5,19 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "index.ts",
+    "README.md",
+    "contract",
     "dist",
+    "index.ts",
     "openclaw.plugin.json",
-    "skills",
-    "README.md"
+    "skills"
   ],
   "scripts": {
     "build": "tsc",
     "scan-leaks": "bash scripts/scan-leaks.sh README.md skills/openclaw-ai-video-editor/SKILL.md openclaw.plugin.json",
-    "prepublishOnly": "npm run scan-leaks && npm run build",
-    "test": "echo \"No tests yet\" && exit 0"
+    "prepublishOnly": "node scripts/sync-contract.mjs --check && npm run scan-leaks && npm run build",
+    "test": "echo \"No tests yet\" && exit 0",
+    "sync-contract": "node scripts/sync-contract.mjs"
   },
   "keywords": [
     "openclaw",
