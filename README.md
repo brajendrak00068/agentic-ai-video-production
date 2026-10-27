@@ -107,6 +107,23 @@ All revisions are saved in a durable, linear undo/redo history backed by immutab
 
 Whether you are an AI developer looking to integrate automated editing into your agent loops, or a content creator building an automated faceless channel, Levea has a native path for you.
 
+### 🟣 Claude Code plugin (one command)
+
+Install Levea as a Claude Code plugin. It bundles the hosted Levea MCP server (OAuth sign-in, nothing to run locally) and the Levea editing skills:
+
+```
+/plugin install levea-video-editor --marketplace brajendrak00068/agentic-ai-video-production
+```
+
+Or from your shell:
+
+```bash
+claude plugin marketplace add brajendrak00068/agentic-ai-video-production
+claude plugin install levea-video-editor@levea
+```
+
+On first use, run `/mcp`, select **levea**, and sign in to your Levea account in the browser. Then describe the edit, for example: *"Cut a 30-second vertical clip from https://example.com/talk.mp4 with word-by-word captions and export an MP4."*
+
 ### 🧑‍💻 Path A: For Developers & AI Engineers (The MCP Route)
 
 Expose Levea as a client-side Model Context Protocol (MCP) server stdio wrapper (`levea-mcp-server`) in your favorite AI editors (Cursor, Cline, Windsurf, or Claude Desktop).

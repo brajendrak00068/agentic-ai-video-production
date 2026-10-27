@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "levea-video-editor",
+  "displayName": "Levea AI Video Editor",
+  "version": "1.0.0",
+  "description": "Autonomous natural-language video editing: viral clips, word-by-word captions and subtitles, 9:16 vertical reframe, silence removal, B-roll and motion graphics, multicam podcasts, color grading, and cloud MP4 export. Connects to the hosted Levea MCP server with OAuth sign-in.",
+  "author": {
+    "name": "Levea (livecore.ai)",
+    "url": "https://livecore.ai"
+  },
+  "homepage": "https://livecore.ai",
+  "repository": "https://github.com/brajendrak00068/agentic-ai-video-production",
+  "license": "MIT",
+  "keywords": [
+    "video",
+    "video-editing",
+    "ai-video-editor",
+    "captions",
+    "subtitles",
+    "viral-clips",
+    "reels",
+    "tiktok",
+    "youtube-shorts",
+    "vertical-reframe",
+    "b-roll",
+    "motion-graphics",
+    "podcast",
+    "mcp"
+  ],
+  "icon": "./assets/logo-icon-400.png",
+  "documentationUrl": "https://github.com/brajendrak00068/agentic-ai-video-production#readme",
+  "supportUrl": "https://github.com/brajendrak00068/agentic-ai-video-production/issues",
+  "privacyPolicyUrl": "https://livecore.ai/privacy",
+  "termsOfServiceUrl": "https://livecore.ai/terms",
+  "mcpServers": {
+    "levea": {
+      "type": "http",
+      "url": "https://api.livecore.ai/api/v1/misc/mcp"
+    }
+  }
+}
