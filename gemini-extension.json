@@ -1,6 +1,6 @@
 {
   "name": "levea-ai-video-editor",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Prompt-first autonomous AI video editor: viral clips, captions, 9:16 reframe, chroma key, B-roll, voiceover, music and MP4 export.",
   "mcpServers": {
     "levea": {

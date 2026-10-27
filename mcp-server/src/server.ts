@@ -408,10 +408,25 @@ function summarizeExec(r: ExecuteResult): string {
   return lines.join('\n');
 }
 
+// Edit outcomes that carry success:false but are not errors: the client is
+// expected to continue (approve the plan, answer a question, poll pending work).
+const NON_ERROR_OUTCOMES: ReadonlySet<string> = new Set(['awaiting_approval', 'awaiting_input', 'partial_success']);
+
+// Every tool result goes through here. A backend failure must set `isError`
+// (MCP clients read the flag, not the ❌ in the text).
+function isFailure(structured: unknown): boolean {
+  if (!structured || typeof structured !== 'object') return false;
+  const r = structured as { success?: unknown; type?: unknown; raw?: { type?: unknown } };
+  if (r.success !== false) return false;
+  const outcome = String(r.type ?? r.raw?.type ?? '');
+  return !NON_ERROR_OUTCOMES.has(outcome);
+}
 function ok(text: string, structured: unknown) {
+  const failed = isFailure(structured);
   return {
     content: [{ type: 'text' as const, text }],
     structuredContent: structured as Record<string, unknown>,
+    ...(failed ? { isError: true } : {}),
   };
 }
 function fail(text: string, structured?: unknown) {
