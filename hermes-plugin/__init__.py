@@ -254,10 +254,55 @@ def _to_tool_result(result: dict) -> str:
 # Tool handlers (accept (args, **kwargs), always return a JSON string)
 # ---------------------------------------------------------------------------
 
-_EDIT_TOP_LEVEL_KEYS = (
-    "requirePlanApproval", "workingMemory", "captionTemplatePreset", "captionTemplateMode",
-    "core_only", "brandId", "projectBrandId", "editedPlan",
-)
+# Edit request fields come from edit_contract.json, a synced copy of the repo's
+# single source of truth (contract/edit-contract.json). Both the tool schemas
+# and the backend bodies loop over its fields, so no field can be dropped.
+_CONTRACT = json.loads((Path(__file__).parent / "edit_contract.json").read_text(encoding="utf-8"))
+
+
+def _contract_fields(surface: str) -> list:
+    return [f for f in _CONTRACT["fields"] if surface in f["surfaces"]]
+
+
+def _edit_schema(surface: str, required: Optional[list] = None) -> dict:
+    fields = _contract_fields(surface)
+    names = {f["name"] for f in fields}
+    return {
+        "type": "object",
+        "properties": {f["name"]: f["schema"] for f in fields},
+        "required": required or [n for n in _CONTRACT["required"] if n in names],
+        "additionalProperties": False,
+    }
+
+
+def _normalize(field: dict, value: Any) -> Any:
+    if value is None:
+        return None
+    kind = field["schema"].get("type")
+    if kind == "string":
+        return None if isinstance(value, str) and not value.strip() else str(value)
+    if kind == "boolean":
+        return bool(value)
+    if kind == "array":
+        return value if isinstance(value, list) and value else None
+    return value
+
+
+def _build_edit_body(args: dict, surface: str) -> dict:
+    params: dict = {}
+    body: dict = {"tool": "autonomous_edit", "params": params}
+    for field in _contract_fields(surface):
+        value = _normalize(field, args.get(field["name"]))
+        if value is None:
+            continue
+        if field["placement"] == "param":
+            params[field["name"]] = value
+        elif field["placement"] == "project":
+            body["projectId"] = value
+            body["project_id"] = value
+        else:
+            body[field["name"]] = value
+    return body
 
 
 def handle_video_edit(args: dict, **kwargs) -> str:
@@ -268,23 +313,7 @@ def handle_video_edit(args: dict, **kwargs) -> str:
             return json.dumps({"success": False, "status": "error", "code": "MISSING_PROMPT",
                                "message": "Missing required parameter: prompt."})
         project_id = _first_string(args.get("project_id"))
-        params: dict = {"prompt": prompt}
-        if _first_string(args.get("video_url")):
-            params["video_url"] = args["video_url"]
-        if isinstance(args.get("assets"), list) and args["assets"]:
-            params["assets"] = args["assets"]
-        body: dict = {"tool": "autonomous_edit", "params": params}
-        if project_id:
-            body["projectId"] = project_id
-            body["project_id"] = project_id
-        if args.get("scene") is not None:
-            body["scene"] = args["scene"]
-        for key in ("attachedImages", "flaggedIssues"):
-            if isinstance(args.get(key), list) and args[key]:
-                body[key] = args[key]
-        for key in _EDIT_TOP_LEVEL_KEYS:
-            if args.get(key) is not None and args.get(key) != "":
-                body[key] = args[key]
+        body = _build_edit_body({**args, "prompt": prompt}, "all")
         return _to_tool_result(_call_backend(
             "POST", "/execute", body, label="autonomous_edit", require_message=True,
             require_verification=True, fallback_project_id=project_id))
@@ -304,14 +333,7 @@ def handle_queue_edit(args: dict, **kwargs) -> str:
             return json.dumps({"success": False, "status": "error", "code": "MISSING_PROJECT_ID",
                                "message": "levea_queue_edit requires a stable project_id so the queued "
                                           "edit cannot attach to a shared default project."})
-        body: dict = {"prompt": prompt, "projectId": project_id, "project_id": project_id}
-        if args.get("scene") is not None:
-            body["scene"] = args["scene"]
-        for key in ("assets", "platforms"):
-            if isinstance(args.get(key), list):
-                body[key] = args[key]
-        if isinstance(args.get("autoExport"), bool):
-            body["autoExport"] = args["autoExport"]
+        body = _build_edit_body({**args, "prompt": prompt, "project_id": project_id}, "queue")
         return _to_tool_result(_call_backend(
             "POST", "/queue-edit", body, label="queue_edit", require_message=True,
             fallback_project_id=project_id))
@@ -373,19 +395,11 @@ def handle_active_task(args: dict, **kwargs) -> str:
 # Schemas
 # ---------------------------------------------------------------------------
 
-_PROMPT = {
-    "type": "string",
-    "minLength": 1,
-    "description": ("Natural-language description of the desired video edit. Send the complete user "
-                    "intent in one prompt; the backend owns decomposition, execution, and verification."),
-}
 _PROJECT_ID = {
     "type": "string",
     "minLength": 1,
     "description": "Stable project identifier. Reuse the projectId returned by the first call for every continuation.",
 }
-_SCENE = {"type": "object", "description": "Optional scene used only to bootstrap a project without a committed scene."}
-_ASSETS = {"type": "array", "items": {"type": "object"}, "description": "Optional asset descriptors used to seed a new scene."}
 
 VIDEO_EDIT_SCHEMA = {
     "name": "levea_video_edit",
@@ -395,50 +409,13 @@ VIDEO_EDIT_SCHEMA = {
         "several minutes. success is true only after the backend's authoritative verification; partial, "
         "pending, and failed outcomes are explicit in status. Reuse the returned projectId for follow-up edits."
     ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "prompt": _PROMPT,
-            "video_url": {"type": "string", "description": "Optional source video URL for a new project."},
-            "assets": _ASSETS,
-            "project_id": _PROJECT_ID,
-            "scene": _SCENE,
-            "requirePlanApproval": {"type": "boolean", "description": "Pause after planning and return workingMemory for approval."},
-            "workingMemory": {"type": "object", "description": "Working memory returned by an awaiting-approval call; resend it to resume."},
-            "attachedImages": {"type": "array", "items": {"type": "string"}, "description": "Reference images for planning."},
-            "flaggedIssues": {"type": "array", "items": {"type": "string"}, "description": "Specific issues the editor must repair."},
-            "captionTemplatePreset": {"type": "string", "description": "Caption template slug or saved template id."},
-            "captionTemplateMode": {
-                "type": "string",
-                "enum": ["add", "recreate", "style", "translate", "clear", "remove_fillers"],
-                "description": "Caption-template operation mode.",
-            },
-            "core_only": {"type": "boolean", "description": "Return rendering-essential scene fields only."},
-            "brandId": {"type": "string", "description": "Per-call brand profile id."},
-            "projectBrandId": {"type": "string", "description": "Default brand profile for this project."},
-            "editedPlan": {"type": "object", "description": "User-edited plan returned by a prior approval pause."},
-        },
-        "required": ["prompt"],
-        "additionalProperties": False,
-    },
+    "parameters": _edit_schema("all"),
 }
 
 QUEUE_EDIT_SCHEMA = {
     "name": "levea_queue_edit",
     "description": "Queue a long-running Levea edit against a required stable project_id; poll the returned taskId with levea_task_status.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "prompt": _PROMPT,
-            "project_id": _PROJECT_ID,
-            "scene": _SCENE,
-            "assets": _ASSETS,
-            "platforms": {"type": "array", "items": {"type": "string"}, "description": "Optional export platforms."},
-            "autoExport": {"type": "boolean", "description": "Automatically export after the queued edit."},
-        },
-        "required": ["prompt", "project_id"],
-        "additionalProperties": False,
-    },
+    "parameters": _edit_schema("queue", required=["prompt", "project_id"]),
 }
 
 JOB_STATUS_SCHEMA = {

@@ -1,0 +1,272 @@
+{
+  "$comment": "SINGLE SOURCE OF TRUTH for the fields of a Levea edit request. Edit only this file, then run `node scripts/sync-contract.mjs`. Every client (mcp-server, OpenClaw plugin, Hermes plugin) builds BOTH its tool input schema and its backend request body by looping over these fields, and the skills / OpenAPI docs are generated from it. `node scripts/sync-contract.mjs --check` fails CI and publishing when any copy is stale. placement: 'param' -> body.params[name]; 'top' -> body[name]; 'project' -> body.projectId and body.project_id. surfaces: where the field is exposed (all: autonomous_edit / video_edit tools; queue: queue_edit tools — only fields /queue-edit actually reads; openapi: ChatGPT action spec).",
+  "version": 1,
+  "required": [
+    "prompt"
+  ],
+  "fields": [
+    {
+      "name": "prompt",
+      "placement": "param",
+      "surfaces": [
+        "all",
+        "queue",
+        "openapi"
+      ],
+      "doc": "Description of the video edit to perform, in the user's own words.",
+      "schema": {
+        "type": "string",
+        "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose."
+      }
+    },
+    {
+      "name": "project_id",
+      "placement": "project",
+      "surfaces": [
+        "all",
+        "queue",
+        "openapi"
+      ],
+      "doc": "Project identifier returned by a prior call; reuse it for every follow-up edit on the same video.",
+      "schema": {
+        "type": "string",
+        "description": "Optional project id for tracking and continuity. Reuse the projectId returned by the first call for every continuation."
+      }
+    },
+    {
+      "name": "video_url",
+      "placement": "param",
+      "surfaces": [
+        "all",
+        "queue",
+        "openapi"
+      ],
+      "doc": "Public source video URL when starting a new project.",
+      "schema": {
+        "type": "string",
+        "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. Local file paths are not supported."
+      }
+    },
+    {
+      "name": "assets",
+      "placement": "param",
+      "surfaces": [
+        "all",
+        "queue",
+        "openapi"
+      ],
+      "doc": "Input media (video, image, audio) as public HTTP/HTTPS URLs.",
+      "schema": {
+        "type": "array",
+        "description": "Optional input media assets. URLs must be public HTTP/HTTPS links.",
+        "items": {
+          "type": "object",
+          "required": [
+            "url"
+          ],
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Publicly accessible HTTP/HTTPS URL to the video, image, or audio asset."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "video",
+                "audio",
+                "image"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "duration": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "scene",
+      "placement": "top",
+      "surfaces": [
+        "all",
+        "queue"
+      ],
+      "doc": "Existing scene/timeline state to continue editing (advanced).",
+      "schema": {
+        "type": "object",
+        "description": "Optional existing scene/timeline state to continue editing (advanced)."
+      }
+    },
+    {
+      "name": "captionTemplatePreset",
+      "placement": "top",
+      "surfaces": [
+        "all",
+        "queue",
+        "openapi"
+      ],
+      "doc": "Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. Call `list_caption_templates` for the exact ids.",
+      "schema": {
+        "type": "string",
+        "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
+      }
+    },
+    {
+      "name": "captionTemplateMode",
+      "placement": "top",
+      "surfaces": [
+        "all",
+        "queue",
+        "openapi"
+      ],
+      "doc": "How to apply `captionTemplatePreset`: one of `add`, `recreate`, `style`, `translate`, `clear`, `remove_fillers`.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "add",
+          "recreate",
+          "style",
+          "translate",
+          "clear",
+          "remove_fillers"
+        ],
+        "description": "How to apply captionTemplatePreset."
+      }
+    },
+    {
+      "name": "requirePlanApproval",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "When `true`, pause after planning and return `workingMemory` for the user to approve.",
+      "schema": {
+        "type": "boolean",
+        "description": "If true, the backend stops after planning and returns workingMemory for user approval. Resend with workingMemory (and optionally editedPlan) to continue."
+      }
+    },
+    {
+      "name": "workingMemory",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "State returned by a paused plan-approval call; send it back to resume.",
+      "schema": {
+        "type": "object",
+        "description": "Working memory returned by an awaiting-approval call; resend it to resume."
+      }
+    },
+    {
+      "name": "editedPlan",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "The user's edited version of a plan returned by an approval pause.",
+      "schema": {
+        "type": "object",
+        "description": "Optional pre-edited plan object returned by a prior awaiting_approval response."
+      }
+    },
+    {
+      "name": "attachedImages",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Reference image URLs for planning (style, branding).",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional reference image URLs used for planning."
+      }
+    },
+    {
+      "name": "flaggedIssues",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Specific problems the user flagged that this run must fix.",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional list of specific user-flagged problems for this run (e.g. [\"caption #3 misspelled\"])."
+      }
+    },
+    {
+      "name": "brandId",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Brand kit to apply to this call.",
+      "schema": {
+        "type": "string",
+        "description": "Optional per-call brand profile id (see list_brand_kits)."
+      }
+    },
+    {
+      "name": "projectBrandId",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Default brand kit for the project; persists across calls.",
+      "schema": {
+        "type": "string",
+        "description": "Optional default brand for the project. Persists; per-call brandId overrides."
+      }
+    },
+    {
+      "name": "core_only",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Return only rendering-essential scene fields (smaller responses).",
+      "schema": {
+        "type": "boolean",
+        "description": "Return rendering-essential scene fields only (smaller payloads)."
+      }
+    },
+    {
+      "name": "platforms",
+      "placement": "top",
+      "surfaces": [
+        "queue"
+      ],
+      "doc": "Export platforms for the queued edit (e.g. `tiktok`, `reels`, `youtube_shorts`).",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional export platforms for the queued edit."
+      }
+    },
+    {
+      "name": "autoExport",
+      "placement": "top",
+      "surfaces": [
+        "queue"
+      ],
+      "doc": "Export automatically when the queued edit finishes.",
+      "schema": {
+        "type": "boolean",
+        "description": "Automatically export after the queued edit."
+      }
+    }
+  ]
+}

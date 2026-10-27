@@ -27,6 +27,7 @@ import {
   type Tool,
   type ToolAnnotations,
 } from '@modelcontextprotocol/sdk/types.js';
+import { buildEditBody, editInputSchema } from './editContract';
 import {
   execute,
   executeStreaming,
@@ -55,7 +56,6 @@ import {
   deleteAsset,
   transcribeAsset,
   type ExecuteResult,
-  type ExecuteArgs,
   type SSEEvent,
 } from './client';
 
@@ -69,84 +69,9 @@ export const PKG_VERSION: string =
 // Tool schemas
 // ───────────────────────────────────────────────────────────────────────────
 
-const AUTONOMOUS_EDIT_SCHEMA = {
-  type: 'object',
-  properties: {
-    prompt: {
-      type: 'string',
-      description:
-        'Natural-language description of the desired edit or creative brief. ' +
-        'The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). ' +
-        'Send the user\'s intent verbatim — do not pre-decompose into multiple calls.',
-    },
-    project_id: { type: 'string', description: 'Optional project id for tracking / continuity.' },
-    video_url: {
-      type: 'string',
-      description: 'Optional source video URL. Auto-seeded as the starting layer when no scene is provided.',
-    },
-    assets: {
-      type: 'array',
-      description:
-        'Optional asset descriptors. Each item: { id?, type: "video"|"image"|"audio", url|src, mimeType?, duration? }.',
-      items: { type: 'object' },
-    },
-    scene: {
-      type: 'object',
-      description: 'Optional existing scene/timeline state to continue editing (advanced).',
-    },
-    requirePlanApproval: {
-      type: 'boolean',
-      description:
-        'If true, the agent stops after planning and returns { status: "awaiting_approval", workingMemory, plan } without mutating. ' +
-        'Resume by re-calling with the returned workingMemory + an approval prompt ("yes", "approve", "do it").',
-    },
-    workingMemory: {
-      type: 'object',
-      description:
-        'Working-memory snapshot returned by a prior call (typically one that returned awaiting_approval). Re-sending resumes that run.',
-    },
-    attachedImages: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Optional base64-encoded reference images the agent should consider while planning.',
-    },
-    flaggedIssues: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Optional list of specific user-flagged problems for this run (e.g. ["caption #3 misspelled"]).',
-    },
-    captionTemplatePreset: {
-      type: 'string',
-      description:
-        'Optional caption template slug to apply when (re)generating captions. ' +
-        'A builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available.',
-    },
-    captionTemplateMode: {
-      type: 'string',
-      enum: ['add', 'recreate', 'style', 'translate', 'clear', 'remove_fillers'],
-      description: 'How to apply captionTemplatePreset.',
-    },
-    core_only: {
-      type: 'boolean',
-      description: 'If true, response carries only rendering-essential scene fields (no debug metadata).',
-    },
-    brandId: {
-      type: 'string',
-      description:
-        'Optional brand-profile id to apply for this call (palette, fonts, logo, voice, gradeBias). ' +
-        'Look up ids via list_brand_kits. Overrides project default brand.',
-    },
-    projectBrandId: {
-      type: 'string',
-      description: 'Optional default brand for the project. Persists; per-call brandId overrides.',
-    },
-    editedPlan: {
-      type: 'object',
-      description: 'Optional pre-edited plan object returned by a prior awaiting_approval response.',
-    },
-  },
-  required: ['prompt'],
-} as const;
+// Input schemas come from the edit contract (see editContract.ts).
+const AUTONOMOUS_EDIT_SCHEMA = editInputSchema('all');
+const QUEUE_EDIT_SCHEMA = editInputSchema('queue');
 
 const TOOL_DEFS: Tool[] = [
   // ── Editing — single tool ────────────────────────────────────────────────
@@ -166,7 +91,7 @@ const TOOL_DEFS: Tool[] = [
     name: 'queue_edit',
     description:
       'Fire-and-forget async path. Returns immediately with a `taskId`. Use when the edit may exceed the MCP request timeout (long viral-clip generation, multi-format export). Poll with check_task_status or get_active_task.',
-    inputSchema: AUTONOMOUS_EDIT_SCHEMA as unknown as Tool['inputSchema'],
+    inputSchema: QUEUE_EDIT_SCHEMA as unknown as Tool['inputSchema'],
   },
 
   // ── Job / task polling ───────────────────────────────────────────────────
@@ -473,28 +398,6 @@ function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
-function pickExecuteArgs(a: Record<string, unknown>): ExecuteArgs {
-  const params: Record<string, unknown> = { prompt: a.prompt };
-  if (a.video_url) params.video_url = a.video_url;
-  if (Array.isArray(a.assets) && a.assets.length > 0) params.assets = a.assets;
-  const out: ExecuteArgs = {
-    tool: 'autonomous_edit',
-    params,
-    project_id: str(a.project_id),
-    scene: a.scene,
-  };
-  if (a.requirePlanApproval !== undefined) out.requirePlanApproval = !!a.requirePlanApproval;
-  if (a.workingMemory !== undefined) out.workingMemory = a.workingMemory as Record<string, unknown>;
-  if (Array.isArray(a.attachedImages)) out.attachedImages = a.attachedImages as string[];
-  if (Array.isArray(a.flaggedIssues)) out.flaggedIssues = a.flaggedIssues as string[];
-  if (a.captionTemplatePreset) out.captionTemplatePreset = String(a.captionTemplatePreset);
-  if (a.captionTemplateMode) out.captionTemplateMode = String(a.captionTemplateMode);
-  if (a.core_only !== undefined) out.core_only = !!a.core_only;
-  if (a.brandId) out.brandId = String(a.brandId);
-  if (a.projectBrandId) out.projectBrandId = String(a.projectBrandId);
-  if (a.editedPlan !== undefined) out.editedPlan = a.editedPlan as Record<string, unknown>;
-  return out;
-}
 
 function summarizeExec(r: ExecuteResult): string {
   const head = r.success ? '✅' : '❌';
@@ -548,7 +451,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
   switch (name) {
     case 'autonomous_edit': {
       if (!str(a.prompt)) return fail('❌ `prompt` is required for autonomous_edit.');
-      const r = await execute(pickExecuteArgs(a));
+      const r = await execute(buildEditBody(a, 'all'));
       return ok(summarizeExec(r), r);
     }
 
@@ -556,7 +459,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       if (!str(a.prompt)) return fail('❌ `prompt` is required for autonomous_edit_streaming.');
       const events: SSEEvent[] = [];
       let stepN = 0;
-      const r = await executeStreaming(pickExecuteArgs(a), (ev) => {
+      const r = await executeStreaming(buildEditBody(a, 'all'), (ev) => {
         events.push(ev);
         const dataObj = (typeof ev.data === 'object' ? ev.data : { raw: ev.data }) as Record<string, unknown>;
         const typeStr = String(ev.event || dataObj.type || 'event');
@@ -577,17 +480,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
 
     case 'queue_edit': {
       if (!str(a.prompt)) return fail('❌ `prompt` is required for queue_edit.');
-      const r = await queueEdit({
-        tool: 'autonomous_edit',
-        prompt: a.prompt,
-        ...(a.video_url ? { video_url: a.video_url } : {}),
-        ...(Array.isArray(a.assets) ? { assets: a.assets } : {}),
-        params: { prompt: a.prompt, ...(a.video_url ? { video_url: a.video_url } : {}), ...(Array.isArray(a.assets) ? { assets: a.assets } : {}) },
-        projectId: str(a.project_id) || `mcp_${Date.now()}`,
-        ...(a.scene !== undefined ? { scene: a.scene } : {}),
-        ...(a.captionTemplatePreset ? { captionTemplatePreset: String(a.captionTemplatePreset) } : {}),
-        ...(a.captionTemplateMode ? { captionTemplateMode: String(a.captionTemplateMode) } : {}),
-      });
+      const r = await queueEdit(buildEditBody(a, 'queue'));
       return ok(summarizeAny('queue_edit', r), r);
     }
 

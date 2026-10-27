@@ -40,15 +40,19 @@
                     "properties": {
                       "prompt": {
                         "type": "string",
-                        "description": "The natural language instruction of what edits to make. Example: 'Add bold word-by-word captions, track my face, and add a social media lower third card'."
+                        "description": "Natural-language description of the desired edit or creative brief. The backend planner decomposes it into canonical actions (viral clips, captions, reframe, export, …). Send the user's intent verbatim — do not pre-decompose."
+                      },
+                      "project_id": {
+                        "type": "string",
+                        "description": "Optional project id for tracking and continuity. Reuse the projectId returned by the first call for every continuation."
                       },
                       "video_url": {
                         "type": "string",
-                        "description": "Optional starting/source video public URL to apply edits to (e.g. S3, Google Drive public link, Dropbox, direct MP4). Note: local /mnt/data paths are not supported."
+                        "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. Local file paths are not supported."
                       },
                       "assets": {
                         "type": "array",
-                        "description": "Input media assets to be edited. URLs must be public HTTP/HTTPS links.",
+                        "description": "Optional input media assets. URLs must be public HTTP/HTTPS links.",
                         "items": {
                           "type": "object",
                           "required": [
@@ -66,17 +70,34 @@
                                 "audio",
                                 "image"
                               ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "mimeType": {
+                              "type": "string"
+                            },
+                            "duration": {
+                              "type": "number"
                             }
                           }
                         }
                       },
                       "captionTemplatePreset": {
                         "type": "string",
-                        "description": "Optional caption template preset name (e.g. 'mrbeast', 'hormozi', 'neon-pop', 'karaoke')."
+                        "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
                       },
-                      "project_id": {
+                      "captionTemplateMode": {
                         "type": "string",
-                        "description": "Optional Levea project ID for tracking and continuity across edits."
+                        "enum": [
+                          "add",
+                          "recreate",
+                          "style",
+                          "translate",
+                          "clear",
+                          "remove_fillers"
+                        ],
+                        "description": "How to apply captionTemplatePreset."
                       }
                     }
                   }

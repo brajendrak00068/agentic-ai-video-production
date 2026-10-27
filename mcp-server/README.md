@@ -281,19 +281,25 @@ curl -sS -X POST "$LEVEA_API_URL/api/v1/misc/openclaw/v1/execute" \
 
 `prompt` is the only required field. Everything else is optional:
 
-| Param | Purpose |
+<!-- edit-contract:start (generated from contract/edit-contract.json — edit that file, then run node scripts/sync-contract.mjs) -->
+| Field | What it does |
 |---|---|
-| `prompt` | The natural-language edit instruction (**required**) |
-| `project_id` | Reuse an existing project's scene + history |
-| `scene` | Inline scene state, as an alternative to `project_id` (round-trip the `scene` from a previous response) |
-| `video_url` | Start from a single video URL with no prior scene |
-| `assets` | Multiple input assets (the first video seeds the scene) |
-| `attachedImages` | Reference / style screenshot image URLs |
-| `flaggedIssues` | Specific problems from a prior output to fix on this pass |
-| `captionTemplatePreset` / `captionTemplateMode` | Force a named caption style + how it's applied |
-| `brandId` / `projectBrandId` | Apply a brand kit (palette · fonts · logo · voice) |
-| `requirePlanApproval` | Stop after planning and wait for approval — see [Plan approval](#plan-approval) |
-| `workingMemory` / `editedPlan` | Resume state + revised plan for the approval loop |
+| `prompt` | Description of the video edit to perform, in the user's own words. (**required**) |
+| `project_id` | Project identifier returned by a prior call; reuse it for every follow-up edit on the same video. |
+| `video_url` | Public source video URL when starting a new project. |
+| `assets` | Input media (video, image, audio) as public HTTP/HTTPS URLs. |
+| `scene` | Existing scene/timeline state to continue editing (advanced). |
+| `captionTemplatePreset` | Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. Call `list_caption_templates` for the exact ids. |
+| `captionTemplateMode` | How to apply `captionTemplatePreset`: one of `add`, `recreate`, `style`, `translate`, `clear`, `remove_fillers`. |
+| `requirePlanApproval` | When `true`, pause after planning and return `workingMemory` for the user to approve. |
+| `workingMemory` | State returned by a paused plan-approval call; send it back to resume. |
+| `editedPlan` | The user's edited version of a plan returned by an approval pause. |
+| `attachedImages` | Reference image URLs for planning (style, branding). |
+| `flaggedIssues` | Specific problems the user flagged that this run must fix. |
+| `brandId` | Brand kit to apply to this call. |
+| `projectBrandId` | Default brand kit for the project; persists across calls. |
+| `core_only` | Return only rendering-essential scene fields (smaller responses). |
+<!-- edit-contract:end -->
 
 ### Response
 

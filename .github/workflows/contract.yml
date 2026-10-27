@@ -1,0 +1,28 @@
+name: edit-contract
+
+# contract/edit-contract.json is the single source of truth for edit request
+# fields. This fails any change that leaves a generated copy stale or lets a
+# client drop a field.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generated copies are in sync
+        run: node scripts/sync-contract.mjs --check
+      - name: mcp-server builds and forwards every contract field
+        working-directory: mcp-server
+        run: npm ci && npm run build && npm test
+      - name: OpenClaw plugin type-checks against the contract
+        run: npm ci && npx tsc --noEmit -p tsconfig.json
+      - name: Hermes plugin loads its contract
+        run: python3 -c "import importlib.util,os; s=importlib.util.spec_from_file_location('h', os.path.abspath('hermes-plugin/__init__.py')); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); assert m.QUEUE_EDIT_SCHEMA['parameters']['properties']"
