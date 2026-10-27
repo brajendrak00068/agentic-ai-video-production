@@ -1,0 +1,11 @@
+{
+  "name": "levea-ai-video-editor",
+  "version": "0.6.2",
+  "description": "Prompt-first autonomous AI video editor: viral clips, captions, 9:16 reframe, chroma key, B-roll, voiceover, music and MP4 export.",
+  "mcpServers": {
+    "levea": {
+      "httpUrl": "https://api.livecore.ai/api/v1/misc/mcp",
+      "timeout": 600000
+    }
+  }
+}
