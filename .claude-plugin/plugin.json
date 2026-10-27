@@ -31,11 +31,5 @@
   "documentationUrl": "https://github.com/brajendrak00068/agentic-ai-video-production#readme",
   "supportUrl": "https://github.com/brajendrak00068/agentic-ai-video-production/issues",
   "privacyPolicyUrl": "https://livecore.ai/privacy",
-  "termsOfServiceUrl": "https://livecore.ai/terms",
-  "mcpServers": {
-    "levea": {
-      "type": "http",
-      "url": "https://api.livecore.ai/api/v1/misc/mcp"
-    }
-  }
+  "termsOfServiceUrl": "https://livecore.ai/terms"
 }
