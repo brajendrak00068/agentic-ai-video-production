@@ -244,6 +244,10 @@ def _to_tool_result(result: dict) -> str:
     else:
         normalized = backend_status or "completed"
     out = dict(result)
+    # Hermes marks any result carrying an ``error`` key (even null) plus a ``message`` as a
+    # failed call (agent/display.py _detect_tool_failure), so a successful export showed ✗.
+    if not failed and not out.get("error"):
+        out.pop("error", None)
     if backend_status and backend_status != normalized:
         out["backendStatus"] = backend_status
     out["status"] = normalized
@@ -463,6 +467,23 @@ _TOOLS = (
 )
 
 
+def _skill_description(skill_md: Path) -> str:
+    """The ``description:`` value from a SKILL.md YAML frontmatter block, or ``""``."""
+    lines = skill_md.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        key, sep, value = line.partition(":")
+        if sep and key.strip() == "description":
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            return value
+    return ""
+
+
 def register(ctx) -> None:
     for schema, handler, emoji in _TOOLS:
         ctx.register_tool(
@@ -479,4 +500,6 @@ def register(ctx) -> None:
         for child in sorted(skills_dir.iterdir()):
             skill_md = child / "SKILL.md"
             if child.is_dir() and skill_md.exists():
-                ctx.register_skill(child.name, skill_md)
+                # Hermes lists plugin skills in <available_skills> with the description we pass;
+                # without it the row is blank and the model guesses the skill name.
+                ctx.register_skill(child.name, skill_md, description=_skill_description(skill_md))
