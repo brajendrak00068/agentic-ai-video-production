@@ -8,7 +8,7 @@
 
 # Levea — Prompt-First AI Video Editor (MCP Server & Cloud Production Harness)
 
-> **Prompt-to-video editing without manual timelines.** Levea is an agentic AI video production platform that turns natural-language creative direction, transcripts, and source footage into fully structured, editable video projects. An **open-source MCP client wrapper** connects your local AI agent (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes) to our **cloud GPU production harness**—executing frame-accurate cuts, 60+ kinetic caption templates, 2D and 3D motion graphics checked by an AI critic before they ship, a licensed music and sound-effects library, voiceovers, active-speaker reframing, and cloud-rendered MP4 exports, all checked on the rendered frames before delivery and without taxing your local machine.
+> **Prompt-to-video editing without manual timelines.** Describe the edit in plain language; Levea plans it, edits a real multi-layer project, checks the result on the rendered frames, and exports the MP4. An **open-source MCP client** connects your AI agent (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes, ChatGPT) to our **cloud GPU production harness**: frame-accurate cuts, 60+ caption templates, 2D and 3D motion graphics reviewed by an AI critic, a licensed music and sound-effects library, voiceovers, and active-speaker reframing, with nothing heavy running on your machine.
 
 [![npm](https://img.shields.io/npm/v/levea-mcp-server?label=npm%20levea-mcp-server)](https://www.npmjs.com/package/levea-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-levea--mcp--server-orange)](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server)
@@ -36,63 +36,56 @@ Unlike traditional one-shot AI video generators that output locked, un-editable 
 
 ## 🏗️ Platform Architecture
 
-Levea separates probabilistic creative reasoning from deterministic project execution:
+Levea separates probabilistic creative reasoning from deterministic project execution: a language model decides *what* to do, as a typed plan; deterministic code decides *how*, changes the project, and checks the result.
 
 ```text
-                     Creative Intent + Source Media
+        Creative Intent + Source Media (video links, transcript, references)
                                   │
                                   ▼
-               Probabilistic Multimodal Intelligence
-                         (Frontier LLMs)
+          Production Pipeline + Director Skills
+          (reel, podcast, documentary, motion graphics, …)
                                   │
                                   ▼
-                 Typed Action Plan (186 Typed Actions)
+        Multimodal Planner (frontier LLM: prompt, transcript, frames, scene)
                                   │
                                   ▼
-                           Plan Compiler
-                                  │
-                    ┌─────────────┴─────────────┐
-                    ▼                           ▼
-              Workflow DAG                   Scene IR
-        (Task Dependencies & Gating)   (Timeline & Layer Hierarchy)
-                    └─────────────┬─────────────┘
+                Typed Action Plan (186 canonical actions)
                                   │
                                   ▼
-               Deterministic Video-Production Harness
-                   ├── Perception Engine (Face Tracking, Active Speaker, Shot Cuts)
-                   ├── Timeline and Scene Graph (Tracks, Layers, Geometry)
-                   ├── Media Operators (Silence Cuts, Slip/Slide, Ripple, Split-Screen)
-                   ├── Caption & Typography Engine (60+ Templates, Kinetic Word Sync, Latin / Indic / Arabic / Cyrillic / Greek)
-                   ├── Animation & Camera (Spring Physics, Keyframed 3D Camera, Speed Ramps, 29 Blend Modes)
-                   ├── Audio (Licensed Music + SFX Library, Sound Design, EBU R128 Loudness, Voiceover, Auto-Duck)
-                   ├── Composition & Asset Execution
-                   │   ├── HyperFrames — 2D motion design, 3D character films, charts, cards
-                   │   ├── Vulkan/WebGPU — 160+ transitions, ~100 GPU effect presets, final compositing
-                   │   ├── Lottie — authored vector animations
-                   │   └── Generative models — supporting images, video, music, voice
-                   ├── Typed Operation Engine (Atomic, Audited Mutations)
-                   ├── Project Versioning (Immutable Scene History)
-                   └── Export Pipeline (Hardware-Accelerated / Vulkan MP4)
+     Plan Compiler (schema validation, parameter binding, dependency order)
                                   │
                                   ▼
-        Verification on Rendered Frames → Repair Loop → Editable Scene
-                                                    ├── Return Scene JSON
-                                                    ├── Queue Media Work
-                                                    └── Optional Multi-Platform Export
+          Workflow DAG (tasks, dependencies, gates, verifiers)
+                                  │
+                                  ▼
+      Execution Harness ── typed, audited operations ──▶ Scene IR
+      │                                                (timeline, tracks, layers;
+      │                                                 every revision saved)
+      ├── Perception: transcript, faces, active speaker, shot cuts, on-screen text
+      ├── Editing: cuts, ripple, slip/slide, reframe, multicam, speed ramps
+      ├── Captions: 60+ templates, word-level sync, Latin/Indic/Arabic/Cyrillic/Greek
+      ├── Audio: licensed music + SFX library, sound design, EBU R128, ducking, voiceover
+      ├── Motion graphics (HyperFrames): 2D motion design, 3D character films, charts
+      ├── Generation jobs: images, B-roll video, music, voice (async artifacts)
+      └── Rendering (Vulkan / WebGPU): 160+ transitions, ~100 GPU effect presets
+                                  │
+                                  ▼
+      Verification: each task's checks, then a final review of the rendered frames
+              │  fails                                  ▲
+              └──▶ Repair loop: typed fixes, re-verified ┘
+                                  │ passes (or budget spent: reported, never hidden)
+                                  ▼
+      Editable Scene + verification report ──▶ MP4 / multi-platform export
 ```
 
-### 1. Multimodal planning
-The planning layer interprets user prompts, transcripts, visual references, and timeline boundaries. It compiles raw natural language into a typed **Workflow DAG** of sequential and parallel editing operations.
+### 1. Pipelines and planning
+Each request is matched to a production pipeline (a short-form reel, a podcast cut, a documentary montage, a motion-graphic film, …) whose director skills give the planner its craft rules. The planner reads the prompt, the transcript, sampled frames, and the current scene, and emits a **typed action plan**: canonical actions with typed parameters, never free-form scene edits.
 
-### 2. Workflow DAG and Scene IR (Intermediate Representation)
-These represent the dual brain-body architecture of Levea:
-- The **Workflow DAG** maps the editing tasks, dependencies, gating, verifiers, and asset-generation jobs.
-- The **Scene IR** is the serializable media schema representing the complete timeline: canvas dimensions, tracks, layers, custom transitions, effects, and assets.
+### 2. Compilation, Workflow DAG and Scene IR
+The **plan compiler** validates every action against its schema, binds parameters, and orders the work into a **Workflow DAG** of tasks, dependencies, gates, and verifiers. Tasks change the **Scene IR** (the serializable project: canvas, tracks, layers, transitions, effects, assets) only through typed, audited operations, so every edit is inspectable and repeatable, and the project never belongs to the language model.
 
-Separating intent from execution makes edits fully inspectable, repeatable, and independently repairable without transferring project ownership to an LLM.
-
-### 3. Deterministic Production Harness
-Typed production operators execute the plan against the scene graph. The native renderer compiles Scene compositions through native Vulkan and browser WebGPU paths, subsequently compositing them with motion graphics produced by HyperFrames: editorial layouts, data charts, stat cards, diagrams, and short 3D character films with their own camera, lighting, music, and sound design. Every motion graphic is reviewed by an AI critic against a craft checklist and revised until it passes before it reaches the timeline.
+### 3. Execution Harness
+Typed operators run on the cloud GPU cluster: perception, editing, captions, audio, and rendering through native Vulkan (export) and browser WebGPU (preview) from one shared scene-preparation path. Motion graphics come from HyperFrames: editorial layouts, data charts, stat cards, diagrams, and short 3D character films with their own camera, lighting, music, and sound design. Every motion graphic is reviewed by an AI critic against a craft checklist and revised before it reaches the timeline.
 
 ### 4. Versioning and Export
 All revisions are saved in a durable, linear undo/redo history backed by immutable scene payloads, preventing state corruption during multi-step iterations. Export is optional—Levea can return the updated editable scene, queue asset rendering, deliver an MP4, or bundle assets for multi-platform delivery.
@@ -105,7 +98,7 @@ Whether you are an AI developer looking to integrate automated editing into your
 
 ### 🟣 Claude Code plugin (one command)
 
-Install Levea as a Claude Code plugin. It bundles the hosted Levea MCP server (OAuth sign-in, nothing to run locally) and the Levea editing skills:
+Install Levea as a Claude Code plugin. It bundles the hosted Levea MCP server (OAuth sign-in, nothing to run locally) and a Levea editing skill:
 
 ```
 /plugin install levea-video-editor --marketplace brajendrak00068/agentic-ai-video-production
@@ -172,8 +165,8 @@ Add the following configuration block to your editor's MCP settings:
 
 Deploy Levea as an autonomous editing agent directly inside the OpenClaw workspace.
 
-1. **Install the Plugin:** Search for `openclaw-ai-video-editor` on ClawHub and install it to gain system-level execution, asset upload UI, and rendering support.
-2. **Install the Skill:** Subscribe to `levea-ai-video-editor` on ClawHub Skills directory to give your agent professional editorial taste, system instructions, and pacing rules.
+1. **Install the Plugin:** Search for `openclaw-ai-video-editor` on ClawHub and install it. It adds the edit, queue, and status tools.
+2. **Install the Skill:** Add `levea-ai-video-editor` from ClawHub Skills so your agent knows when and how to call the tools.
 3. **Run your first edit:**
    > *"Review my vertical video, remove the opening silence, auto-apply Hormozi-style captions with highlighted keywords, add subtle background music, and export the Reels-ready MP4."*
 
@@ -183,8 +176,8 @@ Deploy Levea as an autonomous editing agent directly inside the OpenClaw workspa
 
 Levea is built for modular agent platforms. When deploying Levea inside platforms like OpenClaw or Hermes, we split execution capabilities from cognitive strategies:
 
-- **The Plugin (`openclaw-ai-video-editor`):** Acts as the **physical body**. It exposes the core MCP tool surface, registers tool schemas, manages API keys, sets up SSE progress pipelines, and handles physical file uploads and rendering hooks.
-- **The Skill (`levea-ai-video-editor`):** Acts as the **cognitive mind**. It is a prompt-engineered, context-aware instruction set (system prompts and few-shot creative templates) that teaches the agent how to act as a professional director—enforcing brand rules, safe zones, timing pacing, and layout aesthetics.
+- **The Plugin (`openclaw-ai-video-editor`):** the **tools**. It registers the edit, queue, and status tools with their schemas, manages the API key, and streams progress.
+- **The Skill (`levea-ai-video-editor`):** the **instructions**. It tells the agent when to use Levea, which parameters to pass, and how to handle approvals, long-running edits, and follow-ups. The editorial craft itself (pipelines, director skills, verification) runs on the Levea backend.
 
 *We recommend installing **both** to unlock the full power of autonomous editing with a professional finish.*
 
@@ -244,44 +237,26 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 
 ## 🎬 Creator & Dev Use Cases
 
-| Use Case / Request | Typical Autonomous Production Path | Organic Keywords |
-| --- | --- | --- |
-| **Faceless Channel Generator** | Segment transcript, plan layout, overlay B-roll, generate AI background music, and render. | `faceless-video`, `auto-reels`, `short-form-video` |
-| **CapCut Auto-Cap Alternative** | Run whisper transcription, highlight keywords, style fonts, align timing, and apply animation presets. | `auto-captions`, `video-subtitles`, `kinetic-typography` |
-| **Shorts & Reels Highlights** | Extract high-engagement hooks, crop canvas to vertical 9:16 safe zones, and apply motion graphics. | `viral-clips`, `clip-generator`, `tiktok-video`, `youtube-shorts` |
-| **Corporate Interview Polish** | Cut long silence gaps, bleep profanity, apply color grades, and add lower third speaker graphics. | `silence-removal`, `audio-cleanup`, `lower-thirds` |
-| **Green Screen & Backdrop Swap** | Isolate speaker matte, layer background photo/video, align depth tracks, and composite. | `chroma-key`, `green-screen`, `background-removal` |
-| **Multi-Cam Active Speaker Cuts** | Synchronize dual camera angles, run diarization, and automatically cut to the active speaker. | `multi-cam-sync`, `active-speaker`, `video-automation` |
+| Use case | Typical production path |
+| --- | --- |
+| **Faceless channel** | Segment the transcript, plan the layout, overlay B-roll, add library or generated music, and render. |
+| **Auto-captions** | Transcribe, time every word, highlight keywords, and style with a caption template. |
+| **Shorts & Reels highlights** | Find the hook, trim to the target length, reframe to 9:16 around the speaker, add captions and motion graphics. |
+| **Interview polish** | Cut long silences, bleep profanity, grade color, and add lower-third speaker graphics. |
+| **Green screen & backdrop swap** | Key or matte the speaker, layer a new background photo or video, and composite. |
+| **Multicam active-speaker cuts** | Sync camera angles by audio, identify speakers, and cut to whoever is talking. |
 
 ---
 
-## ⚙️ Robust Verification & Repair Containment
+## ⚙️ Verification & Repair
 
-To ensure that AI planning errors never result in broken compositions or corrupt files, Levea operates a closed-loop verification and repair containment pipeline.
+Levea checks its own work before it reports success.
 
-```text
-User correction
-      ↓
-Semantic-node reference resolution
-      ↓
-Typed repair patch
-      ↓
-Repair-policy validation
-      ↓
-Affected-subgraph invalidation
-      ↓
-Partial recompilation and execution
-      ↓
-Verification
-      ↓
-Atomic replacement of prior version
-```
-
-- **Internal Verifier-Driven Repair:** Levea currently supports verifier-driven bounded repair for supported typed failures. Verifier failures identify the unsatisfied invariant, repair begins from the last verified scene revision, and every repaired result is verified again before it is committed.
-- **User-Directed Semantic Repair:** User-directed repair operates at the level of user-visible semantic nodes rather than low-level infrastructure tasks. Where a node type supports natural-language repair, Levea resolves the user’s reference—such as “the second chart,” “the last title,” or “the graphic after the pricing section”—to a stable semantic node and compiles the requested change into a typed patch.
-- **Subgraph Invalidation:** The repair system then determines which dependent planning, asset, composition, rendering, and verification nodes are affected. Only that subgraph is invalidated and executed again; unrelated verified work is preserved. User language never directly mutates arbitrary scene JSON or internal execution tasks.
-- **Bounded Budgets:** Natural-language node repair is available only for semantic node types that expose stable identity, editable fields, and a repair policy. All repair attempts remain bounded by action, attempt, cost, and time budgets.
-- **Asynchronous Completion Verification:** A workflow may return a pending or partial result while optional media jobs continue. A result is considered fully verified only after all required artifact jobs complete and their outputs pass verification.
+- **Every task is verified when it runs:** typed checks such as "the layer exists", "the timing matches the request", "no graphic covers a face", or "captions stay in sync". A failed check names the invariant, what was expected, and what was found.
+- **A repair loop fixes what failed:** it proposes typed fixes (any canonical action), applies them, and verifies again, until the check passes or the request's time and model-call budget runs out. A fix is refused if the request prohibits it, if it would destroy the user's own layers, or if it would break a task that already passed.
+- **A final review looks at the rendered frames** of the finished edit and can make further fixes.
+- **The result says what happened:** `verificationReport.status` is `verified` only when that final review approved the edit; `unverified` means no verdict was reached (the edit is kept, never reported as verified), with every failed check and what repair tried.
+- **Corrections are a follow-up prompt** with the same `project_id`. Every revision is saved, so a change can be undone.
 
 ---
 
@@ -326,13 +301,13 @@ Every edit result carries a `verificationReport` (`verified`, `rejected`, `unver
 
 ---
 
-## 🔮 Organic SEO FAQ for Developers & Creators
+## 🔮 FAQ
 
 #### How does Levea compare to generic video generators like Sora, Veo, or Runway?
 Generic generative video models (Sora, Runway, Veo) output raw, locked pixels. You cannot edit a layer, adjust caption typography, swap background music, or correct a word timing afterward. Levea is a **full-featured timeline editor** that builds structured project layers. It uses generative models only as optional asset generation steps, keeping your editing pipeline fully editable, inspectable, and deterministic.
 
-#### Is Levea safe to use in enterprise productions?
-Yes. Every mutation runs through a typed operation engine, and every action the planner or the repair loop chooses is authorized against the request before it runs, so an LLM cannot inject arbitrary mutations. If you set `requirePlanApproval: true`, the system halts and returns the creative plan for approval; resend with `planDecision: "approve"` (or an `editedPlan`) to run it.
+#### Is Levea safe to use for client and enterprise work?
+It is designed for it. Every mutation runs through a typed operation engine, and every action the planner or the repair loop chooses is authorized against the request before it runs, so an LLM cannot inject arbitrary mutations. If you set `requirePlanApproval: true`, the system halts and returns the creative plan for approval; resend with `planDecision: "approve"` (or an `editedPlan`) to run it.
 
 #### What coding and agent environments does Levea support?
 Levea integrates natively with **Model Context Protocol (MCP)** hosts like Claude Desktop, Cursor, Cline, Windsurf, and Claude Code. For standalone agent systems, Levea exposes structured packages for **OpenClaw** and **Hermes**.
