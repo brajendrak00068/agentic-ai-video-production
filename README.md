@@ -358,7 +358,7 @@ Absolutely. Using our **Brand Kits API and tools**, you can declare custom typog
 
 **Security:** see [SECURITY.md](./SECURITY.md). **Contributing:** see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-**Support & Contact:** [support@livecore.ai](mailto:support@livecore.ai) · [GitHub issues](https://github.com/brajendrak00068/agentic-ai-video-production/issues)
+**Support & Contact:** [brajendra@livecore.ai](mailto:brajendra@livecore.ai) · [GitHub issues](https://github.com/brajendrak00068/agentic-ai-video-production/issues)
 
 ---
 
