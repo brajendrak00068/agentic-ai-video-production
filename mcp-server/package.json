@@ -6,7 +6,8 @@
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "bin": {
-    "levea-mcp-server": "dist/index.js"
+    "levea-mcp-server": "dist/index.js",
+    "levea-mcp-http-server": "dist/http-server.js"
   },
   "files": [
     "dist",
@@ -17,9 +18,10 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "start:http": "node dist/http-server.js",
     "dev": "tsc --watch",
     "publish-sync": "node mcp-publish-sync.js",
-    "scan-leaks": "bash ../scripts/scan-leaks.sh README.md server.json src/index.ts src/server.ts src/http.ts src/client.ts",
+    "scan-leaks": "bash ../scripts/scan-leaks.sh README.md server.json src/index.ts src/server.ts src/http.ts src/http-server.ts src/client.ts",
     "prepublishOnly": "node ../scripts/sync-contract.mjs --check && npm run scan-leaks && npm run build",
     "test": "node --test test/*.test.mjs",
     "sync-contract": "node ../scripts/sync-contract.mjs"
