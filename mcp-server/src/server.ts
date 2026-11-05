@@ -400,7 +400,7 @@ function str(v: unknown): string | undefined {
 
 
 function summarizeExec(r: ExecuteResult): string {
-  const head = r.success ? '✅' : '❌';
+  const head = r.success ? '✅' : r.status === 'running' ? '⏳' : '❌';
   const lines = [`${head} ${r.message || r.reply || (r.success ? 'Done' : 'Failed')}`];
   if (r.videoUrl) lines.push(`📹 ${r.videoUrl}`);
   if (r.jobId !== undefined) lines.push(`🆔 job ${r.jobId}`);
@@ -409,8 +409,9 @@ function summarizeExec(r: ExecuteResult): string {
 }
 
 // Edit outcomes that carry success:false but are not errors: the client is
-// expected to continue (approve the plan, answer a question, poll pending work).
-const NON_ERROR_OUTCOMES: ReadonlySet<string> = new Set(['awaiting_approval', 'awaiting_input', 'partial_success']);
+// expected to continue (approve the plan, answer a question, poll pending work,
+// follow an edit that outlived the client's wait).
+const NON_ERROR_OUTCOMES: ReadonlySet<string> = new Set(['awaiting_approval', 'awaiting_input', 'partial_success', 'still_running']);
 
 // Every tool result goes through here. A backend failure must set `isError`
 // (MCP clients read the flag, not the ❌ in the text).

@@ -1,4 +1,3 @@
-
 # Levea MCP Server
 
 > **An autonomous agentic video editor.** Send a sentence. Get a finished video. No timelines, no keyframes, no plugin chains. Open-source MCP client connecting local AI agents (Claude, Cursor, Cline) to our cloud GPU video production harness.
@@ -45,7 +44,7 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
 }
 ```
 
-**3. Use it** — say to your AI: *"Use the levea tool to generate 5 viral clips from this video, add captions, reframe vertical."* The agent picks the tool, fills the prompt; the editor plans → executes → exports.
+**3. Use it** — say to your AI: *"Use the levea tool to generate 5 viral clips from this video, add captions, reframe vertical."* The agent picks the tool, fills the prompt; the editor plans → executes → exports. A full edit takes minutes, not seconds; see [Safety & limits](#safety--limits) for long edits.
 
 ### Per-client setup
 
@@ -117,7 +116,7 @@ Say it in plain language; the agent plans and finishes the edit.
 | "Remove all silences and filler words, add background music" | Cleans the audio track, adds ducked music under speech |
 | "Auto-zoom on whoever's talking" | Active-speaker detection + dynamic zoom-follow framing |
 | "Caption this and highlight every time they say 'launch'" | Auto-captions + keyword emphasis (scaling / glow / pulse) |
-| "Find every clip where Alex appears" | Cross-asset face identity search |
+| "Find every clip where Alex appears" | Face identity search across the project's clips |
 | "Add narration in a cloned voice over the intro" | Voice cloning + TTS overlay + auto-ducking |
 | "Caption this Hormozi-style with karaoke word highlighting" | Word-synced karaoke captions — active word fills + underlines in time with speech |
 | "Generate B-roll over the product mention" | AI B-roll generation + placement at the right timestamp |
@@ -150,11 +149,11 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 ### 🎬 Visual editing
 - **Color grade** — brightness, contrast, saturation, hue, lift/gamma/gain, RGB curves, LUT / film-look presets (including your own .cube files), auto color, shot-to-shot color matching, vignette, chromatic aberration
-- **VFX** — 100 GPU effects: lens flares, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, lens blur, slit-scan, glassmorphism, bokeh, portal, …
-- **Transitions** — 169 transitions, each drawn with its own technique (wipes, whips, light-band reveals, glitches, CRT power-off, …)
+- **VFX** — ~100 GPU effect presets: lens flares, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, lens blur, slit-scan, glassmorphism, bokeh, portal, …
+- **Transitions** — 160+ named transitions (wipes, whips, light-band reveals, glitches, CRT power-off, …)
 - **Editing techniques** — speed ramps and time remap, J/L, match, and smash cuts, AI outpainting to a new aspect ratio, eye-contact correction, face retouch
 - **Composite** — chroma key, AI background removal (alpha matte), masking (luma / alpha / depth, with boolean multi-mask)
-- **Blend & opacity** — 17 blend modes (multiply, screen, overlay, color dodge / burn, difference, hue / saturation / color / luminosity, additive) + per-layer & group opacity
+- **Blend & opacity** — 29 blend modes (multiply, screen, overlay, color dodge / burn, difference, hue / saturation / color / luminosity, additive) + per-layer & group opacity
 - **Shape & transform** — clip shapes (circle, dome, star, hexagon, polygon), crop, 3D rotation / perspective, glow, shadow, gradient fills
 - **Lighting** — up to 8 scene lights illuminating 3D-transformed layers
 - **Reframe & layout** — caption-safe vertical reframe (9:16) + vertical montage, split screen (top/bottom, L/R, PiP, grid)
@@ -180,7 +179,7 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 ### 🎵 Audio
 - **Clean up** — remove silences, breaths, filler words; word-level mute/cut
-- **Mix** — auto-duck (sidechain music vs voice), loudness (LUFS) normalize + true-peak limiting, denoise, crossfade, EQ presets (bass-boost, vocal-clarity, warm, bright), stem separation
+- **Mix** — auto-duck (sidechain music vs voice), loudness (LUFS) normalize + true-peak limiting, denoise, crossfade, EQ presets (bass-boost, vocal-clarity, warm, bright), vocal / instrumental separation
 - **Library** — a reviewed, licensed music and sound-effects library; music fitted to the video length; sound design (effects on cuts and beats, room tone)
 - **Generate** — SFX, music (mood/genre/BPM), voiceover (TTS or cloned voice), voice conversion
 - **Sync** — external master audio alignment (timecode / explicit offset)
@@ -209,8 +208,8 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 - **Multi-platform pack** — TikTok + Reels + Shorts + YouTube + Instagram in one pass
 
 ### ✅ Also shipped
-- Content-aware inpainting (LaMa) — removes on-screen text, logos, and watermarks via `REPLACE_ON_SCREEN_TEXT` and overlay-removal powers
-- On-screen text OCR recognition — PP-OCRv5 detection + recognition populate `TextRegion.text`, enabling find-and-replace on burned-in text
+- On-screen text, logo, and watermark removal
+- On-screen text recognition (OCR), enabling find-and-replace on burned-in text
 
 ---
 
@@ -354,7 +353,7 @@ Set `Accept: text/event-stream` or `?stream=true`. Notable event types:
 | `thought` · `reasoning_chunk` | Per-step reasoning visibility |
 | `tool_call` · `tool_result` | Action started / finished |
 | `background_job_completed` | Async job done |
-| `success` / `partial_success` | Terminal payload |
+| `success` / `partial_success` / `awaiting_approval` | Terminal payload |
 | `error` | Terminal failure |
 
 ### Async job lifecycle
@@ -411,7 +410,7 @@ Every edit result carries `verificationReport`: `status` is `verified` (approved
 | **Interface** | Drag, drop, keyframe by hand | One sentence; the agent does the rest |
 | **Auto-analysis on upload** | Manual scene detection + subtitles | Faces, speakers, shots, on-screen text regions, mattes detected automatically |
 | **"Make this viral"** | You build the workflow | Single preset — vertical + captions + silences + tracking |
-| **Cross-asset search** | Filename search | "Find every clip where Alex appears" across the whole library |
+| **Face search** | Filename search | "Find every clip where Alex appears" across the project's clips |
 | **Background replace** | Key out, find background, composite | One call |
 | **Broadcast-grade audio** | Manual loudness metering + EQ | Auto LUFS loudness-normalized + true-peak limited, music auto-ducked under speech |
 | **Editorial reasoning** | You decide the climax | Agent surfaces narrative peaks and reaction moments |
@@ -426,11 +425,12 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 ## Safety & limits
 
 - **Beta** — outputs can be wrong. Preview every result before sharing. For irreversible workflows, pass `requirePlanApproval: true` to inspect and approve the plan first.
-- API-key authentication on every request.
+- OAuth or API-key authentication on every request.
 - Destructive actions (mass deletes, clears) require explicit confirmation params.
 - Output is verified after execution; auto-repairs on failure.
 - Concurrent identical requests are deduplicated server-side.
-- Rate-limited per API key. Read-only ~1–3s · structural edits ~3–10s · async generation 30s–5min per artifact · viral-clip / multi-platform exports several minutes.
+- Rate-limited per account. Read-only questions take seconds; a simple edit with export takes a few minutes; a full edit with motion graphics, music, and export can take 10–20 minutes.
+- Long edits outlive a single MCP request: `autonomous_edit` waits up to 5 minutes (`LEVEA_REQUEST_TIMEOUT_MS`) and `autonomous_edit_streaming` up to 30 (`LEVEA_STREAM_TIMEOUT_MS`), then return `status: "running"` with the `project_id`; the edit keeps running, and `get_active_task` follows it. For full edits, `queue_edit` + `check_task_status` is the most robust path.
 
 ---
 
@@ -442,7 +442,7 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 | **Image in** | JPG, PNG, WebP |
 | **Audio in** | MP3, WAV, M4A, AAC (or extracted from video) |
 | **Output** | MP4 (export), ZIP (viral clips / multi-platform bundles) |
-| **Max video length** | Up to **3 hours** per asset (plan-dependent); sync edits and async generation both supported |
+| **Long sources** | Long podcasts and webinars are supported; short-form requests are trimmed to the hook first, so heavy processing runs only on the kept segment |
 | **Recommended resolution** | 1080p or 4K; canvas configurable per project |
 
 ---
@@ -461,6 +461,8 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 
 > Versions aren't pinned here — `npx -y levea-mcp-server` and the ClawHub listing always pull the latest, and the linked npm / ClawHub pages show the current version. You never need a specific number.
 
-**Support** — setup help, integration questions, or issue reports: `brajendrak00068@gmail.com`
+**Support** — setup help, integration questions, or issue reports: [support@livecore.ai](mailto:support@livecore.ai) or [GitHub issues](https://github.com/brajendrak00068/agentic-ai-video-production/issues).
+
+**Privacy & telemetry** — edits send your prompt, source URLs, and project ids to the Levea API. The client also sends a tiny anonymous usage ping (event name, client version, whether a key is set; never prompts, media, or keys). Turn it off with `LEVEA_TELEMETRY=off`. See the [privacy policy](https://www.livecore.ai/privacy).
 
 **License** — MIT

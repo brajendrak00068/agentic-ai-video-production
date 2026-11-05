@@ -44,7 +44,14 @@ export interface SSEEvent {
   data: Record<string, unknown> | string;
 }
 
-const DEFAULT_TIMEOUT_MS = 300_000;
+function envMs(name: string, fallback: number): number {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+/** How long a plain request waits (LEVEA_REQUEST_TIMEOUT_MS; default 5 min). */
+const DEFAULT_TIMEOUT_MS = envMs('LEVEA_REQUEST_TIMEOUT_MS', 300_000);
+/** The SSE variant reports progress while it waits, so it can wait longer than a plain request. */
+const STREAM_TIMEOUT_MS = envMs('LEVEA_STREAM_TIMEOUT_MS', 1_800_000);
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
 const MCP_CLIENT_VERSION = '0.6.5';
 
@@ -118,8 +125,16 @@ function v1(path: string): string {
   return `${baseRoot()}/v1${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+/** Telemetry is on unless LEVEA_TELEMETRY is off / false / 0. */
+function telemetryEnabled(): boolean {
+  const v = String(process.env.LEVEA_TELEMETRY ?? '').trim().toLowerCase();
+  return !(v === 'off' || v === 'false' || v === '0' || v === 'no');
+}
+
+// Sends only an event name, this client's name and version, and whether a key is
+// set: no prompts, media, keys, or project data. Disable with LEVEA_TELEMETRY=off.
 function sendMcpFunnelTelemetry(event: string, hasApiKey: boolean): void {
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') return;
+  if (process.env.VITEST || process.env.NODE_ENV === 'test' || !telemetryEnabled()) return;
   try {
     const telemetryUrl = `${baseRoot()}-keys/telemetry`;
     void axios.post(
@@ -199,6 +214,29 @@ function flattenResult(d: Record<string, unknown>): ExecuteResult {
   };
 }
 
+/**
+ * The client stopped waiting, but the edit keeps running on Levea: a full edit
+ * with motion graphics and an export can take 10-20 minutes, longer than an MCP
+ * request should block. Not an error: the caller polls the project's active task.
+ */
+function stillRunning(body: EditRequestBody, waitedMs: number): ExecuteResult {
+  const projectId = String(body.projectId || body.project_id || '');
+  const minutes = Math.round(waitedMs / 60_000);
+  return {
+    success: false,
+    status: 'running',
+    message:
+      `The edit is still running on Levea after ${minutes} min (full edits with motion graphics and export can take 10-20 minutes). ` +
+      `Call get_active_task with project_id "${projectId}" to follow it; the finished video will be on that project.`,
+    raw: { type: 'still_running', status: 'running', projectId, project_id: projectId },
+  };
+}
+
+function isTimeout(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  return e?.code === 'ECONNABORTED' || e?.code === 'ETIMEDOUT' || String(e?.message || '').toLowerCase().includes('timeout');
+}
+
 /** Execute autonomous_edit (or any allowed tool) — single JSON response. */
 export async function execute(edit: EditRequestBody): Promise<ExecuteResult> {
   const body = withProjectId(edit);
@@ -211,6 +249,7 @@ export async function execute(edit: EditRequestBody): Promise<ExecuteResult> {
     }
     return flattenResult(d);
   } catch (err) {
+    if (isTimeout(err)) return stillRunning(body, DEFAULT_TIMEOUT_MS);
     return describeError(err, `execute(${String(body.tool || 'autonomous_edit')})`);
   }
 }
@@ -226,7 +265,8 @@ export async function executeStreaming(
   edit: EditRequestBody,
   onEvent: (ev: SSEEvent) => void
 ): Promise<ExecuteResult> {
-  const body = JSON.stringify(withProjectId(edit));
+  const editBody = withProjectId(edit);
+  const body = JSON.stringify(editBody);
   const url = new URL(v1('/execute'));
   const isHttps = url.protocol === 'https:';
   const transport = isHttps ? https : http;
@@ -268,7 +308,7 @@ export async function executeStreaming(
             if (parsed) {
               try { onEvent(parsed); } catch (_e) { /* ignore consumer errors */ }
               const ev = String(parsed.event || (typeof parsed.data === 'object' && (parsed.data as any)?.type) || '');
-              if (ev === 'success' || ev === 'partial_success' || ev === 'error') {
+              if (TERMINAL_STREAM_EVENTS.has(ev)) {
                 const d = (typeof parsed.data === 'object' ? parsed.data : { reply: parsed.data }) as Record<string, unknown>;
                 final = flattenResult(d);
               }
@@ -283,11 +323,20 @@ export async function executeStreaming(
       }
     );
     req.on('error', (e) => reject(e));
-    req.setTimeout(600_000, () => req.destroy(new Error('Streaming timed out after 10m')));
+    req.setTimeout(STREAM_TIMEOUT_MS, () => {
+      // Stop waiting, not the edit: it keeps running on Levea.
+      resolve(stillRunning(editBody, STREAM_TIMEOUT_MS));
+      req.destroy();
+    });
     req.write(body);
     req.end();
   });
 }
+
+/** The run's terminal SSE event types: its outcome, or an error. */
+const TERMINAL_STREAM_EVENTS: ReadonlySet<string> = new Set([
+  'success', 'partial_success', 'awaiting_approval', 'awaiting_input', 'complete', 'error',
+]);
 
 function parseSSEMessage(raw: string): SSEEvent | null {
   let event: string | undefined;

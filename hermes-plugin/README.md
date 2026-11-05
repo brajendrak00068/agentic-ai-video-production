@@ -34,8 +34,8 @@ A bundled skill, `levea-video-editor:levea-video-editing`, teaches the agent the
   (`https://api.livecore.ai`, or `LEVEA_API_URL`) with your `LEVEA_API_KEY`. Source videos at the URLs you pass are
   downloaded and processed by Levea.
 - **Usage:** edits and exports consume your Levea account quota. Tool calls run without an extra approval prompt.
-- **Long calls:** `levea_video_edit` and `levea_job_status` with `wait: true` can block for up to 10 minutes.
-- **No telemetry**, no background processes, no shell commands, no files read or written outside the plugin.
+- **Long calls:** `levea_video_edit` and `levea_job_status` with `wait: true` can block for up to 10 minutes. A full edit with motion graphics and export can take longer; the call then returns the `project_id` and the edit keeps running (follow it with `levea_active_task`, or use `levea_queue_edit` for long edits).
+- **No telemetry pings.** Requests identify the client as `hermes-plugin/<version>` (`X-Levea-Client`). No background processes, no shell commands, no files read or written outside the plugin.
 - Credentials are read only through Hermes's secret scope.
 
 ## License

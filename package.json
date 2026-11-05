@@ -1,6 +1,6 @@
 {
   "name": "openclaw-ai-video-editor",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "OpenClaw plugin for timeline video editing, 9:16 vertical reframing, synchronized captions, B-roll, multicam podcast sync, audio cleanup, and MP4 export.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -105,7 +105,7 @@
     "ai-video-production",
     "prompt-to-video"
   ],
-  "author": "brajendrak00068 <brajendrak00068@gmail.com>",
+  "author": "Levea (livecore.ai) <support@livecore.ai>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -113,7 +113,7 @@
   },
   "bugs": {
     "url": "https://github.com/brajendrak00068/agentic-ai-video-production/issues",
-    "email": "brajendrak00068@gmail.com"
+    "email": "support@livecore.ai"
   },
   "homepage": "https://github.com/brajendrak00068/agentic-ai-video-production#readme",
   "dependencies": {

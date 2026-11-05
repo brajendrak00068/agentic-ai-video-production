@@ -1,6 +1,8 @@
 # Levea — ChatGPT Custom GPT / Action Kit
 
-This folder contains the complete configuration and OpenAPI specification for publishing **Levea** on the **OpenAI GPT Store** (`chatgpt.com/gpts`).
+This folder contains the configuration and OpenAPI specification for a **Custom GPT** that calls Levea through a GPT Action.
+
+> **Public listing: use the ChatGPT app, not this kit.** A GPT Action authenticates with the one API key you paste into the GPT editor, so a *public* GPT would run every ChatGPT user's edits on your key and your credits. For a public listing, publish the ChatGPT app in [`../chatgpt-plugin/`](../chatgpt-plugin/): it connects to the hosted Levea MCP server with **OAuth**, so each user signs in to their own Levea account. Use this Action kit only for a GPT that is private to you or your team.
 
 ---
 
@@ -10,7 +12,7 @@ This folder contains the complete configuration and OpenAPI specification for pu
 2. Switch to the **Configure** tab:
    - **Logo / Avatar**: Click the circle icon at the top and upload `logo.png` (from this folder).
    - **Name**: `Levea — AI Video Editor`
-   - **Description**: `Autonomous prompt-to-video editor. Generate viral clips, 40+ caption styles, vertical 9:16 reframe, motion graphics, voiceovers & B-roll.`
+   - **Description**: `Autonomous prompt-to-video editor. Generate viral clips, 60+ caption templates, vertical 9:16 reframe, motion graphics, voiceovers & B-roll.`
    - **Instructions**: Copy & paste from `INSTRUCTIONS.md`.
    - **Conversation Starters**: See `INSTRUCTIONS.md`.
 
@@ -24,17 +26,14 @@ This folder contains the complete configuration and OpenAPI specification for pu
    - **API Key**: Enter a Levea API key (from [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=chatgpt&utm_medium=gpt-action&utm_campaign=levea)).
 4. **Privacy Policy**: `https://livecore.ai/privacy`.
 
-## 3. Publish to the GPT Store
+## 3. Share the GPT
 
 1. In the top-right corner, click **Create** / **Update**.
-2. Select **Everyone (Public to GPT Store)**.
-3. Category: **Productivity** or **Video & Animation**.
-4. Save.
+2. Select **Only me** or **Anyone with the link** for a GPT that runs on your own key. Do not select **Everyone (GPT Store)** with a shared key; publish the OAuth ChatGPT app instead (see the note at the top).
+3. Save.
 
 ---
 
 ## 4. Aggregator Listings
 
-Once live, submit your public GPT link (`https://chatgpt.com/g/...`) to:
-- [GPTStore.ai](https://gptstore.ai/submit)
-- [There's An AI For That](https://theresanaiforthat.com/submit/)
+Once the OAuth ChatGPT app is live, submit its link to directories such as [There's An AI For That](https://theresanaiforthat.com/submit/).

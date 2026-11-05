@@ -1,7 +1,7 @@
 ---
 name: levea-ai-video-editor
 description: "Plan, execute, and verify timeline video edits through the autonomous_edit MCP tool."
-version: 1.0.30
+version: 1.0.31
 author: brajendrak00068
 license: MIT
 ---
@@ -66,7 +66,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - 60+ caption templates, title cards, and motion graphics placed clear of every face.
 - 2D and 3D motion-graphic films, reviewed by an AI critic before they ship.
 - A licensed music and sound-effects library, sound design, voiceover, and loudness-balanced mixing.
-- Color grading, 100 GPU effects, 169 transitions, speed ramps, and keyframed camera moves.
+- Color grading, ~100 GPU effect presets, 160+ transitions, speed ramps, and keyframed camera moves.
 - Every edit checked on the rendered frames, with a typed verification report and MP4 rendering.
 
 ## Response fields
