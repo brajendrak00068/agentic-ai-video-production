@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "levea-ai-video-editor",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Prompt-first AI video editor: describe the edit and get a finished MP4.",
   "author": {
     "name": "Levea",
