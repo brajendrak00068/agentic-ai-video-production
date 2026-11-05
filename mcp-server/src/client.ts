@@ -202,12 +202,25 @@ function withProjectId(body: EditRequestBody): EditRequestBody {
   return { ...body, projectId, project_id: projectId };
 }
 
+/**
+ * The exported video's URL. The backend sets videoUrl only when the export
+ * finished before the response was assembled; otherwise the same URL arrives
+ * as export_url / exportUrl / downloadUrl.
+ */
+function exportedVideoUrl(d: Record<string, unknown>): string | undefined {
+  for (const k of ['videoUrl', 'exportUrl', 'export_url', 'downloadUrl']) {
+    const v = d[k];
+    if (typeof v === 'string' && v.startsWith('http')) return v;
+  }
+  return undefined;
+}
+
 function flattenResult(d: Record<string, unknown>): ExecuteResult {
   return {
     success: d.success !== false,
     message: (d.message as string | undefined) ?? (d.reply as string | undefined),
     data: d.data,
-    videoUrl: d.videoUrl as string | undefined,
+    videoUrl: exportedVideoUrl(d),
     jobId: d.jobId as string | number | undefined,
     status: d.status as string | undefined,
     workingMemory: d.workingMemory as Record<string, unknown> | undefined,
@@ -441,7 +454,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
       progress: (d.progress as number) || 0,
       message: (d.message as string) || '',
       result: d.result,
-      videoUrl: d.videoUrl as string | undefined,
+      videoUrl: exportedVideoUrl(d),
       error: (d.error as string | null) ?? null,
       createdAt: d.createdAt as string | undefined,
       updatedAt: d.updatedAt as string | undefined,

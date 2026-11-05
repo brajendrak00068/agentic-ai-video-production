@@ -98,7 +98,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.2.4';
+const PLUGIN_VERSION = '1.2.5';
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 
@@ -304,9 +304,13 @@ export function normalizeBackendResponse(
     }
   }
 
+  // The backend sets videoUrl only when the export finished before the response
+  // was assembled; otherwise the same URL arrives as export_url / exportUrl.
+  const videoUrl = firstString(data.videoUrl, data.exportUrl, data.export_url, data.downloadUrl);
   return {
     ...data,
     ...projectFields,
+    ...(videoUrl && videoUrl.startsWith('http') ? { videoUrl } : {}),
     success: explicitSuccess,
     message,
     httpStatus,
