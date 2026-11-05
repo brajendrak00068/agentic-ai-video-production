@@ -43,6 +43,7 @@ server directly to your Hermes MCP config (see [`mcp.json`](./mcp.json)):
 
 ## Tools
 
-Same surface as every other client: a single edit tool (`autonomous_edit`) plus
-two diagnostics (`check_job_status`, `editor_health`). One brain, one entry
-point — see the [MCP server README](../mcp-server/README.md) for the rationale.
+The full `levea-mcp-server` surface (25 tools): the edit tool `autonomous_edit`
+plus streaming, async queue, job and task status, caption templates, brand kits,
+projects, assets, and `editor_health`. One brain, one entry point; see the
+[MCP server README](../mcp-server/README.md).

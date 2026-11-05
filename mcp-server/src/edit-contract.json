@@ -176,6 +176,21 @@
       }
     },
     {
+      "name": "planDecision",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Set to `\"approve\"` to approve the plan from an approval pause; resend it with that response's `workingMemory`.",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "approve"
+        ],
+        "description": "Typed approval of a plan returned by an awaiting_approval response. Send \"approve\" together with the workingMemory (and optionally editedPlan) from that response to run the plan as proposed. Omit it to revise the plan with a new prompt instead."
+      }
+    },
+    {
       "name": "attachedImages",
       "placement": "top",
       "surfaces": [
