@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "levea-video-editor",
   "displayName": "Levea AI Video Editor",
-  "version": "1.0.0",
-  "description": "Autonomous natural-language video editing: viral clips, word-by-word captions and subtitles, 9:16 vertical reframe, silence removal, B-roll and motion graphics, multicam podcasts, color grading, and cloud MP4 export. Connects to the hosted Levea MCP server with OAuth sign-in.",
+  "version": "1.1.0",
+  "description": "Autonomous natural-language video editing: viral clips, word-by-word captions and subtitles, 9:16 vertical reframe, silence removal, B-roll, 2D and 3D motion graphics, music and sound effects, multicam podcasts, color grading, and cloud MP4 export. Connects to the hosted Levea MCP server with OAuth sign-in.",
   "author": {
     "name": "Levea (livecore.ai)",
     "url": "https://livecore.ai"

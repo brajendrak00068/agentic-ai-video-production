@@ -53,9 +53,9 @@ The non-editing tools (brand kit CRUD, project CRUD, asset upload, caption templ
 ## How to call it well
 
 1. **Send the user's intent verbatim.** Don't pre-decompose on the calling side. "Make 3 vertical TikTok clips with captions, sync to beat, export" is one `autonomous_edit` call — not four.
-2. **Treat every call as expensive and long-running.** A single `autonomous_edit` can plan + execute many steps and trigger an auto-export. Minutes, not seconds. **Do not retry on transient errors without backoff**; never re-invoke as a substitute for polling.
+2. **Treat every call as expensive and long-running.** A single `autonomous_edit` can plan + execute many steps and trigger an auto-export. Minutes, not seconds: a full edit with motion graphics, music, and export can take 10–20 minutes. If the client's wait runs out first (5 min for `autonomous_edit`, 30 for `autonomous_edit_streaming`), the result is `status: "running"` with the `project_id`; the edit keeps running, so follow it with `get_active_task` instead of calling again. For full edits, prefer `queue_edit` + `check_task_status`. **Do not retry on transient errors without backoff**; never re-invoke as a substitute for polling.
 3. **Async / job pattern.** Mutating calls may return a `jobId`. Poll with `check_job_status` (or call with `wait: true` to block until terminal). Never re-invoke `autonomous_edit` to "check progress."
-4. **Plan approval for irreversible work.** When the user's intent is destructive or hard to undo, set `requirePlanApproval: true` in `autonomous_edit` params — the editor stops after planning, returns the plan, waits for confirmation. Resume by re-calling with the returned `workingMemory` + an approval prompt (`"yes"`, `"approve"`, `"do it"`).
+4. **Plan approval for irreversible work.** When the user's intent is destructive or hard to undo, set `requirePlanApproval: true` in `autonomous_edit` params — the editor stops after planning, returns the plan, waits for confirmation. Resume by re-calling with the returned `workingMemory` and `planDecision: "approve"` (an approval prompt such as `"yes"` also works), optionally with an `editedPlan`.
 5. **Use `editor_health` for connection diagnostics**, not auth diagnostics — it's unauthenticated. A 200 here just means the host is reachable; a bad `LEVEA_API_KEY` will surface on the first `autonomous_edit` call.
 
 ## Response shape
@@ -79,6 +79,8 @@ Set via the MCP client's `mcpServers[].env`. Canonical (v0.3.0+):
 
 Backward compat: the legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` names are still read as a silent fallback; use `LEVEA_*`.
 
+Optional: `LEVEA_REQUEST_TIMEOUT_MS` / `LEVEA_STREAM_TIMEOUT_MS` (how long a call waits before returning `running`), `LEVEA_TELEMETRY=off` (turns off the anonymous usage ping: event name, client version, whether a key is set).
+
 The client never accepts a *full path* in `LEVEA_API_URL` — set only the host. The path `/api/v1/misc/openclaw/v1/execute` is appended automatically. Do not point at `/api/v1/misc/editor/` (different route, different auth model).
 
 ## Errors — how to react
@@ -90,6 +92,7 @@ The client never accepts a *full path* in `LEVEA_API_URL` — set only the host.
 | `isError: true` + 5xx / network | Transient backend | Retry **once** with backoff. Then surface. |
 | `success: true`, `jobId` present | Async work running | Poll `check_job_status` — don't re-invoke `autonomous_edit`. |
 | `success: true`, `videoUrl` present | Export landed | Show the URL to the user. Read `verificationReport.status`: only `verified` means the result passed its checks on the rendered frames; mention `qualityNotes`. |
+| `status: "running"` (`type: "still_running"`) | The client stopped waiting; the edit is still running | Call `get_active_task` with the returned `project_id`; never re-invoke the edit. |
 | `status: "awaiting_approval"` | Plan proposed (`requirePlanApproval: true`) | Show the plan; when the user agrees, call again with the returned `workingMemory` and `planDecision: "approve"`. |
 
 ## Cost-shaping recommendations

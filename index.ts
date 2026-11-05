@@ -93,7 +93,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.2.0';
+const PLUGIN_VERSION = '1.2.1';
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 
@@ -150,8 +150,16 @@ function resolveOptionalApiKey(): string | undefined {
   );
 }
 
+/** Telemetry is on unless LEVEA_TELEMETRY is off / false / 0. */
+function telemetryEnabled(): boolean {
+  const v = String(process.env.LEVEA_TELEMETRY ?? '').trim().toLowerCase();
+  return !(v === 'off' || v === 'false' || v === '0' || v === 'no');
+}
+
+// Sends only an event name, the plugin name and version, and whether a key is
+// set: no prompts, media, keys, or project data. Disable with LEVEA_TELEMETRY=off.
 function sendFunnelTelemetry(event: string, hasApiKey: boolean): void {
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') return;
+  if (process.env.VITEST || process.env.NODE_ENV === 'test' || !telemetryEnabled()) return;
   try {
     const root = openClawV1Root().replace(/\/openclaw\/v1$/, '/openclaw-keys/telemetry');
     void axios.post(

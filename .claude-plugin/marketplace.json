@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "levea-video-editor",
-      "source": "./",
-      "description": "Autonomous natural-language video editing (viral clips, captions, vertical reframe, B-roll, multicam, MP4 export) via the hosted Levea MCP server with OAuth sign-in.",
+      "source": "./claude-plugin",
+      "description": "Autonomous natural-language video editing (viral clips, captions, vertical reframe, motion graphics, music, multicam, MP4 export) via the hosted Levea MCP server with OAuth sign-in.",
       "category": "productivity"
     }
   ]

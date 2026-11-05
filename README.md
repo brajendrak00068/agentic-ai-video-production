@@ -20,10 +20,6 @@
   <a href="https://www.claudeai.directory/launches/levea" target="_blank" rel="noopener">
     <img src="https://www.claudeai.directory/badge/levea?theme=dark" alt="Levea - Listed on Claude AI Directory" width="220" height="54" />
   </a>
-  &nbsp;&nbsp;
-  <a href="https://chatgpt.com/gpts" target="_blank" rel="noopener">
-    <img src="https://raw.githubusercontent.com/brajendrak00068/agentic-ai-video-production/main/chatgpt/chatgpt-badge.svg" alt="Levea - Available on ChatGPT Store" width="220" height="54" />
-  </a>
 </p>
 
 ---
@@ -33,8 +29,8 @@
 Unlike traditional one-shot AI video generators that output locked, un-editable pixels, Levea maintains a fully structured, multi-layer **project and timeline (Scene IR)** containing assets, text, masks, audio, and brand kits. 
 
 - **Frontier LLMs for Planning:** We use probabilistic Frontier LLMs solely for planning, semantic analysis, and parameter parsing.
-- **Cloud-Accelerated Production Harness:** Heavy computation (Vulkan rendering, GPU WhisperX transcription, active-speaker face tracking, and HyperFrames motion graphics) executes on our remote cloud GPU cluster. You get instant 4K and vertical reel exports without melting your local laptop CPU or installing CUDA.
-- **Open-Source Client, Hosted Engine:** The client-side MCP server wrapper (`levea-mcp-server`), OpenClaw plugins, and skills are open-source (MIT). They connect to our hosted video production engine via API key. You can generate an API key with free starter credits at [livecore.ai](https://livecore.ai/).
+- **Cloud-Accelerated Production Harness:** Heavy computation (Vulkan rendering, GPU transcription, active-speaker face tracking, and HyperFrames motion graphics) executes on our remote cloud GPU cluster. You get 4K and vertical reel exports without melting your local laptop CPU or installing CUDA.
+- **Open-Source Client, Hosted Engine:** The client-side MCP server wrapper (`levea-mcp-server`), OpenClaw plugins, and skills are open-source (MIT). They connect to our hosted video production engine with OAuth sign-in or an API key. Create a free account and API key at [livecore.ai](https://livecore.ai/).
 
 ---
 
@@ -47,13 +43,13 @@ Levea separates probabilistic creative reasoning from deterministic project exec
                                   │
                                   ▼
                Probabilistic Multimodal Intelligence
-                      (Gemini / Frontier LLMs)
+                         (Frontier LLMs)
                                   │
                                   ▼
-                CanonicalActionIR (186 Typed Actions)
+                 Typed Action Plan (186 Typed Actions)
                                   │
                                   ▼
-                        CanonicalPlanCompiler
+                           Plan Compiler
                                   │
                     ┌─────────────┴─────────────┐
                     ▼                           ▼
@@ -67,13 +63,13 @@ Levea separates probabilistic creative reasoning from deterministic project exec
                    ├── Timeline and Scene Graph (Tracks, Layers, Geometry)
                    ├── Media Operators (Silence Cuts, Slip/Slide, Ripple, Split-Screen)
                    ├── Caption & Typography Engine (60+ Templates, Kinetic Word Sync, Latin / Indic / Arabic / Cyrillic / Greek)
-                   ├── Animation & Camera (Spring Physics, Keyframed 3D Camera, Speed Ramps, 17 Blend Modes)
+                   ├── Animation & Camera (Spring Physics, Keyframed 3D Camera, Speed Ramps, 29 Blend Modes)
                    ├── Audio (Licensed Music + SFX Library, Sound Design, EBU R128 Loudness, Voiceover, Auto-Duck)
                    ├── Composition & Asset Execution
                    │   ├── HyperFrames — 2D motion design, 3D character films, charts, cards
-                   │   ├── Vulkan/WebGPU — 169 transitions, 100 GPU effects, final compositing
+                   │   ├── Vulkan/WebGPU — 160+ transitions, ~100 GPU effect presets, final compositing
                    │   ├── Lottie — authored vector animations
-                   │   └── Veo / Imagen 3 — generated supporting media
+                   │   └── Generative models — supporting images, video, music, voice
                    ├── Typed Operation Engine (Atomic, Audited Mutations)
                    ├── Project Versioning (Immutable Scene History)
                    └── Export Pipeline (Hardware-Accelerated / Vulkan MP4)
@@ -86,7 +82,7 @@ Levea separates probabilistic creative reasoning from deterministic project exec
 ```
 
 ### 1. Multimodal planning
-The planning layer interprets user prompts, transcripts, visual references, and timeline boundaries. It compiles raw natural language into a highly optimized, typed **Workflow DAG** of sequential and parallel editing operations. The hosted planner currently utilizes Gemini through Google AI and Vertex AI.
+The planning layer interprets user prompts, transcripts, visual references, and timeline boundaries. It compiles raw natural language into a typed **Workflow DAG** of sequential and parallel editing operations.
 
 ### 2. Workflow DAG and Scene IR (Intermediate Representation)
 These represent the dual brain-body architecture of Levea:
@@ -205,13 +201,13 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | *"Make this TikTok-ready"* | Vertical 9:16 reframe + captions + silence removal + keyword emphasis kit. |
 | *"Export for TikTok, Reels, Shorts, YouTube, and Instagram"* | One pass, all platform-specific aspect ratios in one package. |
 | *"Replace the green screen with a beach, keep the speaker centered"* | Chroma key + background composite + face tracking in one call. |
-| *"Remove the background — no green screen"* | AI background removal via Robust Video Matting (RVM) alpha matte on any footage. |
+| *"Remove the background — no green screen"* | AI background removal via an alpha matte on any footage. |
 | *"Swap my background for a city skyline — no green screen"* | AI matte isolates subject cleanly, compositing the new background behind. |
 | *"Remove all silences and filler words, add background music"* | Cleans audio track (cuts `um`, `uh`, `like`), adds ducked music bed under speech. |
 | *"Auto-zoom on whoever's talking"* | Active-speaker detection + dynamic zoom-follow framing. |
 | *"Caption this and highlight every time they say 'launch'"* | Auto-captions + keyword emphasis (scaling / glow / pulse). |
-| *"Find every clip where Alex appears"* | Cross-asset facial identity search using AI facial embeddings. |
-| *"Add narration in a cloned voice over the intro"* | Voice cloning + Google Cloud TTS overlay + auto-ducking. |
+| *"Find every clip where Alex appears"* | Face identity search across the clips in your project. |
+| *"Add narration in a cloned voice over the intro"* | Voice cloning + TTS overlay + auto-ducking. |
 | *"Caption this Hormozi-style with karaoke word highlighting"* | Word-synced karaoke captions — active word fills and underlines in sync with speech. |
 | *"Generate B-roll over the product mention"* | AI B-roll generation + placement at the exact timestamp. |
 | *"Color grade this like a Netflix doc"* | Cinematic LUT color grade with contrast and film-look curve. |
@@ -226,7 +222,6 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | *"Speed-ramp into the jump and use J-cuts between speakers"* | Speed ramps / time remap and J/L, match, and smash cuts as typed editing techniques. |
 | *"Push the camera in slowly with a little parallax"* | Keyframed 3D camera moves with depth-based parallax. |
 | *"Match the color of the second camera to the first"* | Auto color and shot-to-shot color matching, plus film looks, film burn, and lens flares. |
-| *"Post it to TikTok and Instagram tomorrow at 9am with a caption"* | AI-written post copy and scheduled publishing to connected social accounts. |
 
 ---
 
@@ -237,8 +232,8 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | **Interface** | Drag, drop, keyframe by hand on a manual timeline | One natural-language prompt; the agent plans and finishes the edit |
 | **Auto-analysis on upload** | Manual scene detection + subtitles | Faces, active speakers, shot cuts, and on-screen text regions detected automatically |
 | **"Make this viral"** | You manually hunt for hooks, crop, splice, and align | Single preset — vertical 9:16 + captions + silences + face tracking |
-| **Cross-asset search** | Filename search | "Find every clip where Alex appears" using AI facial embeddings across your library |
-| **Background replace** | Key out green screen or draw rotoscope masks by hand | One call — Robust Video Matting (RVM) handles any footage without a green screen |
+| **Face search** | Filename search | "Find every clip where Alex appears" across the clips in your project |
+| **Background replace** | Key out green screen or draw rotoscope masks by hand | One call — an AI alpha matte handles any footage without a green screen |
 | **Broadcast-grade audio** | Manual loudness metering + compression + EQ | Auto LUFS loudness-normalized (EBU R128), true-peak limited, music ducked under speech |
 | **Editorial reasoning** | You listen and hunt for the climax | Agent surfaces narrative peaks and high-retention moments |
 | **Verification & Repair** | You eyeball it and manually re-render | Every edit is checked on the rendered frames; failures are repaired automatically and reported with a typed verification report |
@@ -298,18 +293,18 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 - **Project and timeline state:** Full NLE track and clip operations (insert, overwrite, lift, extract, ripple delete/trim, slip, slide, freeze frame, reverse), multi-track management, nesting containers, and durable linear undo/redo.
 - **Captions:** automatic captions, word timing, keyword emphasis, 60+ caption templates (Hormozi, Spotlight, Karaoke, Typewriter, phrase lockups, two-line podcast looks, …), animated word entrances and burn-aways, and Latin, Indic, Arabic, Cyrillic, and Greek text.
 - **Motion graphics:** lower thirds, title cards, charts, counters, flow diagrams, collage layouts, text behind the subject, and full motion-graphic films (2D motion design and 3D character films with camera, lighting, music, and sound design). Every graphic is placed clear of faces and reviewed by an AI critic before it ships.
-- **Editing techniques:** speed ramps and time remap, J/L, match, and smash cuts, keyframed 3D camera moves with depth parallax, AI outpainting to new aspect ratios, eye-contact correction, face retouch, style packages, and 169 transitions.
-- **Layout and perception:** multi-cam synchronization and active-speaker cuts, scene and shot cut analysis, face detection and tracking, cross-clip face identity search, on-screen text-region **detection and OCR recognition** (PP-OCRv5 det + rec), safe zones, and explicit-region tracking or masking.
-- **Compositing and color:** chroma key, masks, blend modes (17 modes), adjustment layers, alpha-matte background replacement, content-aware inpainting for on-screen text / logo / watermark removal, auto color and shot matching, LUTs (including your own .cube files), and 100 GPU effects (lens flares, film burn, bloom, rain, smoke, fire, glitch, portal, lightning, …).
-- **Audio:** a reviewed, licensed music and sound-effects library, sound design (effects on cuts and beats, room tone), music fitted to the video length, silence and filler-word cleanup, word-level muting, crossfades, EQ, denoise, EBU R128 loudness normalization, voiceover, **voice cloning** and voice conversion, speech-aware ducking, beat- and drop-synced edits, and AI stem separation.
+- **Editing techniques:** speed ramps and time remap, J/L, match, and smash cuts, keyframed 3D camera moves with depth parallax, AI outpainting to new aspect ratios, eye-contact correction, face retouch, style packages, and 160+ transitions.
+- **Layout and perception:** multi-cam synchronization and active-speaker cuts, scene and shot cut analysis, face detection and tracking, face identity search across a project's clips, on-screen text-region **detection and OCR recognition**, safe zones, and explicit-region tracking or masking.
+- **Compositing and color:** chroma key, masks, blend modes (29 modes), adjustment layers, alpha-matte background replacement, on-screen text / logo / watermark removal, auto color and shot matching, LUTs (including your own .cube files), and ~100 GPU effect presets (lens flares, film burn, bloom, rain, smoke, fire, glitch, portal, lightning, …).
+- **Audio:** a reviewed, licensed music and sound-effects library, sound design (effects on cuts and beats, room tone), music fitted to the video length, silence and filler-word cleanup, word-level muting, crossfades, EQ, denoise, EBU R128 loudness normalization, voiceover, **voice cloning** and voice conversion, speech-aware ducking, beat- and drop-synced edits, and vocal / instrumental separation.
 - **Autonomous Directing:** automated cold-open hook extraction, hook-first trims to a target length, podcast polish macros, contextual B-roll placement, auto lower thirds, and slideshow generation.
-- **Sources and delivery:** public video links (including Google Drive files and folders) checked before planning, MP4 export in every platform aspect ratio, and social publishing with AI-written post copy and scheduling.
+- **Sources and delivery:** public video links (including Google Drive files and folders) checked before planning, and MP4 export in every platform aspect ratio.
 - **Verification:** typed task contracts, checks on the rendered frames, requirement tracking, an automatic repair loop, plan approval (`requirePlanApproval` + `planDecision`), and a typed `verificationReport` on every result.
 
 ### Model- or Deployment-Dependent
 - Generated video, images, B-roll, music, sound effects, voiceover, and voice cloning quality/availability vary by model tier and quota (all are wired as canonical actions in production).
 - Neural alpha matting and background replacement quality.
-- **CJK / RTL caption rendering:** cosmic-text bidi shaping and RTL language handling ship in production; the 39-font MSDF atlas is Latin-ASCII, so CJK/RTL glyph coverage depends on system-font fallback when `preserveUnicode` is enabled.
+- **CJK caption rendering:** right-to-left shaping ships in production; CJK glyph coverage depends on font fallback.
 
 ---
 
@@ -322,7 +317,7 @@ The MCP server (`levea-mcp-server`, 25 tools) exposes one high-level editing ent
 | **Edit** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Single-entry edit prompts, SSE progress streaming, and asynchronous queuing. |
 | **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, generation jobs, and the active task of a project. |
 | **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
-| **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, speaker voice clones, and grading rules. |
+| **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, voice tone, and grading rules. |
 | **Projects** | `list_projects`, `get_project`, `create_project`, `delete_project` | Project workspace management. |
 | **Assets** | `asset_upload_url`, `list_assets`, `delete_asset`, `transcribe_asset` | Signed upload URLs, asset listing and deletion, and transcription. |
 | **Diagnostics** | `editor_health` | Unauthenticated connectivity check. |
@@ -334,7 +329,7 @@ Every edit result carries a `verificationReport` (`verified`, `rejected`, `unver
 ## 🔮 Organic SEO FAQ for Developers & Creators
 
 #### How does Levea compare to generic video generators like Sora, Veo, or Runway?
-Generic generative video models (Sora, Runway, Veo) output raw, locked pixels. You cannot edit a layer, adjust caption typography, swap background music, or correct a word timing afterward. Levea is a **full-featured timeline editor** that builds structured project layers. It uses generative models (like Omni/Veo/Imagen) only as optional asset generation plugins, keeping your editing pipeline fully editable, inspectable, and deterministic.
+Generic generative video models (Sora, Runway, Veo) output raw, locked pixels. You cannot edit a layer, adjust caption typography, swap background music, or correct a word timing afterward. Levea is a **full-featured timeline editor** that builds structured project layers. It uses generative models only as optional asset generation steps, keeping your editing pipeline fully editable, inspectable, and deterministic.
 
 #### Is Levea safe to use in enterprise productions?
 Yes. Every mutation runs through a typed operation engine, and every action the planner or the repair loop chooses is authorized against the request before it runs, so an LLM cannot inject arbitrary mutations. If you set `requirePlanApproval: true`, the system halts and returns the creative plan for approval; resend with `planDecision: "approve"` (or an `editedPlan`) to run it.
@@ -343,7 +338,7 @@ Yes. Every mutation runs through a typed operation engine, and every action the 
 Levea integrates natively with **Model Context Protocol (MCP)** hosts like Claude Desktop, Cursor, Cline, Windsurf, and Claude Code. For standalone agent systems, Levea exposes structured packages for **OpenClaw** and **Hermes**.
 
 #### Can I use custom brand fonts, logos, and specific caption templates?
-Absolutely. Using our **Brand Kits API and tools**, you can declare custom typography scales, palette hex codes, logo image references, and custom voice prints. The planning model reads these rules and automatically enforces them across the timeline during the composition pass.
+Absolutely. Using our **Brand Kits API and tools**, you can declare custom typography scales, palette hex codes, logo image references, and voice tone. The planning model reads these rules and automatically enforces them across the timeline during the composition pass.
 
 ---
 
@@ -357,7 +352,13 @@ Absolutely. Using our **Brand Kits API and tools**, you can declare custom typog
 - **Detailed Agent Integration Guide:** [AGENTS.md](./AGENTS.md)
 - **MCP Folder Documentation:** [mcp-server/README.md](./mcp-server/README.md)
 
-**Support & Contact:** `brajendrak00068@gmail.com`
+**How long an edit takes:** read-only questions answer in seconds, a simple edit with export in a few minutes, and a full edit with motion graphics, music, and export in 10–20 minutes. Clients return `status: "running"` with the `project_id` if they stop waiting first; the edit keeps running (see [AGENTS.md](./AGENTS.md)).
+
+**Privacy & telemetry:** edits send your prompt, source links, and project ids to the Levea API ([privacy policy](https://www.livecore.ai/privacy), [terms](https://www.livecore.ai/terms)). The MCP server and OpenClaw plugin also send a tiny anonymous usage ping (event name, client version, whether a key is set; never prompts, media, or keys); turn it off with `LEVEA_TELEMETRY=off`.
+
+**Security:** see [SECURITY.md](./SECURITY.md). **Contributing:** see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+**Support & Contact:** [support@livecore.ai](mailto:support@livecore.ai) · [GitHub issues](https://github.com/brajendrak00068/agentic-ai-video-production/issues)
 
 ---
 

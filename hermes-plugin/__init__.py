@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
-PLUGIN_VERSION = "1.1.0"
+PLUGIN_VERSION = "1.1.1"
 TOOLSET = "levea_video_editor"
 DEFAULT_API_URL = "https://api.livecore.ai"
 REQUEST_TIMEOUT_SEC = 600
@@ -195,13 +195,15 @@ def _call_backend(method: str, path: str, body: Optional[dict], *, label: str,
         status, raw = error.code, error.read()
     except TimeoutError:
         return {**project_fields, "success": False, "code": "TIMEOUT", "status": "unknown",
-                "message": "The editor request timed out; its final state is unknown. Poll by "
-                           "the returned project or task identifier before retrying."}
+                "message": "The edit is still running on Levea (full edits with motion graphics and "
+                           "export can take 10-20 minutes). Call levea_active_task with this project_id "
+                           "to follow it; do not run the edit again."}
     except urllib.error.URLError as error:
         if isinstance(error.reason, TimeoutError):
             return {**project_fields, "success": False, "code": "TIMEOUT", "status": "unknown",
-                    "message": "The editor request timed out; its final state is unknown. Poll by "
-                               "the returned project or task identifier before retrying."}
+                    "message": "The edit is still running on Levea (full edits with motion graphics and "
+                               "export can take 10-20 minutes). Call levea_active_task with this project_id "
+                               "to follow it; do not run the edit again."}
         return {**project_fields, "success": False, "code": "BACKEND_UNREACHABLE",
                 "message": f"Cannot reach the editor backend: {error.reason}"}
     except Exception as error:  # handlers must never raise
