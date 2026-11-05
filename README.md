@@ -24,6 +24,33 @@
 
 ---
 
+## 🧭 How Levea Routes Your Request
+
+Every request is first classified into **one production type**, from your prompt *and* your footage (is there speech? faces? one long recording or many short clips?). Each production type maps to exactly **one production pipeline**, and the pipeline decides which editing craft (director skills) the planner works with. The planner can still load extra skills while it reviews your footage.
+
+| You ask for… (example) | Production type | Pipeline | What it does |
+|---|---|---|---|
+| "Make a reel showing off our new studio / store / product" (footage with no speaker) | `showcase_montage` | `visual_showcase_montage` | Music-driven reveal montage where the footage is the hero: best moments per clip, uneven shots cut to the music, designed transitions, no text over the subject unless you ask |
+| "Clean up this talking-head video, cut the ums and silences" | `talking_head_cleanup` | `talking_head_cleanup` | Dialogue cleanup, pacing, captions and finishing |
+| "Turn this podcast episode into clips" (needs speech) | `podcast_clips` | `podcast_repurposing` | Podcast cleanup and social clip repurposing |
+| "Edit this two-camera interview" | `multicam_interview` | `multicam_interview` | Multi-camera sync and active-speaker editing |
+| "Add a teaser hook at the start of this episode" | `cold_open` | `cold_open_production` | Cold-open / teaser-hook assembly |
+| "Make a 30 s vertical short with captions" | `social_short` | `social_short_generation` | Vertical, captioned social short |
+| "Add motion graphics that explain what I'm saying" | `motion_graphics_overlay` | `motion_graphics_enhancement` | Transcript-grounded motion graphics over your footage |
+| "Make a 20 s animated explainer / title sequence" | `motion_graphics_film` | `motion_graphics_film` | A standalone motion-graphics film |
+| "Create a product demo video for this app / site" | `product_demo` | `product_demo` | Product demo with generated assets and motion design |
+| "Make a documentary-style montage from this archive" | `documentary_montage` | `documentary_montage` | Evidence-grounded documentary montage |
+| "Dub this video into Hindi" | `localization_dub` | `localization_dubbing` | Localized voice, captions and timing checks |
+| "Grade, mix and deliver this final cut" | `final_finishing` | `final_finishing_delivery` | Final grade, mix, verification and delivery |
+| "Assemble a rough cut from this footage" | `rough_cut` | `rough_cut` | Transcript-aware structural rough cut |
+
+**Good to know**
+- **Your footage counts, not just your words.** "Launch reel for our new *podcast* studio" over silent clips of an empty set is a **showcase**, not podcast clipping, because a podcast pipeline needs speech.
+- **Links in your prompt get a role.** A URL is classified as footage to import, a style reference, **your brand's site (used for palette and tone, not shown on screen unless you ask)** or a website to show.
+- **Want a specific pipeline?** Say so in plain words ("treat this as a documentary montage"); the classifier reads it.
+
+---
+
 ## ⚡ The Levea Philosophy: Prompt-to-Project
 
 Unlike traditional one-shot AI video generators that output locked, un-editable pixels, Levea maintains a fully structured, multi-layer **project and timeline (Scene IR)** containing assets, text, masks, audio, and brand kits. 
