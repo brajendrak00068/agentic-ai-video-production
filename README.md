@@ -140,6 +140,26 @@ All paths start with `https://api.livecore.ai`.
 - **Telegram:** message [@Levea_editing_bot](https://telegram.me/Levea_editing_bot) to edit from your phone. Link it to your Levea account from the sign-in page ("Try on Telegram").
 - **Skills** (ClawHub, the Claude Code plugin) are instructions for the agent; they do not run code.
 
+**Directory — every box in the map above, linked:**
+
+| Map option | Where it takes you |
+|---|---|
+| Web studio | [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=github&utm_medium=readme&utm_campaign=agentic-ai-video-production) |
+| Telegram bot | [@Levea_editing_bot](https://telegram.me/Levea_editing_bot) |
+| Levea API (`/api/v1/misc/openclaw/v1/*`) | [API reference](./mcp-server/README.md#api-reference) |
+| levea-mcp-server | [npm](https://www.npmjs.com/package/levea-mcp-server) · [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server) |
+| OpenClaw plugin | [ClawHub](https://clawhub.ai/plugins/openclaw-ai-video-editor) |
+| Hermes plugin | [`hermes-plugin/`](./hermes-plugin) (Python) · [`hermes-levea/`](./hermes-levea) (MCP bundle) |
+| ChatGPT action | [`chatgpt/`](./chatgpt) (OpenAPI spec + GPT instructions) |
+| Claude Code plugin | [`claude-plugin/`](./claude-plugin) — install: `/plugin install levea-video-editor --marketplace brajendrak00068/agentic-ai-video-production` |
+| Claude connector | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — add as a custom connector (any plan); directory listing in preparation |
+| ChatGPT app | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — directory submission in preparation ([`chatgpt-plugin/`](./chatgpt-plugin)) |
+| Cursor plugin | [`.cursor-plugin/marketplace.json`](./.cursor-plugin/marketplace.json) — add this repo as a plugin marketplace in Cursor |
+| Gemini CLI extension | [`gemini-extension.json`](./gemini-extension.json) — `gemini extensions install https://github.com/brajendrak00068/agentic-ai-video-production` |
+| Grok Bot | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — see [Use inside Grok Bot](#-use-inside-grok-bot) |
+| Mistral | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — add as a Le Chat connector |
+| Any remote-MCP client | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — OAuth 2.1 sign-in or `Authorization: Bearer <key>` |
+
 ### 1. Pipelines and planning
 Each request is matched to a production pipeline (a short-form reel, a podcast cut, a documentary montage, a motion-graphic film, …) whose director skills give the planner its craft rules. The planner reads the prompt, the transcript, sampled frames, and the current scene, and emits a **typed action plan**: canonical actions with typed parameters, never free-form scene edits.
 
@@ -192,6 +212,14 @@ Two hosts bundle this hosted server for one-step installs:
   gemini extensions install https://github.com/brajendrak00068/agentic-ai-video-production
   ```
 - **Cursor plugin** — add this repo as a plugin marketplace in Cursor (it reads [`.cursor-plugin/marketplace.json`](./.cursor-plugin/marketplace.json)), then install `levea-video-editor`.
+
+### 🤖 Use inside Grok Bot
+
+Grok Bot can add an MCP server by URL, and the hosted server speaks the exact contract it expects (Streamable HTTP, OAuth 2.1 with RFC 7591 dynamic client registration). Tell your Bot:
+
+> **"Add the Levea MCP server: `https://api.livecore.ai/api/v1/misc/mcp`"**
+
+(or use **Connect apps → add an MCP server by URL**). A browser opens to sign in to your Levea account — then every Levea tool (`autonomous_edit`, `queue_edit`, job polling, caption templates, brand kits, projects, assets) is available to that Bot, and edits land in the same projects you see in the web studio. Clients that cannot do OAuth can use `Authorization: Bearer <your Levea API key>` instead.
 
 ### 🧑‍💻 Path A: For Developers & AI Engineers (The MCP Route)
 
