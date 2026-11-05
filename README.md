@@ -8,7 +8,7 @@
 
 # Levea — Prompt-First AI Video Editor (MCP Server & Cloud Production Harness)
 
-> **Prompt-to-video editing without manual timelines.** Describe the edit in plain language; Levea plans it, edits a real multi-layer project, checks the result on the rendered frames, and exports the MP4. An **open-source MCP client** connects your AI agent (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes, ChatGPT) to our **cloud GPU production harness**: frame-accurate cuts, 60+ caption templates, 2D and 3D motion graphics reviewed by an AI critic, a licensed music and sound-effects library, voiceovers, and active-speaker reframing, with nothing heavy running on your machine.
+> **Prompt-to-video editing without manual timelines.** Describe the edit in plain language; Levea plans it, edits a real multi-layer project, checks the result on the rendered frames, and exports the MP4. An **open-source MCP client** connects your AI agent (Claude Desktop, Claude Code, Cursor, Cline, Gemini CLI, OpenClaw, Hermes, ChatGPT) to our **cloud GPU production harness**: frame-accurate cuts, 60+ caption templates, 2D and 3D motion graphics reviewed by an AI critic, a licensed music and sound-effects library, voiceovers, and active-speaker reframing, with nothing heavy running on your machine.
 
 [![npm](https://img.shields.io/npm/v/levea-mcp-server?label=npm%20levea-mcp-server)](https://www.npmjs.com/package/levea-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-levea--mcp--server-orange)](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server)
@@ -110,30 +110,32 @@ Levea separates probabilistic creative reasoning from deterministic project exec
 Every Levea client reaches the same editor on the Levea backend. The agent clients are thin wrappers over one HTTP API, with the same edit fields (one shared [edit contract](./contract/edit-contract.json)); the web studio and the Telegram bot have their own routes into the same editor. Pick whichever fits your tools:
 
 ```text
-                 Levea editor (one edit pipeline, same result everywhere)
-                                          ▲
-           ┌──────────────────────────────┼──────────────────────────┐
-           │                              │                          │
- Levea API                         Web studio route           Telegram route
- /api/v1/misc/openclaw/v1/*        /api/v1/misc/editor/*      /api/v1/misc/telegram/*
- (execute, queue-edit, jobs,              ▲                          ▲
-  task-status, projects, assets, …)       │                          │
-           ▲                       Levea web studio           Telegram bot
-           │                       (livecore.ai)              (@Levea_editing_bot)
-   ┌───────┴─────────┬────────────────┬──────────────┐
-   │                 │                │              │
-levea-mcp-server  OpenClaw plugin  Hermes plugin  ChatGPT action
-(npm, stdio MCP)  (ClawHub)        (Python)       (OpenAPI)
- ▲
-Hosted MCP: /api/v1/misc/mcp
-(the same server, run by Levea; OAuth sign-in or API key)
- ▲
-Claude Code plugin · Claude connector · ChatGPT app · Cursor / any remote-MCP client
+               Levea editor (one edit pipeline, same result everywhere)
+                                           ▲
+               ┌───────────────────────────┼─────────────────────────┐
+               │                           │                         │
+           Levea API               Web studio route           Telegram route
+  /api/v1/misc/openclaw/v1/*    /api/v1/misc/editor/*    /api/v1/misc/telegram/*
+  (execute, queue-edit, jobs,              ▲                         ▲
+   task-status, projects, assets, …)       │                         │
+               ▲                   Levea web studio            Telegram bot
+               │                    (livecore.ai)          (@Levea_editing_bot)
+          ┌────┴───────────┬────────────────┬────────────────┐
+          │                │                │                │
+  levea-mcp-server  OpenClaw plugin   Hermes plugin   ChatGPT action
+  (npm, stdio MCP)     (ClawHub)        (Python)         (OpenAPI)
+          ▲
+  Hosted MCP: /api/v1/misc/mcp
+  (the same server, run by Levea; OAuth sign-in or API key)
+          ▲
+  Claude Code plugin · Claude connector · ChatGPT app · Cursor plugin ·
+  Gemini CLI extension · Grok Bot · Mistral · any remote-MCP client
 ```
 
 All paths start with `https://api.livecore.ai`.
 
 - **MCP clients** (Claude Desktop, Cursor, Cline, Windsurf) run `levea-mcp-server` locally with an API key, or connect to the **hosted MCP** URL with no install.
+- **Cursor plugin** (`.cursor-plugin` marketplace) and **Gemini CLI extension** (`gemini-extension.json`) install from this repo and ride the **hosted MCP** server — nothing to run locally. **Grok Bot** (add the hosted MCP by URL: `https://api.livecore.ai/api/v1/misc/mcp`) and **Mistral** (Le Chat connectors) reach it the same way.
 - **OpenClaw**, **Hermes**, and the **ChatGPT action** call the API directly.
 - **Telegram:** message [@Levea_editing_bot](https://telegram.me/Levea_editing_bot) to edit from your phone. Link it to your Levea account from the sign-in page ("Try on Telegram").
 - **Skills** (ClawHub, the Claude Code plugin) are instructions for the agent; they do not run code.
@@ -182,6 +184,14 @@ https://api.livecore.ai/api/v1/misc/mcp
 ```
 
 It speaks Streamable HTTP and signs you in with **OAuth 2.1** (the client opens a browser to your Levea account). Clients that cannot do OAuth can send `Authorization: Bearer <your Levea API key>` instead.
+
+Two hosts bundle this hosted server for one-step installs:
+
+- **Gemini CLI extension** — this repo is a Gemini extension ([`gemini-extension.json`](./gemini-extension.json)):
+  ```bash
+  gemini extensions install https://github.com/brajendrak00068/agentic-ai-video-production
+  ```
+- **Cursor plugin** — add this repo as a plugin marketplace in Cursor (it reads [`.cursor-plugin/marketplace.json`](./.cursor-plugin/marketplace.json)), then install `levea-video-editor`.
 
 ### 🧑‍💻 Path A: For Developers & AI Engineers (The MCP Route)
 
@@ -370,7 +380,7 @@ Generic generative video models (Sora, Runway, Veo) output raw, locked pixels. Y
 It is designed for it. Every mutation runs through a typed operation engine, and every action the planner or the repair loop chooses is authorized against the request before it runs, so an LLM cannot inject arbitrary mutations. If you set `requirePlanApproval: true`, the system halts and returns the creative plan for approval; resend with `planDecision: "approve"` (or an `editedPlan`) to run it.
 
 #### What coding and agent environments does Levea support?
-Levea integrates natively with **Model Context Protocol (MCP)** hosts like Claude Desktop, Cursor, Cline, Windsurf, and Claude Code. For standalone agent systems, Levea exposes structured packages for **OpenClaw** and **Hermes**.
+Levea integrates natively with **Model Context Protocol (MCP)** hosts like Claude Desktop, Cursor, Cline, Windsurf, Claude Code, and the Gemini CLI (via the bundled extension). For standalone agent systems, Levea exposes structured packages for **OpenClaw** and **Hermes**.
 
 #### Can I use custom brand fonts, logos, and specific caption templates?
 Absolutely. Using our **Brand Kits API and tools**, you can declare custom typography scales, palette hex codes, logo image references, and voice tone. The planning model reads these rules and automatically enforces them across the timeline during the composition pass.
