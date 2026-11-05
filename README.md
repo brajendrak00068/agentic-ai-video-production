@@ -80,24 +80,35 @@ Levea separates probabilistic creative reasoning from deterministic project exec
 
 ### How the clients connect
 
-Every Levea client is a thin wrapper over one HTTP API on the Levea backend. Pick whichever fits your tools; they all reach the same editor, with the same edit fields (one shared [edit contract](./contract/edit-contract.json)):
+Every Levea client reaches the same editor on the Levea backend. The agent clients are thin wrappers over one HTTP API, with the same edit fields (one shared [edit contract](./contract/edit-contract.json)); the web studio and the Telegram bot have their own routes into the same editor. Pick whichever fits your tools:
 
 ```text
-              Levea API: https://api.livecore.ai/api/v1/misc/openclaw/v1/*
-              (execute, queue-edit, jobs, task-status, projects, assets, …)
-                                       ▲
-     ┌────────────────┬────────────────┼────────────────┬────────────────┐
-levea-mcp-server   OpenClaw plugin   Hermes plugin   ChatGPT action    Levea web studio
-(npm, stdio MCP)   (ClawHub)         (Python)        (OpenAPI)         (livecore.ai)
-     ▲
-Hosted MCP: https://api.livecore.ai/api/v1/misc/mcp
+                 Levea editor (one edit pipeline, same result everywhere)
+                                          ▲
+           ┌──────────────────────────────┼──────────────────────────┐
+           │                              │                          │
+ Levea API                         Web studio route           Telegram route
+ /api/v1/misc/openclaw/v1/*        /api/v1/misc/editor/*      /api/v1/misc/telegram/*
+ (execute, queue-edit, jobs,              ▲                          ▲
+  task-status, projects, assets, …)       │                          │
+           ▲                       Levea web studio           Telegram bot
+           │                       (livecore.ai)              (@Levea_editing_bot)
+   ┌───────┴─────────┬────────────────┬──────────────┐
+   │                 │                │              │
+levea-mcp-server  OpenClaw plugin  Hermes plugin  ChatGPT action
+(npm, stdio MCP)  (ClawHub)        (Python)       (OpenAPI)
+ ▲
+Hosted MCP: /api/v1/misc/mcp
 (the same server, run by Levea; OAuth sign-in or API key)
-     ▲
+ ▲
 Claude Code plugin · Claude connector · ChatGPT app · Cursor / any remote-MCP client
 ```
 
+All paths start with `https://api.livecore.ai`.
+
 - **MCP clients** (Claude Desktop, Cursor, Cline, Windsurf) run `levea-mcp-server` locally with an API key, or connect to the **hosted MCP** URL with no install.
 - **OpenClaw**, **Hermes**, and the **ChatGPT action** call the API directly.
+- **Telegram:** message [@Levea_editing_bot](https://telegram.me/Levea_editing_bot) to edit from your phone. Link it to your Levea account from the sign-in page ("Try on Telegram").
 - **Skills** (ClawHub, the Claude Code plugin) are instructions for the agent; they do not run code.
 
 ### 1. Pipelines and planning
