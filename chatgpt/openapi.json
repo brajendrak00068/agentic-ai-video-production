@@ -115,18 +115,47 @@
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "True when the edit completed and its checks passed."
                     },
-                    "export_url": {
+                    "status": {
+                      "type": "string",
+                      "description": "completed, failed, or awaiting_approval (the plan is waiting for approval)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of the edits performed."
+                    },
+                    "videoUrl": {
                       "type": "string",
                       "description": "Direct URL to the finished MP4 video render."
                     },
-                    "jobId": {
-                      "type": "string"
-                    },
-                    "summary": {
+                    "export_url": {
                       "type": "string",
-                      "description": "Human-readable summary of the edits performed."
+                      "description": "Same URL as videoUrl when an export ran (legacy name)."
+                    },
+                    "jobId": {
+                      "type": "string",
+                      "description": "Numeric id of the export job, for polling."
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "description": "Project id; send it as params.project_id on every follow-up edit."
+                    },
+                    "workingMemory": {
+                      "type": "object",
+                      "description": "Returned with status awaiting_approval; send it back with planDecision \"approve\" to run the plan."
+                    },
+                    "verificationReport": {
+                      "type": "object",
+                      "description": "Verification of the finished edit: status is verified, rejected, unverified, or not_applicable, with each failed check and what repair tried."
+                    },
+                    "qualityNotes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Advisory notes about the result."
                     }
                   }
                 }

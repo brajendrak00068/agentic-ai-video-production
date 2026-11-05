@@ -93,7 +93,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.1.9';
+const PLUGIN_VERSION = '1.2.0';
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 

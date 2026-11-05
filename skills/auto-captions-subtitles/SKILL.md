@@ -1,7 +1,7 @@
 ---
 name: auto-captions-subtitles
 description: "Generate synchronized word-by-word animated captions and translated subtitles for video timelines."
-version: 1.0.2
+version: 1.0.3
 author: brajendrak00068
 license: MIT
 ---
@@ -43,6 +43,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `requirePlanApproval` (boolean, optional): When `true`, pause after planning and return `workingMemory` for the user to approve.
 - `workingMemory` (object, optional): State returned by a paused plan-approval call; send it back to resume.
 - `editedPlan` (object, optional): The user's edited version of a plan returned by an approval pause.
+- `planDecision` (string, optional): Set to `"approve"` to approve the plan from an approval pause; resend it with that response's `workingMemory`.
 - `attachedImages` (array, optional): Reference image URLs for planning (style, branding).
 - `flaggedIssues` (array, optional): Specific problems the user flagged that this run must fix.
 - `brandId` (string, optional): Brand kit to apply to this call.
@@ -62,7 +63,8 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Speech-to-text word timing alignment on the active timeline.
-- Built-in caption templates including karaoke, word-pill, viral-pop, and subtitle bars.
+- 60+ caption templates including Hormozi, Spotlight, karaoke, word-pill, phrase lockups, and two-line podcast looks.
+- Animated word entrances and burn-aways; Latin, Indic, Arabic, Cyrillic, and Greek text.
 - Safe-zone placement that avoids covering faces and lower-third graphics.
 - Multi-language subtitle translation.
 
@@ -73,4 +75,6 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `projectId` (string): Active project identifier for subsequent edits.
 - `projectRevision` (number): Committed project revision number.
 - `videoUrl` (string, optional): Rendered MP4 download URL when export completes.
+- `verificationReport` (object): `status` is `verified`, `rejected`, `unverified`, or `not_applicable`, with each failed check and what repair tried.
+- `qualityNotes` (array, optional): Advisory notes about the result.
 - `jobId` (string, optional): Async render job identifier for status polling via `check_job_status`.

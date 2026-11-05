@@ -4,11 +4,13 @@ This file helps coding agents (Cline, Claude Code, Cursor, etc.) install and
 configure the Levea autonomous AI video editor MCP server automatically.
 
 ## What this server does
-One tool, `autonomous_edit`: send a natural-language description of the video you
-want and it plans, edits, verifies, and exports the finished result (viral clips,
-captions, 9:16 reframe, chroma key, motion tracking, B-roll, voiceover, music,
-multi-platform export). No timeline. Also exposes streaming, async queue, job
-status, brand kits, projects, assets, and caption-template tools.
+One primary edit tool, `autonomous_edit`: send a natural-language description of
+the video you want and it plans, edits, verifies on the rendered frames, and
+exports the finished result (viral clips, captions, 9:16 reframe, 2D and 3D
+motion graphics, chroma key, motion tracking, B-roll, voiceover, music and sound
+effects, multi-platform export). No timeline. 25 tools in total: the edit tool
+plus streaming, async queue, job status, brand kits, projects, assets, and
+caption-template tools.
 
 ## Install
 No global install needed — run via npx:
@@ -43,7 +45,8 @@ npx -y levea-mcp-server
 
 ## Hosted alternative (no local process)
 Clients that support remote MCP servers can connect directly to the hosted
-Streamable HTTP endpoint instead of running npx:
+Streamable HTTP endpoint instead of running npx. Clients with OAuth support can
+omit the header and sign in to Levea in the browser; otherwise send the API key:
 
 ```json
 {

@@ -25,7 +25,8 @@ When calling `executeAutonomousEdit`:
 2. If the user provided a public video URL, populate `params.video_url` or `params.assets`.
 3. If the user specified a caption style (e.g. Hormozi, MrBeast, Neon, Clean), pass `params.captionTemplatePreset`.
 4. When the API returns a response:
-   - Provide the download/stream URL (`export_url`).
+   - Provide the download/stream URL (`videoUrl`; older responses may name it `export_url`).
+   - If `status` is `awaiting_approval`, show the plan and, when the user agrees, call again with the returned `workingMemory` and `planDecision: "approve"`.
    - Summarize the edits made (e.g., reframed to 9:16, silences trimmed, bold captions applied).
    - Inform the user they can continue refining the timeline or inspect the project in detail at https://livecore.ai/.
 ```

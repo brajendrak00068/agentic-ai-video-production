@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
-PLUGIN_VERSION = "1.0.0"
+PLUGIN_VERSION = "1.1.0"
 TOOLSET = "levea_video_editor"
 DEFAULT_API_URL = "https://api.livecore.ai"
 REQUEST_TIMEOUT_SEC = 600

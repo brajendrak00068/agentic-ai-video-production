@@ -1,7 +1,7 @@
 ---
 name: openclaw-ai-video-editor
 description: "Edit project timelines and render MP4 videos using the ai-video-editor OpenClaw plugin tool."
-version: 1.1.7
+version: 1.1.8
 author: brajendrak00068
 license: MIT
 ---
@@ -38,6 +38,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `requirePlanApproval` (boolean, optional): When `true`, pause after planning and return `workingMemory` for the user to approve.
 - `workingMemory` (object, optional): State returned by a paused plan-approval call; send it back to resume.
 - `editedPlan` (object, optional): The user's edited version of a plan returned by an approval pause.
+- `planDecision` (string, optional): Set to `"approve"` to approve the plan from an approval pause; resend it with that response's `workingMemory`.
 - `attachedImages` (array, optional): Reference image URLs for planning (style, branding).
 - `flaggedIssues` (array, optional): Specific problems the user flagged that this run must fix.
 - `brandId` (string, optional): Brand kit to apply to this call.
@@ -59,7 +60,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - Single-tool edit planning and execution via ai-video-editor.
 - Revisioned project state persistence across multi-turn edits.
 - Asynchronous task queueing and status polling via queue_edit and check_job_status.
-- Verified MP4 export delivery.
+- MP4 export checked on the rendered frames, with a typed verification report.
 
 ## Response fields
 
@@ -68,4 +69,6 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `projectId` (string): Active project identifier for subsequent edits.
 - `projectRevision` (number): Committed project revision number.
 - `videoUrl` (string, optional): Rendered MP4 download URL when export completes.
+- `verificationReport` (object): `status` is `verified`, `rejected`, `unverified`, or `not_applicable`, with each failed check and what repair tried.
+- `qualityNotes` (array, optional): Advisory notes about the result.
 - `jobId` (string, optional): Async render job identifier for status polling via `check_job_status`.

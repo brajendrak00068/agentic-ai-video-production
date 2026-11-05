@@ -1,7 +1,7 @@
 ---
 name: ai-b-roll-motion-graphics
 description: "Insert contextual B-roll cutaways, animated data charts, lower thirds, and callout overlays on video timelines."
-version: 1.0.2
+version: 1.0.3
 author: brajendrak00068
 license: MIT
 ---
@@ -43,6 +43,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `requirePlanApproval` (boolean, optional): When `true`, pause after planning and return `workingMemory` for the user to approve.
 - `workingMemory` (object, optional): State returned by a paused plan-approval call; send it back to resume.
 - `editedPlan` (object, optional): The user's edited version of a plan returned by an approval pause.
+- `planDecision` (string, optional): Set to `"approve"` to approve the plan from an approval pause; resend it with that response's `workingMemory`.
 - `attachedImages` (array, optional): Reference image URLs for planning (style, branding).
 - `flaggedIssues` (array, optional): Specific problems the user flagged that this run must fix.
 - `brandId` (string, optional): Brand kit to apply to this call.
@@ -62,9 +63,10 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Contextual B-roll placement aligned to transcript timestamps.
-- Animated charts, stat counters, and lower-third title cards.
-- Picture-in-picture and split-screen layout composition.
-- Safe-zone aware positioning for landscape and vertical canvases.
+- Animated charts, stat counters, flow diagrams, lower thirds, collage layouts, and text behind the subject.
+- Standalone 2D and 3D character motion-graphic films with camera moves, lighting, music, and sound design.
+- Every graphic placed clear of faces and reviewed by an AI critic against a craft checklist.
+- Picture-in-picture and split-screen layout composition with safe-zone aware positioning.
 
 ## Response fields
 
@@ -73,4 +75,6 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `projectId` (string): Active project identifier for subsequent edits.
 - `projectRevision` (number): Committed project revision number.
 - `videoUrl` (string, optional): Rendered MP4 download URL when export completes.
+- `verificationReport` (object): `status` is `verified`, `rejected`, `unverified`, or `not_applicable`, with each failed check and what repair tried.
+- `qualityNotes` (array, optional): Advisory notes about the result.
 - `jobId` (string, optional): Async render job identifier for status polling via `check_job_status`.

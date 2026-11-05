@@ -24,7 +24,7 @@ The surface is **one edit tool plus management & polling**. The editing path is 
 
 ### Caption templates (5)
 
-`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. Builtin templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) plus your saved templates; call `list_caption_templates` for the exact ids.
+`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 60+ built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
 
 ### Brand kits (5)
 
@@ -77,7 +77,7 @@ Set via the MCP client's `mcpServers[].env`. Canonical (v0.3.0+):
 | `LEVEA_API_URL` | yes | `https://api.livecore.ai` |
 | `LEVEA_API_KEY` | yes | Generate at https://livecore.ai/?openclaw=1&utm_source=openclaw&utm_medium=plugin&utm_campaign=openclaw-ai-video-editor |
 
-Backward compat: `ADSCENE_API_URL` / `ADSCENE_API_KEY` still read as a silent fallback (v0.2.0 only honors these — `LEVEA_*` arrives in v0.3.0).
+Backward compat: the legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` names are still read as a silent fallback; use `LEVEA_*`.
 
 The client never accepts a *full path* in `LEVEA_API_URL` — set only the host. The path `/api/v1/misc/openclaw/v1/execute` is appended automatically. Do not point at `/api/v1/misc/editor/` (different route, different auth model).
 
@@ -89,7 +89,8 @@ The client never accepts a *full path* in `LEVEA_API_URL` — set only the host.
 | `isError: true` + "is required" | Env var missing | Surface; do not retry. |
 | `isError: true` + 5xx / network | Transient backend | Retry **once** with backoff. Then surface. |
 | `success: true`, `jobId` present | Async work running | Poll `check_job_status` — don't re-invoke `autonomous_edit`. |
-| `success: true`, `videoUrl` present | Export landed | Show the URL to the user. |
+| `success: true`, `videoUrl` present | Export landed | Show the URL to the user. Read `verificationReport.status`: only `verified` means the result passed its checks on the rendered frames; mention `qualityNotes`. |
+| `status: "awaiting_approval"` | Plan proposed (`requirePlanApproval: true`) | Show the plan; when the user agrees, call again with the returned `workingMemory` and `planDecision: "approve"`. |
 
 ## Cost-shaping recommendations
 
