@@ -26,7 +26,8 @@ small tool calls.
 3. Read `status` and `success` from the result:
    - `success: true` means the backend verified the edit. Report `videoUrl` when present.
    - `pending` with a `jobId`: call `levea_job_status` with `wait: true` to get the rendered file.
-   - `awaiting_approval`: show the plan to the user; resend with `workingMemory` (and optional `editedPlan`) to continue.
+   - `awaiting_approval`: show the plan to the user; when they agree, resend with the returned `workingMemory` and `planDecision: "approve"` (optionally an `editedPlan`). To change the plan, send a new prompt with the same `workingMemory`.
+   - `running` (`STILL_RUNNING`): the edit outlived the wait and keeps running; call `levea_active_task` with the `project_id`, never run the edit again.
    - `partial` or `error`: tell the user what failed using `message`; do not claim success.
 4. For very long edits use `levea_queue_edit` (requires `project_id`) and poll `levea_task_status`.
    If a connection drops mid-edit, `levea_active_task` reconnects to the running edit for a project.

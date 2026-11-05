@@ -21,7 +21,7 @@
         {
           "name": "LEVEA_API_URL",
           "description": "Levea API base URL, e.g. https://api.livecore.ai",
-          "isRequired": true,
+          "isRequired": false,
           "format": "string",
           "isSecret": false
         },

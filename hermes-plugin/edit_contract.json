@@ -111,10 +111,10 @@
         "queue",
         "openapi"
       ],
-      "doc": "Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. Call `list_caption_templates` for the exact ids.",
+      "doc": "Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. With the MCP server, `list_caption_templates` lists the exact ids; elsewhere, name the look in the prompt.",
       "schema": {
         "type": "string",
-        "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
+        "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. With the MCP server, list_caption_templates lists the exact ids."
       }
     },
     {
@@ -229,7 +229,7 @@
       "doc": "Brand kit to apply to this call.",
       "schema": {
         "type": "string",
-        "description": "Optional per-call brand profile id (see list_brand_kits)."
+        "description": "Optional per-call brand profile id (brand kits are managed in the Levea studio or with the MCP server's brand-kit tools)."
       }
     },
     {

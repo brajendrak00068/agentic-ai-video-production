@@ -44,7 +44,11 @@ function normalize(field: ContractField, value: unknown): unknown {
     case 'string':
       return typeof value === 'string' && value.trim() === '' ? undefined : String(value);
     case 'boolean':
-      return Boolean(value);
+      // Only a real boolean (or its string spelling): Boolean("false") is true.
+      if (typeof value === 'boolean') return value;
+      if (value === 'true') return true;
+      if (value === 'false') return false;
+      return undefined;
     case 'array':
       return Array.isArray(value) && value.length > 0 ? value : undefined;
     default:

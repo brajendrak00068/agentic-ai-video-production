@@ -85,7 +85,7 @@
                       },
                       "captionTemplatePreset": {
                         "type": "string",
-                        "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. Call list_caption_templates for the exact ids available."
+                        "description": "Optional caption template to apply when (re)generating captions: a builtin slug (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar) or a user-saved template id. With the MCP server, list_caption_templates lists the exact ids."
                       },
                       "captionTemplateMode": {
                         "type": "string",

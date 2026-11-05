@@ -354,12 +354,14 @@ type ToolName =
 const read = (title: string): ToolAnnotations => ({ title, readOnlyHint: true, openWorldHint: false });
 const write = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: false, openWorldHint: false });
 const destructive = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+// Edits fetch whatever public media URL the user passes, so they reach the open web.
+const edit = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: true, openWorldHint: true });
 
 const TOOL_ANNOTATIONS = {
   // Edits can cut, replace, or remove content in the project, so they are marked destructive.
-  autonomous_edit: destructive('Edit video'),
-  autonomous_edit_streaming: destructive('Edit video (live progress)'),
-  queue_edit: destructive('Queue video edit'),
+  autonomous_edit: edit('Edit video'),
+  autonomous_edit_streaming: edit('Edit video (live progress)'),
+  queue_edit: edit('Queue video edit'),
   check_job_status: read('Check job status'),
   check_task_status: read('Check task status'),
   get_active_task: read('Get active task'),
@@ -461,13 +463,18 @@ function summarizeAny(label: string, data: unknown): string {
 
 interface DispatchCtx {
   notifyProgress?: (progress: number, total?: number, message?: string) => Promise<void>;
+  /** The host's cancel signal: aborts the upstream request when the client goes away. */
+  signal?: AbortSignal;
 }
+
+/** Events kept on a streaming result (the last ones, heartbeats excluded). */
+const MAX_STREAM_EVENTS = 50;
 
 async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchCtx) {
   switch (name) {
     case 'autonomous_edit': {
       if (!str(a.prompt)) return fail('❌ `prompt` is required for autonomous_edit.');
-      const r = await execute(buildEditBody(a, 'all'));
+      const r = await execute(buildEditBody(a, 'all'), ctx.signal);
       return ok(summarizeExec(r), r);
     }
 
@@ -476,9 +483,12 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       const events: SSEEvent[] = [];
       let stepN = 0;
       const r = await executeStreaming(buildEditBody(a, 'all'), (ev) => {
-        events.push(ev);
         const dataObj = (typeof ev.data === 'object' ? ev.data : { raw: ev.data }) as Record<string, unknown>;
         const typeStr = String(ev.event || dataObj.type || 'event');
+        if (typeStr !== 'heartbeat') {
+          events.push(ev);
+          if (events.length > MAX_STREAM_EVENTS) events.shift();
+        }
         // Emit progress notifications to the MCP client (when supported).
         const msg =
           (dataObj.message as string | undefined) ||
@@ -490,7 +500,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
           // Fire-and-forget; ignore failures (e.g. client doesn't honor notifications).
           ctx.notifyProgress(stepN, undefined, `${typeStr}: ${msg}`).catch(() => undefined);
         }
-      });
+      }, ctx.signal);
       return ok(summarizeExec(r), { ...r, events });
     }
 
@@ -689,21 +699,23 @@ export function createLeveaMcpServer(): Server {
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (req: any) => {
+  server.setRequestHandler(CallToolRequestSchema, async (req: any, extra: any) => {
     const name = req.params.name;
     const args = (req.params.arguments || {}) as Record<string, unknown>;
     const progressToken = req.params._meta?.progressToken;
     const ctx: DispatchCtx = {
+      // Sent on this request's own channel: the hosted endpoint is stateless and
+      // has no standalone stream, so an unrelated notification would be dropped.
       notifyProgress: progressToken
         ? async (progress, total, message) => {
+            const notification = { method: 'notifications/progress' as const, params: { progressToken, progress, total, message } };
             try {
-              await server.notification({
-                method: 'notifications/progress',
-                params: { progressToken, progress, total, message },
-              });
+              if (typeof extra?.sendNotification === 'function') await extra.sendNotification(notification);
+              else await server.notification(notification, { relatedRequestId: extra?.requestId });
             } catch (_e) { /* swallow */ }
           }
         : undefined,
+      signal: extra?.signal,
     };
     try {
       return await dispatch(name, args, ctx);

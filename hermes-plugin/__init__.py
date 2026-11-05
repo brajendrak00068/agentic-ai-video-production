@@ -1,6 +1,6 @@
 """Levea Agentic Video Editor — Hermes plugin.
 
-Python port of the OpenClaw plugin (../openclaw-ai-video-editor/index.ts).
+Python port of the OpenClaw plugin (../index.ts).
 Editing stays a single high-level tool: the Levea backend owns planning,
 execution, verification, and export. The queue and polling tools expose
 durable backend state; none of them mutate scenes directly.
@@ -12,17 +12,32 @@ override with LEVEA_API_URL) with the user's LEVEA_API_KEY. No telemetry.
 from __future__ import annotations
 
 import json
+import os
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
-PLUGIN_VERSION = "1.1.1"
+PLUGIN_VERSION = "1.1.2"
 TOOLSET = "levea_video_editor"
 DEFAULT_API_URL = "https://api.livecore.ai"
-REQUEST_TIMEOUT_SEC = 600
+def _env_seconds(name: str, fallback: float) -> float:
+    try:
+        value = float(os.environ.get(name, "")) / 1000.0
+        return value if value > 0 else fallback
+    except ValueError:
+        return fallback
+
+
+# How long one call waits in total (LEVEA_REQUEST_TIMEOUT_MS; default 10 min). A
+# wall-clock deadline: the backend keeps a long edit's response alive with
+# keep-alive bytes, so a socket timeout alone would never fire.
+REQUEST_TIMEOUT_SEC = _env_seconds("LEVEA_REQUEST_TIMEOUT_MS", 600.0)
+# Longest silence tolerated on the socket (the backend writes every ~15 s).
+SOCKET_READ_TIMEOUT_SEC = 60
 POLL_INTERVAL_SEC = 4
 KEY_PORTAL_URL = "https://livecore.ai/?utm_source=hermes-plugin"
 
@@ -37,7 +52,7 @@ FAILED_JOB_STATES = {
 }
 PENDING_TOOL_STATES = {
     "pending", "waiting", "queued", "processing", "rendering", "planning",
-    "executing", "dispatch", "awaiting_approval", "awaiting_input",
+    "executing", "dispatch", "running", "verifying", "awaiting_approval", "awaiting_input",
 }
 
 
@@ -188,22 +203,31 @@ def _call_backend(method: str, path: str, body: Optional[dict], *, label: str,
         "Accept": "application/json",
         "X-Levea-Client": f"hermes-plugin/{PLUGIN_VERSION}",
     })
+    still_running = {**project_fields, "success": False, "code": "STILL_RUNNING", "status": "running",
+                     "message": "The edit is still running on Levea (full edits with motion graphics and "
+                                "export can take 10-20 minutes). Call levea_active_task with this project_id "
+                                "to follow it; it returns the result when the edit completes. Do not run the "
+                                "edit again."}
+    deadline = time.monotonic() + REQUEST_TIMEOUT_SEC
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SEC) as response:
-            status, raw = response.status, response.read()
+        with urllib.request.urlopen(request, timeout=SOCKET_READ_TIMEOUT_SEC) as response:
+            status = response.status
+            chunks = []
+            while True:
+                chunk = response.read1(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                if time.monotonic() > deadline:
+                    return still_running
+            raw = b"".join(chunks)
     except urllib.error.HTTPError as error:
         status, raw = error.code, error.read()
     except TimeoutError:
-        return {**project_fields, "success": False, "code": "TIMEOUT", "status": "unknown",
-                "message": "The edit is still running on Levea (full edits with motion graphics and "
-                           "export can take 10-20 minutes). Call levea_active_task with this project_id "
-                           "to follow it; do not run the edit again."}
+        return still_running
     except urllib.error.URLError as error:
         if isinstance(error.reason, TimeoutError):
-            return {**project_fields, "success": False, "code": "TIMEOUT", "status": "unknown",
-                    "message": "The edit is still running on Levea (full edits with motion graphics and "
-                               "export can take 10-20 minutes). Call levea_active_task with this project_id "
-                               "to follow it; do not run the edit again."}
+            return still_running
         return {**project_fields, "success": False, "code": "BACKEND_UNREACHABLE",
                 "message": f"Cannot reach the editor backend: {error.reason}"}
     except Exception as error:  # handlers must never raise
@@ -318,8 +342,11 @@ def handle_video_edit(args: dict, **kwargs) -> str:
         if not prompt:
             return json.dumps({"success": False, "status": "error", "code": "MISSING_PROMPT",
                                "message": "Missing required parameter: prompt."})
-        project_id = _first_string(args.get("project_id"))
-        body = _build_edit_body({**args, "prompt": prompt}, "all")
+        # A first call without project_id gets one here, before the request, so an
+        # edit that outlives the wait can be found (levea_active_task) and a retry
+        # continues the same project instead of starting a second one.
+        project_id = _first_string(args.get("project_id")) or f"hermes_{uuid.uuid4()}"
+        body = _build_edit_body({**args, "prompt": prompt, "project_id": project_id}, "all")
         return _to_tool_result(_call_backend(
             "POST", "/execute", body, label="autonomous_edit", require_message=True,
             require_verification=True, fallback_project_id=project_id))
