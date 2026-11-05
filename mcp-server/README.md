@@ -461,7 +461,7 @@ This isn't an editor with AI features bolted on — it's an autonomous agent tha
 
 > Versions aren't pinned here — `npx -y levea-mcp-server` and the ClawHub listing always pull the latest, and the linked npm / ClawHub pages show the current version. You never need a specific number.
 
-**Support** — setup help, integration questions, or issue reports: [support@livecore.ai](mailto:support@livecore.ai) or [GitHub issues](https://github.com/brajendrak00068/agentic-ai-video-production/issues).
+**Support** — setup help, integration questions, or issue reports: [brajendra@livecore.ai](mailto:brajendra@livecore.ai) or [GitHub issues](https://github.com/brajendrak00068/agentic-ai-video-production/issues).
 
 **Privacy & telemetry** — edits send your prompt, source URLs, and project ids to the Levea API. The client also sends a tiny anonymous usage ping (event name, client version, whether a key is set; never prompts, media, or keys). Turn it off with `LEVEA_TELEMETRY=off`. See the [privacy policy](https://www.livecore.ai/privacy).
 
