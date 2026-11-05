@@ -424,18 +424,51 @@ function isFailure(structured: unknown): boolean {
   const outcome = String(r.type ?? r.raw?.type ?? '');
   return !NON_ERROR_OUTCOMES.has(outcome);
 }
+// Characters of the structured result carried as text (see resultContent).
+const STRUCTURED_TEXT_MAX_CHARS = 60_000;
+
+/**
+ * The text blocks a tool result carries: the one-line summary, then the full
+ * structured result as JSON. Many clients (Claude.ai connectors among them)
+ * hand the model only the text content, so a result whose data lived only in
+ * `structuredContent` reached the model as "✅ projects: 9 item(s)" with no
+ * ids, no upload URL and no list. The MCP spec asks a tool that returns
+ * structured content to also return it serialized in a text block. Bounded:
+ * an over-long result says how much was cut and that the full object is in
+ * structuredContent.
+ */
+function resultContent(text: string, structured: unknown): Array<{ type: 'text'; text: string }> {
+  const blocks: Array<{ type: 'text'; text: string }> = [{ type: 'text', text }];
+  if (structured === undefined || structured === null) return blocks;
+  let json: string;
+  try {
+    json = JSON.stringify(structured, null, 2);
+  } catch (err) {
+    blocks.push({ type: 'text', text: `(result data could not be serialized as text: ${err instanceof Error ? err.message : String(err)}; it is in structuredContent)` });
+    return blocks;
+  }
+  if (json === undefined) return blocks;
+  if (json.length > STRUCTURED_TEXT_MAX_CHARS) {
+    const cut = json.length - STRUCTURED_TEXT_MAX_CHARS;
+    json = `${json.slice(0, STRUCTURED_TEXT_MAX_CHARS)}\n… (${cut} more characters cut; the full result is in structuredContent)`;
+  }
+  blocks.push({ type: 'text', text: json });
+  return blocks;
+}
+
 function ok(text: string, structured: unknown) {
   const failed = isFailure(structured);
   return {
-    content: [{ type: 'text' as const, text }],
+    content: resultContent(text, structured),
     structuredContent: structured as Record<string, unknown>,
     ...(failed ? { isError: true } : {}),
   };
 }
 function fail(text: string, structured?: unknown) {
+  const data = (structured as Record<string, unknown>) ?? { error: text };
   return {
-    content: [{ type: 'text' as const, text }],
-    structuredContent: (structured as Record<string, unknown>) ?? { error: text },
+    content: resultContent(text, structured),
+    structuredContent: data,
     isError: true,
   };
 }

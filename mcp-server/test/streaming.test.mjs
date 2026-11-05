@@ -87,3 +87,18 @@ test('check_job_status wait stops on a 4xx instead of polling to the deadline', 
   assert.equal(r.isError, true);
   assert.equal(polls, 1);
 });
+
+test('a tool result carries its data as text too, so a client that reads only text still gets the upload URL', async () => {
+  const server = await backend((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ success: true, uploadUrl: 'https://signed.example/put?sig=abc', fileUrl: 'https://cdn.example/clip.mp4' }));
+  });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'asset_upload_url', { fileName: 'clip.mp4' });
+  server.closeAllConnections(); server.close();
+  assert.equal(r.structuredContent.uploadUrl, 'https://signed.example/put?sig=abc');
+  const text = r.content.map((c) => c.text).join('\n');
+  assert.ok(text.includes('https://signed.example/put?sig=abc'), 'upload URL missing from the text content');
+  assert.ok(text.includes('https://cdn.example/clip.mp4'), 'file URL missing from the text content');
+  assert.equal(r.content[0].type, 'text');
+  assert.ok(r.content.length >= 2, 'summary and data should be separate text blocks');
+});
