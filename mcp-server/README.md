@@ -293,7 +293,7 @@ curl -sS -X POST "$LEVEA_API_URL/api/v1/misc/openclaw/v1/execute" \
 | `video_url` | Public source video URL when starting a new project. |
 | `assets` | Input media (video, image, audio) as public HTTP/HTTPS URLs. |
 | `scene` | Existing scene/timeline state to continue editing (advanced). |
-| `captionTemplatePreset` | Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. Call `list_caption_templates` for the exact ids. |
+| `captionTemplatePreset` | Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. With the MCP server, `list_caption_templates` lists the exact ids; elsewhere, name the look in the prompt. |
 | `captionTemplateMode` | How to apply `captionTemplatePreset`: one of `add`, `recreate`, `style`, `translate`, `clear`, `remove_fillers`. |
 | `requirePlanApproval` | When `true`, pause after planning and return `workingMemory` for the user to approve. |
 | `workingMemory` | State returned by a paused plan-approval call; send it back to resume. |

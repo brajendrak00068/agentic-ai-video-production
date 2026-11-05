@@ -1,7 +1,7 @@
 ---
 name: openclaw-ai-video-editor
 description: "Edit project timelines and render MP4 videos using the ai-video-editor OpenClaw plugin tool."
-version: 1.1.8
+version: 1.2.4
 author: brajendrak00068
 license: MIT
 ---
@@ -33,7 +33,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `video_url` (string, optional): Public source video URL when starting a new project.
 - `assets` (array, optional): Input media (video, image, audio) as public HTTP/HTTPS URLs.
 - `scene` (object, optional): Existing scene/timeline state to continue editing (advanced).
-- `captionTemplatePreset` (string, optional): Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. Call `list_caption_templates` for the exact ids.
+- `captionTemplatePreset` (string, optional): Caption template id to apply: a builtin slug (e.g. `hormozi`, `viral-pop`, `karaoke`) or a saved template id. With the MCP server, `list_caption_templates` lists the exact ids; elsewhere, name the look in the prompt.
 - `captionTemplateMode` (string, optional): How to apply `captionTemplatePreset`: one of `add`, `recreate`, `style`, `translate`, `clear`, `remove_fillers`.
 - `requirePlanApproval` (boolean, optional): When `true`, pause after planning and return `workingMemory` for the user to approve.
 - `workingMemory` (object, optional): State returned by a paused plan-approval call; send it back to resume.
@@ -59,7 +59,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 
 - Single-tool edit planning and execution via ai-video-editor.
 - Revisioned project state persistence across multi-turn edits.
-- Asynchronous task queueing and status polling via queue_edit and check_job_status.
+- Asynchronous task queueing and status polling via queue_edit and check_task_status.
 - MP4 export checked on the rendered frames, with a typed verification report.
 
 ## Response fields

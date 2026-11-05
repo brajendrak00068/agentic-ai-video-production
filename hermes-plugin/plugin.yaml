@@ -1,5 +1,5 @@
 name: levea-video-editor
-version: 1.1.1
+version: 1.1.2
 description: "Agentic AI video editing via Levea: one natural-language edit tool (trim, 9:16 reframe, captions, B-roll, multicam, audio cleanup, color, motion graphics, MP4 export) plus durable queue and status polling."
 author: brajendrak00068
 license: MIT

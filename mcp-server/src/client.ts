@@ -3,6 +3,7 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import { AsyncLocalStorage } from 'async_hooks';
+import { randomUUID } from 'crypto';
 
 /**
  * Thin HTTP client for the Levea editor backend.
@@ -53,7 +54,8 @@ const DEFAULT_TIMEOUT_MS = envMs('LEVEA_REQUEST_TIMEOUT_MS', 300_000);
 /** The SSE variant reports progress while it waits, so it can wait longer than a plain request. */
 const STREAM_TIMEOUT_MS = envMs('LEVEA_STREAM_TIMEOUT_MS', 1_800_000);
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const MCP_CLIENT_VERSION = '0.6.5';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const MCP_CLIENT_VERSION: string = (require('../package.json') as { version: string }).version;
 
 /**
  * Per-request backend config for hosted (multi-tenant) MCP transports.
@@ -196,7 +198,7 @@ function describeError(err: unknown, label: string): never {
 
 function withProjectId(body: EditRequestBody): EditRequestBody {
   if (body.projectId) return body;
-  const projectId = `mcp_${Date.now()}`;
+  const projectId = `mcp_${randomUUID()}`;
   return { ...body, projectId, project_id: projectId };
 }
 
@@ -227,21 +229,46 @@ function stillRunning(body: EditRequestBody, waitedMs: number): ExecuteResult {
     status: 'running',
     message:
       `The edit is still running on Levea after ${minutes} min (full edits with motion graphics and export can take 10-20 minutes). ` +
-      `Call get_active_task with project_id "${projectId}" to follow it; the finished video will be on that project.`,
+      `Call get_active_task with project_id "${projectId}" to follow it; once no task is active, get_project returns the finished edit.`,
     raw: { type: 'still_running', status: 'running', projectId, project_id: projectId },
   };
 }
 
 function isTimeout(err: unknown): boolean {
-  const e = err as { code?: string; message?: string };
-  return e?.code === 'ECONNABORTED' || e?.code === 'ETIMEDOUT' || String(e?.message || '').toLowerCase().includes('timeout');
+  const e = err as { code?: string; name?: string; message?: string };
+  return e?.code === 'ECONNABORTED' || e?.code === 'ETIMEDOUT' || e?.code === 'ERR_CANCELED'
+    || e?.name === 'CanceledError' || e?.name === 'TimeoutError' || e?.name === 'AbortError'
+    || String(e?.message || '').toLowerCase().includes('timeout');
+}
+
+/**
+ * One abort signal for a call: the host's cancel signal (a disconnected client)
+ * plus a wall-clock limit. `timedOut()` tells the two apart.
+ */
+function callSignal(limitMs: number, hostSignal?: AbortSignal) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const wall = setTimeout(() => { timedOut = true; controller.abort(); }, limitMs);
+  const onHostAbort = () => controller.abort();
+  if (hostSignal) {
+    if (hostSignal.aborted) controller.abort();
+    else hostSignal.addEventListener('abort', onHostAbort, { once: true });
+  }
+  return {
+    signal: controller.signal,
+    timedOut: () => timedOut,
+    dispose: () => { clearTimeout(wall); hostSignal?.removeEventListener('abort', onHostAbort); },
+  };
 }
 
 /** Execute autonomous_edit (or any allowed tool) — single JSON response. */
-export async function execute(edit: EditRequestBody): Promise<ExecuteResult> {
+export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal): Promise<ExecuteResult> {
   const body = withProjectId(edit);
+  // A wall-clock limit: the backend keeps a long edit's response alive with
+  // keep-alive bytes, so axios's own (idle) timeout never fires.
+  const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
   try {
-    const res = await http2().post(v1('/execute'), body);
+    const res = await http2().post(v1('/execute'), body, { signal: call.signal });
     const d = (res.data || {}) as Record<string, unknown>;
     if (res.status >= 400) {
       const msg = (d.error as string) || (d.message as string) || `HTTP ${res.status}`;
@@ -249,21 +276,33 @@ export async function execute(edit: EditRequestBody): Promise<ExecuteResult> {
     }
     return flattenResult(d);
   } catch (err) {
-    if (isTimeout(err)) return stillRunning(body, DEFAULT_TIMEOUT_MS);
+    if (call.timedOut()) return stillRunning(body, DEFAULT_TIMEOUT_MS);
+    if (hostSignal?.aborted) return { success: false, status: 'cancelled', message: 'Cancelled by the client; the edit may still be running on Levea.', raw: { type: 'cancelled', projectId: body.projectId } };
     return describeError(err, `execute(${String(body.tool || 'autonomous_edit')})`);
+  } finally {
+    call.dispose();
   }
 }
 
+/** The run's terminal SSE event types: its outcome, or an error. */
+const TERMINAL_STREAM_EVENTS: ReadonlySet<string> = new Set([
+  'success', 'partial_success', 'awaiting_approval', 'awaiting_input', 'complete', 'error',
+]);
+
+/** How long to wait for the closing payload after a terminal event before returning it. */
+const AFTER_TERMINAL_GRACE_MS = 60_000;
+
 /**
  * Execute with SSE streaming. onEvent is called for every event the backend
- * emits (status, mode_select, thinking, tool_call, tool_result,
- * background_job_completed, workflow_completed, success/partial_success, error,
- * heartbeat). Returns the final terminal payload as ExecuteResult once the
- * stream closes.
+ * emits (status, thinking, tool_call, tool_result, background_job_completed,
+ * heartbeat, the terminal outcome). Returns the final result: the backend's
+ * closing JSON payload when it sends one after the stream, else the terminal
+ * event; an `error` event ends the call at once.
  */
 export async function executeStreaming(
   edit: EditRequestBody,
-  onEvent: (ev: SSEEvent) => void
+  onEvent: (ev: SSEEvent) => void,
+  hostSignal?: AbortSignal,
 ): Promise<ExecuteResult> {
   const editBody = withProjectId(edit);
   const body = JSON.stringify(editBody);
@@ -271,6 +310,24 @@ export async function executeStreaming(
   const isHttps = url.protocol === 'https:';
   const transport = isHttps ? https : http;
   return new Promise<ExecuteResult>((resolve, reject) => {
+    let settled = false;
+    let final: ExecuteResult | null = null;
+    let grace: ReturnType<typeof setTimeout> | null = null;
+    // A wall-clock limit: the backend's 15 s heartbeats keep the stream busy,
+    // so an idle timeout never fires during a long edit. Stopping the wait does
+    // not stop the edit: it keeps running on Levea.
+    const wall = setTimeout(() => finish(final ?? stillRunning(editBody, STREAM_TIMEOUT_MS)), STREAM_TIMEOUT_MS);
+    const onHostAbort = () => finish({ success: false, status: 'cancelled', message: 'Cancelled by the client; the edit may still be running on Levea.', raw: { type: 'cancelled', projectId: editBody.projectId } });
+    function finish(result: ExecuteResult | Error): void {
+      if (settled) return;
+      settled = true;
+      clearTimeout(wall);
+      if (grace) clearTimeout(grace);
+      hostSignal?.removeEventListener('abort', onHostAbort);
+      req.destroy();
+      if (result instanceof Error) reject(result);
+      else resolve(result);
+    }
     const req = transport.request(
       {
         method: 'POST',
@@ -287,56 +344,62 @@ export async function executeStreaming(
       },
       (res) => {
         if (res.statusCode === 401 || res.statusCode === 403) {
-          reject(new Error(`Streaming auth rejected (HTTP ${res.statusCode}). Check LEVEA_API_KEY.`));
+          finish(new Error(`Streaming auth rejected (HTTP ${res.statusCode}). Check LEVEA_API_KEY.`));
           return;
         }
         if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`Streaming HTTP ${res.statusCode}`));
+          finish(new Error(`Streaming HTTP ${res.statusCode}`));
           return;
         }
         let buffer = '';
-        let final: ExecuteResult | null = null;
         res.setEncoding('utf8');
         res.on('data', (chunk: string) => {
-          buffer += chunk;
-          // SSE messages are delimited by blank lines.
+          // SSE messages are delimited by blank lines; accept CRLF line endings too.
+          buffer = (buffer + chunk).split('\r\n').join('\n');
           let idx: number;
           while ((idx = buffer.indexOf('\n\n')) !== -1) {
             const raw = buffer.slice(0, idx);
             buffer = buffer.slice(idx + 2);
             const parsed = parseSSEMessage(raw);
-            if (parsed) {
-              try { onEvent(parsed); } catch (_e) { /* ignore consumer errors */ }
-              const ev = String(parsed.event || (typeof parsed.data === 'object' && (parsed.data as any)?.type) || '');
-              if (TERMINAL_STREAM_EVENTS.has(ev)) {
-                const d = (typeof parsed.data === 'object' ? parsed.data : { reply: parsed.data }) as Record<string, unknown>;
-                final = flattenResult(d);
-              }
+            if (!parsed) continue;
+            try { onEvent(parsed); } catch (_e) { /* ignore consumer errors */ }
+            const data = typeof parsed.data === 'object' ? parsed.data : { reply: parsed.data };
+            const ev = String(parsed.event || (data as Record<string, unknown>).type || '');
+            if (!TERMINAL_STREAM_EVENTS.has(ev)) continue;
+            if (ev === 'error') {
+              // Error events carry no success:false; they are failures.
+              const d = data as Record<string, unknown>;
+              finish({ ...flattenResult(d), success: false, status: 'error', message: (d.message as string) || (d.error as string) || 'The edit failed.' });
+              return;
             }
+            final = flattenResult(data as Record<string, unknown>);
+            // The backend may still send its closing payload; do not wait forever.
+            if (!grace) grace = setTimeout(() => finish(final as ExecuteResult), AFTER_TERMINAL_GRACE_MS);
           }
         });
         res.on('end', () => {
-          if (final) resolve(final);
-          else resolve({ success: false, message: 'Stream ended without a terminal event', status: 'incomplete' });
+          // The closing payload is a bare JSON object after the last event.
+          const rest = buffer.trim();
+          if (rest.startsWith('{')) {
+            try {
+              finish(flattenResult(JSON.parse(rest) as Record<string, unknown>));
+              return;
+            } catch (_e) { /* not JSON: fall through */ }
+          }
+          finish(final ?? { success: false, message: 'Stream ended without a terminal event', status: 'incomplete' });
         });
-        res.on('error', (e) => reject(e));
+        res.on('error', (e) => finish(e));
       }
     );
-    req.on('error', (e) => reject(e));
-    req.setTimeout(STREAM_TIMEOUT_MS, () => {
-      // Stop waiting, not the edit: it keeps running on Levea.
-      resolve(stillRunning(editBody, STREAM_TIMEOUT_MS));
-      req.destroy();
-    });
+    req.on('error', (e) => finish(e));
+    if (hostSignal) {
+      if (hostSignal.aborted) { onHostAbort(); return; }
+      hostSignal.addEventListener('abort', onHostAbort, { once: true });
+    }
     req.write(body);
     req.end();
   });
 }
-
-/** The run's terminal SSE event types: its outcome, or an error. */
-const TERMINAL_STREAM_EVENTS: ReadonlySet<string> = new Set([
-  'success', 'partial_success', 'awaiting_approval', 'awaiting_input', 'complete', 'error',
-]);
 
 function parseSSEMessage(raw: string): SSEEvent | null {
   let event: string | undefined;
@@ -366,6 +429,10 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
     const d = (res.data || {}) as Record<string, unknown>;
     if (res.status === 404) {
       return { success: false, jobId, status: 'not_found', progress: 0, message: 'Job not found' };
+    }
+    if (res.status >= 400) {
+      // A 4xx (revoked key, rate limit, …) is final for this poll: 'error' ends waitForJob.
+      return { success: false, jobId, status: 'error', progress: 0, message: (d.error as string) || (d.message as string) || `HTTP ${res.status}` };
     }
     return {
       success: d.success !== false,

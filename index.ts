@@ -1,5 +1,6 @@
 import { buildEditBody, editInputSchema } from './contract/editContract';
 import axios from 'axios';
+import { randomUUID } from 'node:crypto';
 import { definePluginEntry } from 'openclaw/plugin-sdk/core';
 
 /**
@@ -58,7 +59,11 @@ interface NormalizeOptions {
   acceptActiveContract?: boolean;
 }
 
-const REQUEST_TIMEOUT_MS = 600_000;
+/** How long one call waits (LEVEA_REQUEST_TIMEOUT_MS; default 10 min). */
+const REQUEST_TIMEOUT_MS = (() => {
+  const n = Number(process.env.LEVEA_REQUEST_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 600_000;
+})();
 const TERMINAL_JOB_STATES = new Set([
   'completed', 'complete', 'succeeded', 'success',
   'failed', 'failure', 'error', 'errored',
@@ -70,7 +75,7 @@ const FAILED_JOB_STATES = new Set([
 ]);
 const PENDING_TOOL_STATES = new Set([
   'pending', 'waiting', 'queued', 'processing', 'rendering', 'planning',
-  'executing', 'dispatch', 'awaiting_approval', 'awaiting_input',
+  'executing', 'dispatch', 'running', 'verifying', 'awaiting_approval', 'awaiting_input',
 ]);
 
 function firstString(...values: unknown[]): string | undefined {
@@ -93,7 +98,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.2.3';
+const PLUGIN_VERSION = '1.2.4';
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 
@@ -315,6 +320,17 @@ async function callBackend(
   context: OperationContext,
   options: NormalizeOptions,
 ): Promise<EditorResponse> {
+  // A wall-clock limit: the backend keeps a long edit's response alive with
+  // keep-alive bytes, so axios's own (idle) timeout never fires. The host's
+  // cancel signal still aborts the call.
+  const controller = new AbortController();
+  let timedOut = false;
+  const wall = setTimeout(() => { timedOut = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+  const onHostAbort = () => controller.abort();
+  if (context.signal) {
+    if (context.signal.aborted) controller.abort();
+    else context.signal.addEventListener('abort', onHostAbort, { once: true });
+  }
   try {
     const response = await axios.request({
       method,
@@ -323,7 +339,7 @@ async function callBackend(
       headers: requestHeaders(context),
       timeout: REQUEST_TIMEOUT_MS,
       validateStatus: () => true,
-      ...(context.signal ? { signal: context.signal } : {}),
+      signal: controller.signal,
     });
     const result = normalizeBackendResponse(response.status, response.data, options);
     const clientRequestId = sanitizeRequestId(context.toolCallId);
@@ -331,8 +347,29 @@ async function callBackend(
       ? { ...result, clientRequestId }
       : result;
   } catch (error: any) {
+    if (timedOut) return stillRunning(options.fallbackProjectId, context.toolCallId);
     return handleError(error, options.fallbackProjectId, context.toolCallId);
+  } finally {
+    clearTimeout(wall);
+    context.signal?.removeEventListener('abort', onHostAbort);
   }
+}
+
+/**
+ * The plugin stopped waiting, but the edit keeps running on Levea: a full edit
+ * with motion graphics and an export can take 10-20 minutes.
+ */
+function stillRunning(projectId: string | undefined, toolCallId?: string): EditorResponse {
+  const clientRequestId = sanitizeRequestId(toolCallId);
+  return {
+    success: false,
+    status: 'running',
+    code: 'STILL_RUNNING',
+    message: `The edit is still running on Levea after ${Math.round(REQUEST_TIMEOUT_MS / 60_000)} min (full edits with motion graphics and export can take 10-20 minutes). `
+      + `Call get_active_task with project_id "${projectId || ''}" to follow it; it returns the result when the edit completes. Do not start the edit again.`,
+    ...(projectId ? { projectId, project_id: projectId } : {}),
+    ...(clientRequestId ? { clientRequestId } : {}),
+  };
 }
 
 
@@ -345,9 +382,11 @@ export async function handleEditorOperation(
     return { success: false, message: 'Missing required parameter: prompt.', code: 'MISSING_PROMPT' };
   }
 
-  const projectId = firstString(request.project_id);
+  // A first call without project_id gets one here, before the request, so an
+  // edit that outlives the wait can still be found (get_active_task).
+  const projectId = firstString(request.project_id) || `openclaw_${randomUUID()}`;
   // Every field comes from the edit contract (contract/edit-contract.json).
-  const body = buildEditBody({ ...request, prompt }, 'all');
+  const body = buildEditBody({ ...request, prompt, project_id: projectId }, 'all');
 
   return callBackend('POST', '/execute', body, context, {
     label: 'autonomous_edit',
@@ -577,9 +616,16 @@ export default definePluginEntry({
   description:
     'Agentic video editing through one high-level edit tool plus durable queue and polling state.',
   register(api) {
-    const rawCfg = (api as any)?.config || (api as any)?.pluginConfig || (typeof (api as any)?.getConfig === 'function' ? (api as any).getConfig() : null) || {};
-    const cfgUrl = extractConfigString(rawCfg?.apiUrl || rawCfg?.LEVEA_API_URL);
-    const cfgKey = extractConfigString(rawCfg?.apiKey || rawCfg?.LEVEA_API_KEY);
+    // This plugin's own config (configSchema: apiUrl, apiKey). api.config is the
+    // whole OpenClaw config in current SDKs, so it is read only as a legacy
+    // fallback when it carries the plugin's own keys.
+    const legacyCfg = (api as any)?.config;
+    const rawCfg = (api as any)?.pluginConfig
+      || (typeof (api as any)?.getConfig === 'function' ? (api as any).getConfig() : null)
+      || (legacyCfg && (legacyCfg.apiKey !== undefined || legacyCfg.apiUrl !== undefined) ? legacyCfg : null)
+      || {};
+    const cfgUrl = extractConfigString(rawCfg?.apiUrl);
+    const cfgKey = extractConfigString(rawCfg?.apiKey);
     if (cfgUrl || cfgKey) {
       runtimePluginConfig = {
         ...(cfgUrl ? { apiUrl: cfgUrl } : {}),
