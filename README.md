@@ -78,6 +78,28 @@ Levea separates probabilistic creative reasoning from deterministic project exec
       Editable Scene + verification report ──▶ MP4 / multi-platform export
 ```
 
+### How the clients connect
+
+Every Levea client is a thin wrapper over one HTTP API on the Levea backend. Pick whichever fits your tools; they all reach the same editor, with the same edit fields (one shared [edit contract](./contract/edit-contract.json)):
+
+```text
+              Levea API: https://api.livecore.ai/api/v1/misc/openclaw/v1/*
+              (execute, queue-edit, jobs, task-status, projects, assets, …)
+                                       ▲
+     ┌────────────────┬────────────────┼────────────────┬────────────────┐
+levea-mcp-server   OpenClaw plugin   Hermes plugin   ChatGPT action    Levea web studio
+(npm, stdio MCP)   (ClawHub)         (Python)        (OpenAPI)         (livecore.ai)
+     ▲
+Hosted MCP: https://api.livecore.ai/api/v1/misc/mcp
+(the same server, run by Levea; OAuth sign-in or API key)
+     ▲
+Claude Code plugin · Claude connector · ChatGPT app · Cursor / any remote-MCP client
+```
+
+- **MCP clients** (Claude Desktop, Cursor, Cline, Windsurf) run `levea-mcp-server` locally with an API key, or connect to the **hosted MCP** URL with no install.
+- **OpenClaw**, **Hermes**, and the **ChatGPT action** call the API directly.
+- **Skills** (ClawHub, the Claude Code plugin) are instructions for the agent; they do not run code.
+
 ### 1. Pipelines and planning
 Each request is matched to a production pipeline (a short-form reel, a podcast cut, a documentary montage, a motion-graphic film, …) whose director skills give the planner its craft rules. The planner reads the prompt, the transcript, sampled frames, and the current scene, and emits a **typed action plan**: canonical actions with typed parameters, never free-form scene edits.
 
