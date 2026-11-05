@@ -193,6 +193,14 @@ Two hosts bundle this hosted server for one-step installs:
   ```
 - **Cursor plugin** — add this repo as a plugin marketplace in Cursor (it reads [`.cursor-plugin/marketplace.json`](./.cursor-plugin/marketplace.json)), then install `levea-video-editor`.
 
+### 🤖 Use inside Grok Bot
+
+Grok Bot can add an MCP server by URL, and the hosted server speaks the exact contract it expects (Streamable HTTP, OAuth 2.1 with RFC 7591 dynamic client registration). Tell your Bot:
+
+> **"Add the Levea MCP server: `https://api.livecore.ai/api/v1/misc/mcp`"**
+
+(or use **Connect apps → add an MCP server by URL**). A browser opens to sign in to your Levea account — then every Levea tool (`autonomous_edit`, `queue_edit`, job polling, caption templates, brand kits, projects, assets) is available to that Bot, and edits land in the same projects you see in the web studio. Clients that cannot do OAuth can use `Authorization: Bearer <your Levea API key>` instead.
+
 ### 🧑‍💻 Path A: For Developers & AI Engineers (The MCP Route)
 
 Expose Levea as a client-side Model Context Protocol (MCP) server stdio wrapper (`levea-mcp-server`) in your favorite AI editors (Cursor, Cline, Windsurf, or Claude Desktop).
