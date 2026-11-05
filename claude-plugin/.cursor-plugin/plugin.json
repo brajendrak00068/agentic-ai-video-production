@@ -1,0 +1,16 @@
+{
+  "name": "levea-video-editor",
+  "displayName": "Levea AI Video Editor",
+  "version": "1.1.0",
+  "description": "Prompt-first AI video editing: describe the edit and get a finished MP4. Short clips from long videos, word-by-word captions, 9:16 reframe with face tracking, silence removal, B-roll, motion graphics, voiceover, music, color grading and multi-platform export, through the hosted Levea MCP server with OAuth sign-in.",
+  "author": {
+    "name": "Levea (livecore.ai)",
+    "email": "support@livecore.ai"
+  },
+  "homepage": "https://livecore.ai",
+  "repository": "https://github.com/brajendrak00068/agentic-ai-video-production",
+  "license": "MIT",
+  "keywords": ["video", "video-editing", "ai-video-editor", "captions", "subtitles", "viral-clips", "vertical-reframe", "b-roll", "motion-graphics", "mcp"],
+  "logo": "assets/logo-icon-400.png",
+  "mcpServers": ".mcp.json"
+}

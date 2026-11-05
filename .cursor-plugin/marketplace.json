@@ -1,0 +1,17 @@
+{
+  "name": "levea",
+  "owner": {
+    "name": "Levea (livecore.ai)",
+    "email": "support@livecore.ai"
+  },
+  "metadata": {
+    "description": "Levea AI video editing plugins for Cursor"
+  },
+  "plugins": [
+    {
+      "name": "levea-video-editor",
+      "source": "claude-plugin",
+      "description": "Prompt-first AI video editing (short clips, captions, 9:16 reframe, B-roll, voiceover, music, MP4 export) through the hosted Levea MCP server with OAuth sign-in."
+    }
+  ]
+}
