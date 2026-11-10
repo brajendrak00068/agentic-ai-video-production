@@ -1,10 +1,13 @@
 # Levea Video Editor — Hermes plugin
 
-Agentic AI video editing for [Hermes Agent](https://hermes-agent.nousresearch.com). Describe the edit in plain
-language; the Levea backend plans it, edits the timeline, verifies the result, and exports an MP4.
+Levea is an **AI video editor** and agentic video editing agent for [Hermes Agent](https://hermes-agent.nousresearch.com),
+built for creators, podcasters, YouTubers and marketing teams. Describe the edit in plain language; the Levea
+backend plans it, edits the timeline, verifies the result on the rendered frames, and exports a publish-ready MP4.
 
-Trim, 9:16 vertical reframe, viral clips, animated captions, B-roll, multicam podcast sync, audio cleanup, music,
-voiceover, color grading, motion graphics, and MP4 export.
+Use natural-language prompts to turn long-form videos, podcasts and interviews into short-form viral clips,
+YouTube Shorts, Instagram Reels and TikToks: trim, 9:16 vertical reframe with active-speaker face tracking,
+automatic animated captions, B-roll, multicam podcast editing, audio cleanup, music, AI voiceover, color grading,
+motion graphics, and MP4 export.
 
 ## Install
 

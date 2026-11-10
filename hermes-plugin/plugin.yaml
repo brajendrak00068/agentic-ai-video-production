@@ -1,10 +1,112 @@
 name: levea-video-editor
-version: 1.1.2
-description: "Agentic AI video editing via Levea: one natural-language edit tool (trim, 9:16 reframe, captions, B-roll, multicam, audio cleanup, color, motion graphics, MP4 export) plus durable queue and status polling."
+version: 1.1.3
+manifest_version: 2
+description: "AI video editor and agentic video editing agent via Levea: a podcast editor, podcast clips maker and social media video editor that turns long-form videos, podcasts and interviews into short-form viral clips, podcast highlights, YouTube Shorts, Instagram Reels and TikToks from one natural-language prompt. Describe the edit in plain language (trim, 9:16 vertical video reframe with active-speaker face tracking, automatic animated captions, B-roll, multicam podcast editing, audio cleanup, AI voiceover, color grading, motion graphics, MP4 export) and get a verified, publish-ready MP4. Video repurposing and content repurposing for creators, podcasters and YouTubers. Includes durable queue and status polling tools."
 author: brajendrak00068
 license: MIT
 homepage: https://livecore.ai
 requires_hermes: ">=0.21.6"
+tags:
+  - ai-video-editor
+  - video-editor
+  - video-editing
+  - ai-video-editing
+  - agentic-video-editing
+  - autonomous-video-editor
+  - natural-language-video-editing
+  - prompt-based-video-editing
+  - podcast-editor
+  - podcast-editing
+  - video-podcast
+  - podcast-clips
+  - podcast-highlights
+  - video-repurposing
+  - content-repurposing
+  - short-form-video
+  - viral-clips
+  - youtube-shorts
+  - instagram-reels
+  - tiktok-video
+  - vertical-video
+  - social-media-video-editor
+  - automatic-captions
+  - animated-captions
+  - subtitle-editor
+  - b-roll
+  - multicam-editing
+  - motion-graphics
+  - audio-cleanup
+  - color-grading
+  - voiceover
+  - mp4-export
+  - online-video-editor
+  - auto-captions
+  - silence-removal
+  - noise-reduction
+  - chroma-key
+  - green-screen
+  - face-blur
+  - ai-dubbing
+  - video-translation
+  - ffmpeg-alternative
+  - stream-highlights
+  - twitch-clips
+  - video-trimmer
+  - subtitle-generator
+  - ai-video-generator
+  - video-generator
+  - ai-video-maker
+  - video-maker
+  - ai-video-creator
+  - youtube-editor
+  - youtube-video-editor
+  - tiktok-editor
+  - tiktok-video-editor
+  - reels-editor
+  - reels-maker
+  - shorts-editor
+  - shorts-maker
+  - clip-maker
+  - opus-clip
+  - opus-clip-alternative
+  - vidyo-ai
+  - vidyo-alternative
+  - descript-alternative
+  - capcut-alternative
+  - webinar-repurposing
+  - webinar-to-clips
+  - talking-head-videos
+  - interview-clips
+  - podcast-to-clips
+  - long-form-to-short-form
+  - video-marketing
+  - content-creation
+  - creator-tools
+  - youtube-automation
+  - gaming-clips
+  - vod-to-clips
+  - transcript-editing
+  - text-based-video-editing
+  - transcription
+  - auto-editor
+  - jump-cuts
+  - filler-word-removal
+  - karaoke-captions
+  - subtitles
+  - caption-generator
+  - motion-tracking
+  - crop-video
+  - resize-video
+  - vertical-reframe
+  - broll
+  - youtube
+  - tiktok
+  - instagram
+  - reels
+  - shorts
+  - podcast
+  - clips
+  - captions
 provides_tools:
   - levea_video_edit
   - levea_queue_edit
