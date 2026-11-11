@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
-PLUGIN_VERSION = "1.1.2"
+PLUGIN_VERSION = "1.1.3"
 TOOLSET = "levea_video_editor"
 DEFAULT_API_URL = "https://api.livecore.ai"
 def _env_seconds(name: str, fallback: float) -> float:
