@@ -5,7 +5,7 @@ Thanks for helping improve the Levea clients. This repository holds the open-sou
 ## Before you start
 
 - **Bugs and ideas:** open an issue with the template. For security issues, follow [SECURITY.md](./SECURITY.md) instead.
-- **Edit request fields have one source:** `contract/edit-contract.json`. To add or change a field, edit that file and run `npm run sync-contract`; never hand-edit the generated copies (skills, `mcp-server/src/edit-contract.json`, the Hermes copy, the ChatGPT specs). CI fails if they drift.
+- **Edit request fields have one source:** `contract/edit-contract.json`. To add or change a field, edit that file and run `npm run sync-contract`; never hand-edit the generated copies (skills, `mcp-server/src/edit-contract.json`, the Hermes copy, the ChatGPT specs). Run `npm run sync-contract -- --check` before pushing; it fails if they drift (it also runs on `prepublishOnly`).
 
 ## Checks
 

@@ -3,7 +3,7 @@
 // request fields) to every place that needs it.
 //
 //   node scripts/sync-contract.mjs          rewrite all generated copies
-//   node scripts/sync-contract.mjs --check  exit 1 if any copy is stale (CI / prepublish)
+//   node scripts/sync-contract.mjs --check  exit 1 if any copy is stale (prepublish)
 //
 // Copies: mcp-server/src/{edit-contract.json,editContract.ts}, hermes-plugin/edit_contract.json
 // (the OpenClaw plugin imports contract/edit-contract.json directly).
