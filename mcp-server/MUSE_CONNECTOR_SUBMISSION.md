@@ -11,8 +11,8 @@ else is paste-ready.
 
 | Requirement | Status |
 |---|---|
-| MCP server (25 tools) | ✅ Published: npm `levea-mcp-server`, registry `io.github.brajendrak00068/levea-mcp-server` |
-| Hosted Streamable HTTP transport (multi-tenant, per-request auth) | ✅ In production via misc-service `src/routes/mcp.routes.ts` (serves this package's 25 tools); `levea-mcp-http-server` binary added for self-host parity |
+| MCP server (29 tools) | ✅ Published: npm `levea-mcp-server`, registry `io.github.brajendrak00068/levea-mcp-server` |
+| Hosted Streamable HTTP transport (multi-tenant, per-request auth) | ✅ In production via misc-service `src/routes/mcp.routes.ts` (serves this package's 29 tools); `levea-mcp-http-server` binary added for self-host parity |
 | **Public hosted endpoint** | ✅ **LIVE** — `https://api.livecore.ai/api/v1/misc/mcp` (Streamable HTTP; OAuth 2.1 + API-key Bearer; RFC 9728 challenge verified 2026-11-05) |
 | OAuth 2.1 | ✅ Built-in authorization server (`McpOAuthService.ts`), scope `levea`; read-only-scope note in §5 |
 | Backend API | ✅ Live: `https://api.livecore.ai/api/v1/misc/openclaw/v1/*` |
@@ -29,7 +29,7 @@ else is paste-ready.
 ## 1. Endpoint — already live (no deployment needed)
 
 The hosted MCP endpoint runs in production today (misc-service `src/routes/mcp.routes.ts`,
-serving this package's 25 tools — no forked tool list):
+serving this package's 29 tools — no forked tool list):
 
 ```
 POST https://api.livecore.ai/api/v1/misc/mcp   (Streamable HTTP, stateless)
@@ -184,6 +184,7 @@ irreversible `delete_*` tools.
 | `autonomous_edit` | **Write** | plans + executes a full edit; may auto-queue an export job; supports `requirePlanApproval` pause-before-execute |
 | `autonomous_edit_streaming` | **Write** | same as above, with per-step progress notifications |
 | `queue_edit` | **Write** | fire-and-forget edit; returns `taskId` |
+| `update_layer` / `trim_layer` / `apply_transition` | **Write** | one typed change to an existing project's scene, saved immediately (no planner, no export) |
 | `create_project` | **Write** | creates a project |
 | `create_brand_kit` / `update_brand_kit` | **Write** | brand kit state |
 | `save_caption_template` / `save_current_caption_template` / `apply_caption_template` | **Write** | template state / applies to project |
@@ -193,6 +194,7 @@ irreversible `delete_*` tools.
 | `delete_asset` | **Sensitive write** | irreversible deletion of media |
 | `delete_brand_kit` | **Sensitive write** | irreversible deletion |
 | `delete_caption_template` | **Sensitive write** | irreversible deletion |
+| `delete_layer` | **Sensitive write** | deletes layers from a project's scene (a saved revision can restore them) |
 
 - No payment, purchase, messaging, or publishing tools exist in this connector, so no
   transaction (§4.7) or send/share sensitive-write categories apply. The four `delete_*`

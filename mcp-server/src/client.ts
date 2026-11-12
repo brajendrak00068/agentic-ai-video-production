@@ -297,6 +297,45 @@ export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal): 
   }
 }
 
+/**
+ * Run one deterministic edit tool (update_layer, delete_layer, trim_layer,
+ * apply_transition) on a project's committed scene via /v1/execute. One
+ * canonical action with typed params, no planner; the backend commits the
+ * result to the project and answers 400 naming what a bad request needs.
+ *
+ * The backend echoes the whole edited scene; it is dropped here (the caller
+ * reads it with get_project) so a one-layer nudge does not flood the calling
+ * model's context. `layerCount` is kept as a cheap sanity signal.
+ */
+export async function executeDeterministicTool(
+  tool: string,
+  projectId: string,
+  params: Record<string, unknown>,
+  hostSignal?: AbortSignal,
+): Promise<unknown> {
+  const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
+  try {
+    const res = await http2().post(
+      v1('/execute'),
+      { tool, params, projectId, project_id: projectId },
+      { signal: call.signal },
+    );
+    const d = (res.data || {}) as Record<string, unknown>;
+    const { scene, ...rest } = d;
+    const layers = (scene as { layers?: unknown } | undefined)?.layers;
+    const out: Record<string, unknown> = { ...rest, projectId };
+    if (Array.isArray(layers)) out.layerCount = layers.length;
+    if (res.status >= 400 && out.success === undefined) out.success = false;
+    if (res.status >= 400) out.httpStatus = res.status;
+    return out;
+  } catch (err) {
+    if (hostSignal?.aborted) return { success: false, status: 'cancelled', error: `Cancelled by the client; ${tool} may still have been applied.`, projectId };
+    return describeError(err, `execute(${tool})`);
+  } finally {
+    call.dispose();
+  }
+}
+
 /** The run's terminal SSE event types: its outcome, or an error. */
 const TERMINAL_STREAM_EVENTS: ReadonlySet<string> = new Set([
   'success', 'partial_success', 'awaiting_approval', 'awaiting_input', 'complete', 'error',

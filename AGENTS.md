@@ -8,7 +8,7 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 ## Tools
 
-The surface is **one edit tool plus management & polling**. The editing path is single-tool by design (the backend planner owns intent decomposition); the rest is typed state-management you'd otherwise have to call raw HTTP for.
+The surface is **one agentic edit tool, four deterministic edit tools, plus management & polling**. Anything that needs judgment goes through `autonomous_edit` (the backend planner owns intent decomposition); the four deterministic tools are typed single-step nudges on a project you already have; the rest is typed state-management you'd otherwise have to call raw HTTP for.
 
 ### Edit (1 + 2 variants)
 
@@ -17,6 +17,17 @@ The surface is **one edit tool plus management & polling**. The editing path is 
 | `autonomous_edit` (**primary**) | Yes | Yes — may auto-fire an export job |
 | `autonomous_edit_streaming` (SSE — emits per-step progress notifications) | Yes | Yes |
 | `queue_edit` (fire-and-forget; returns `taskId` for `check_task_status`) | Yes | Yes |
+
+### Deterministic edits (4)
+
+| Tool | What it does |
+|---|---|
+| `update_layer` | Set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`, …) |
+| `delete_layer` | Delete one or more layers; `close_gap: true` ripples the timeline closed |
+| `trim_layer` | Shorten a layer: `edge` + `seconds`, or an absolute `start_time` + `end_time` |
+| `apply_transition` | Put a named transition (~170 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
+
+Each one runs a single typed action on the project's committed scene and saves it immediately: no planner, no auto-export, seconds not minutes. All four require `project_id`; read layer ids from `get_project` (`project.scene.layers[].id`). A bad request comes back as `isError` naming what it needs; `PROJECT_REVISION_CONFLICT` means the project changed while the edit applied and nothing was saved, so read the project again and retry.
 
 ### Job / task polling (3)
 
@@ -44,9 +55,11 @@ The surface is **one edit tool plus management & polling**. The editing path is 
 
 Full input schemas are returned by `tools/list` over MCP.
 
-### Why one edit tool (not many)?
+### Why one agentic edit tool (not many)?
 
 There is no per-capability shim (`add_captions`, `generate_viral_clips`, `remove_silence`, `export_video`, …) and no `editor_execute` escape hatch in the editing path. The backend planner is the specialist; exposing typed editing shims would encourage calling LLMs to dispatch them in isolation and lose multi-step intent that only the full prompt carries. Send the user's intent to `autonomous_edit` verbatim — the planner picks the right canonical actions (`GENERATE_VIRAL_CLIPS`, `GENERATE_CAPTIONS`, `EXPORT_VIDEO`, …) server-side.
+
+The four deterministic tools are the exception, for a different job: an agent that has already looked at the project and wants one exact change ("move the logo 40 px left", "trim 0.5 s off the end of clip 3") would otherwise pay a full planner run for it. Use them for exact, already-decided changes; use `autonomous_edit` whenever the change needs a decision (what to cut, which look, where things go) or touches many layers.
 
 The non-editing tools (brand kit CRUD, project CRUD, asset upload, caption template CRUD) are **state management**, not editing — they don't decide what to do with the scene, they just give integrators typed access to the surrounding data so they can build full integrations through one API key instead of mixing JWT and MCP.
 
@@ -103,7 +116,7 @@ The client never accepts a *full path* in `LEVEA_API_URL` — set only the host.
 
 ## Safety boundary
 
-Low-level operations (shell, ffmpeg flags, raw timeline JSON, filesystem) are **deliberately not exposed**. The backend allowlists canonical actions server-side; the MCP surface offers a single high-level edit tool plus diagnostics. Trust this boundary; do not try to construct paths around it.
+Low-level operations (shell, ffmpeg flags, raw timeline JSON, filesystem) are **deliberately not exposed**. The backend allowlists canonical actions server-side; the MCP surface offers one high-level edit tool, four typed single-action edits that run through the same allowlisted operations, plus management and diagnostics. Trust this boundary; do not try to construct paths around it.
 
 ## Source
 
