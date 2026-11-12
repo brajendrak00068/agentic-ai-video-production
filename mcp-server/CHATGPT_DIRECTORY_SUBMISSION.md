@@ -17,7 +17,7 @@ same tools, ~85% shared material).
 | Public MCP endpoint (universal URL — one endpoint for all users) | ✅ **LIVE** — `https://api.livecore.ai/api/v1/misc/mcp` (Streamable HTTP, stateless) |
 | OAuth for MCP | ✅ OAuth 2.1 + PKCE; **RFC 7591 dynamic client registration** (`/api/v1/misc/oauth/register`), RFC 8414 + RFC 9728 well-known metadata, `/openai-apps-challenge` endpoint already in prod |
 | API-key auth for review test creds (no MFA) | ✅ `Authorization: Bearer <key>` — keys never need SMS/email codes |
-| Tool annotations (`readOnlyHint` / `destructiveHint` / `openWorldHint`) | ✅ All 25 tools annotated (`src/server.ts` `TOOL_ANNOTATIONS`); enforced at server build — a tool without annotations throws |
+| Tool annotations (`readOnlyHint` / `destructiveHint` / `openWorldHint`) | ✅ All 29 tools annotated (`src/server.ts` `TOOL_ANNOTATIONS`); enforced at server build — a tool without annotations throws |
 | Logo | ✅ `icon-512.png` (512×512) `[VERIFY: portal's exact logo spec]` |
 | Organization verification | ❌ Human — see §1 |
 | `api.apps.write` permission | ❌ Human — see §1 |
@@ -62,7 +62,7 @@ MCP Server URL:  https://api.livecore.ai/api/v1/misc/mcp
   `[VERIFY: exactly how the portal wants the key delivered — connection setting or
   credential field.]`
 
-**Step 2 — Scan Tools.** Verify the import matches §3 exactly (25 tools, titles,
+**Step 2 — Scan Tools.** Verify the import matches §3 exactly (29 tools, titles,
 annotations, schemas, instructions). If anything is stale or wrong: fix the server,
 deploy, **Scan Tools again**, then submit. Justifications must match the advertised
 annotations — never argue a tool is "functionally read-only" against a
@@ -112,13 +112,17 @@ Optional (not required for v1): package **skills** (repeatable workflows such as
 
 ## 3. Annotation justification table (what Scan Tools imports and reviewers grade)
 
-Source of truth: `src/server.ts` `TOOL_ANNOTATIONS` (2026-11-05). "—" = hint absent.
+Source of truth: `src/server.ts` `TOOL_ANNOTATIONS` (2026-11-12). "—" = hint absent.
 
 | Tool | Title | readOnly | destructive | openWorld | Why the hints match behavior |
 |---|---|---|---|---|---|
 | `autonomous_edit` | Edit video | false | true | true | Mutates the project and can cut/replace/remove content irreversibly within the edit; fetches arbitrary public media URLs (YouTube, CDN) so it reaches the open web. Safeguard: `requirePlanApproval` pauses before execution. |
 | `autonomous_edit_streaming` | Edit video (live progress) | false | true | true | Same behavior with per-step progress events. |
 | `queue_edit` | Queue video edit | false | true | true | Same behavior, asynchronous (`taskId` → `check_task_status`). |
+| `update_layer` | Update layer | false | false | false | Sets properties on one layer of the caller's own project; reversible (every revision is saved); no URL fetching. |
+| `delete_layer` | Delete layer | false | true | false | Removes layers from the caller's own project. |
+| `trim_layer` | Trim layer | false | true | false | Shortens a layer, cutting content from it. |
+| `apply_transition` | Apply transition | false | false | false | Adds a named transition between two clips of the caller's own project. |
 | `check_job_status` | Check job status | true | — | false | Polls a render/generation job in the caller's own account. |
 | `check_task_status` | Check task status | true | — | false | Polls a queued edit in the caller's account. |
 | `get_active_task` | Get active task | true | — | false | Reads the project's in-flight task. |

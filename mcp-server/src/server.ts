@@ -7,14 +7,19 @@
  * over stdio (`index.ts`) or a hosted Streamable HTTP endpoint
  * (`createLeveaMcpServer` + `runWithLeveaConfig`).
  *
- * Architectural posture — **one edit tool, many management tools**:
- *   - `autonomous_edit` is the SOLE editing entry point. The backend planner
- *     owns intent decomposition, action selection, verification, and export.
- *     We deliberately do NOT expose per-capability shims (`add_captions`,
- *     `generate_viral_clips`, …) because they fragment the planner's visibility.
+ * Architectural posture — **one agentic edit tool, four deterministic nudges,
+ * many management tools**:
+ *   - `autonomous_edit` is the editing entry point for anything that needs
+ *     judgment. The backend planner owns intent decomposition, action
+ *     selection, verification, and export. We deliberately do NOT expose
+ *     per-capability shims (`add_captions`, `generate_viral_clips`, …) because
+ *     they fragment the planner's visibility.
+ *   - `update_layer`, `delete_layer`, `trim_layer`, `apply_transition` are
+ *     typed single actions on a project's committed scene (backend /v1/execute
+ *     deterministic branch, same power the planner path runs): the
+ *     observe → nudge → observe loop of a calling agent, without a planner run.
  *   - All OTHER tools are read-only diagnostics or state-management CRUD
- *     (brand kits, projects, assets, caption templates). They never mutate
- *     scene state directly — that path stays gated through autonomous_edit.
+ *     (brand kits, projects, assets, caption templates).
  *
  * Config (env, set via the MCP client's `mcpServers` entry):
  *   LEVEA_API_URL   e.g. https://api.livecore.ai   (required)
@@ -55,6 +60,7 @@ import {
   listAssets,
   deleteAsset,
   transcribeAsset,
+  executeDeterministicTool,
   type ExecuteResult,
   type SSEEvent,
 } from './client';
@@ -92,6 +98,76 @@ const TOOL_DEFS: Tool[] = [
     description:
       'Fire-and-forget async path. Returns immediately with a `taskId`. Use when the edit may exceed the MCP request timeout (long viral-clip generation, multi-format export). Poll with check_task_status or get_active_task.',
     inputSchema: QUEUE_EDIT_SCHEMA as unknown as Tool['inputSchema'],
+  },
+
+  // ── Deterministic edits — one typed action, no planner ───────────────────
+  // For surgical nudges in an observe → nudge → observe loop on an existing
+  // project. Read layer ids from get_project (project.scene.layers[].id).
+  // Anything that needs judgment (what to cut, which look, where) stays with
+  // autonomous_edit.
+  {
+    name: 'update_layer',
+    description:
+      'Deterministic edit: set static properties on one existing layer of a project, committed immediately (no planner, no export). E.g. {"x": 540, "y": 960}, {"scale": 1.2}, {"opacity": 0.5}, {"volume": 0.3}, {"visible": false}, {"z_index": 4}. Not for moving a layer in time or animating it — use autonomous_edit for those. Get layer ids from get_project (project.scene.layers[].id).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
+        layer_id: { type: 'string', description: 'Id of the layer to change.' },
+        properties: { type: 'object', description: 'Layer property keys to values (non-empty).' },
+      },
+      required: ['project_id', 'layer_id', 'properties'],
+    },
+  },
+  {
+    name: 'delete_layer',
+    description:
+      'Deterministic edit: permanently delete one or more layers of a project, committed immediately. close_gap: true ripples the timeline closed. To hide a layer temporarily use update_layer with {"visible": false} instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
+        layer_id: { type: 'string', description: 'One layer to delete.' },
+        layer_ids: { type: 'array', items: { type: 'string' }, description: 'Several layers to delete (alternative to layer_id).' },
+        close_gap: { type: 'boolean', description: 'Ripple later layers left to close the gap.' },
+      },
+      required: ['project_id'],
+    },
+  },
+  {
+    name: 'trim_layer',
+    description:
+      'Deterministic edit: shorten a layer, committed immediately. Either a relative trim (edge "start" | "end" + seconds to remove) or an absolute playable range of the layer\'s source (start_time + end_time, seconds). Does not move the layer on the timeline.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
+        layer_id: { type: 'string', description: 'Id of the layer to trim.' },
+        edge: { type: 'string', enum: ['start', 'end'], description: '[relative] Which edge to trim.' },
+        seconds: { type: 'number', description: '[relative] Seconds to remove from that edge (> 0).' },
+        start_time: { type: 'number', description: '[absolute] Range start, seconds (>= 0).' },
+        end_time: { type: 'number', description: '[absolute] Range end, seconds (> start_time).' },
+      },
+      required: ['project_id', 'layer_id'],
+    },
+  },
+  {
+    name: 'apply_transition',
+    description:
+      'Deterministic edit: apply a named transition between two adjacent clips, committed immediately (the same operation as the editor\'s transition picker). type is one of ~170 names, e.g. fade, cross_dissolve, dip_to_black, slide_left, push_left, wipe_left, zoom_in, whip_pan, light_leak, glitch, zoom_blur, page_curl, crt_power_off. An unknown name is rejected with the reason.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
+        type: { type: 'string', description: 'Transition name.' },
+        to_layer_id: { type: 'string', description: 'The incoming clip (the transition plays into it).' },
+        from_layer_id: { type: 'string', description: 'Optional outgoing clip.' },
+        duration_sec: { type: 'number', description: 'Optional duration in seconds.' },
+        direction: { type: 'string', description: 'Optional direction for directional transitions (e.g. left, right, up, down).' },
+        easing: { type: 'string', description: 'Optional easing name.' },
+      },
+      required: ['project_id', 'type', 'to_layer_id'],
+    },
   },
 
   // ── Job / task polling ───────────────────────────────────────────────────
@@ -343,6 +419,7 @@ const TOOL_DEFS: Tool[] = [
 // Keyed by tool name; `satisfies` keeps this exhaustive against TOOL_DEFS.
 type ToolName =
   | 'autonomous_edit' | 'autonomous_edit_streaming' | 'queue_edit'
+  | 'update_layer' | 'delete_layer' | 'trim_layer' | 'apply_transition'
   | 'check_job_status' | 'check_task_status' | 'get_active_task'
   | 'list_caption_templates' | 'apply_caption_template' | 'save_caption_template'
   | 'save_current_caption_template' | 'delete_caption_template'
@@ -362,6 +439,11 @@ const TOOL_ANNOTATIONS = {
   autonomous_edit: edit('Edit video'),
   autonomous_edit_streaming: edit('Edit video (live progress)'),
   queue_edit: edit('Queue video edit'),
+  // Deterministic edits touch only the project's own scene (no URL fetching).
+  update_layer: write('Update layer'),
+  delete_layer: destructive('Delete layer'),
+  trim_layer: destructive('Trim layer'),
+  apply_transition: write('Apply transition'),
   check_job_status: read('Check job status'),
   check_task_status: read('Check task status'),
   get_active_task: read('Get active task'),
@@ -541,6 +623,20 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       if (!str(a.prompt)) return fail('❌ `prompt` is required for queue_edit.');
       const r = await queueEdit(buildEditBody(a, 'queue'));
       return ok(summarizeAny('queue_edit', r), r);
+    }
+
+    case 'update_layer':
+    case 'delete_layer':
+    case 'trim_layer':
+    case 'apply_transition': {
+      const pid = str(a.project_id) || str(a.projectId);
+      if (!pid) return fail(`❌ \`project_id\` is required for ${name} (it edits a project's committed scene).`);
+      const { project_id: _p, projectId: _q, ...params } = a;
+      const r = (await executeDeterministicTool(name, pid, params, ctx.signal)) as Record<string, unknown>;
+      const head = r.success === false
+        ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
+        : `✅ ${name}: ${r.observation || 'applied'}`;
+      return ok(head, r);
     }
 
     case 'check_job_status': {

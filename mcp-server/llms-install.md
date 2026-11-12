@@ -8,8 +8,9 @@ One primary edit tool, `autonomous_edit`: send a natural-language description of
 the video you want and it plans, edits, verifies on the rendered frames, and
 exports the finished result (viral clips, captions, 9:16 reframe, 2D and 3D
 motion graphics, chroma key, motion tracking, B-roll, voiceover, music and sound
-effects, multi-platform export). No timeline. 25 tools in total: the edit tool
-plus streaming, async queue, job status, brand kits, projects, assets, and
+effects, multi-platform export). No timeline. 29 tools in total: the edit tool
+plus streaming, async queue, four deterministic single-step edits (update_layer,
+delete_layer, trim_layer, apply_transition), job status, brand kits, projects, assets, and
 caption-template tools.
 
 ## Install
@@ -67,7 +68,7 @@ omit the header and sign in to Levea in the browser; otherwise send the API key:
 
 ## Verify
 Call the `editor_health` tool — it should report the backend as healthy. `tools/list`
-should return 25 tools.
+should return 29 tools.
 
 ## Notes for the agent
 - Never print or log `LEVEA_API_KEY`.

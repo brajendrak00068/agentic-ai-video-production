@@ -389,11 +389,12 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ## 📂 MCP Tool Surface
 
-The MCP server (`levea-mcp-server`, 25 tools) exposes one high-level editing entry point plus typed management and polling tools. The OpenClaw and Hermes plugins expose the five edit and polling tools.
+The MCP server (`levea-mcp-server`, 29 tools) exposes one high-level editing entry point, four deterministic single-step edits, and typed management and polling tools. The OpenClaw and Hermes plugins expose the five edit and polling tools.
 
 | Group | Tools | Description |
 | --- | --- | --- |
 | **Edit** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Single-entry edit prompts, SSE progress streaming, and asynchronous queuing. |
+| **Deterministic edits** | `update_layer`, `delete_layer`, `trim_layer`, `apply_transition` | One exact change to an existing project (move / fade a layer, delete, trim, add a named transition), saved in seconds with no planner run. For agents that have already decided the change. |
 | **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, generation jobs, and the active task of a project. |
 | **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
 | **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, voice tone, and grading rules. |

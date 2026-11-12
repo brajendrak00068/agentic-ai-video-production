@@ -87,6 +87,7 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 | Group | Tools |
 |---|---|
 | **Edit** (one entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
+| **Deterministic edits** (one typed action each, no planner) | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — exact changes to an existing project, saved immediately; layer ids from `get_project` |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
 | Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (280+ built-in + your saved) |
 | Brand kits | `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit` (palette · fonts · logo · voice · gradeBias · enforcement) |
