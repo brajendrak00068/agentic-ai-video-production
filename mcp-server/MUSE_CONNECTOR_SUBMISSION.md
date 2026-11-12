@@ -66,7 +66,7 @@ without editing skills — from short-form social clips to full YouTube-ready pr
 and exports end-to-end:
 
 - Turn long recordings (podcasts, webinars, interviews) into vertical clips and reels
-- Captions with 60+ professional templates, B-roll, music, sound effects, beat sync
+- Captions with 280+ professional templates, B-roll, music, sound effects, beat sync
 - Vertical reframe with speaker tracking, multi-cam edits, silence/filler cleanup
 - AI voiceover and dubbing, color grading, motion graphics, chroma key, face/object blur
 - Cloud MP4 export with per-platform presets; project, asset, brand-kit, and template

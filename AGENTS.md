@@ -24,7 +24,7 @@ The surface is **one edit tool plus management & polling**. The editing path is 
 
 ### Caption templates (5)
 
-`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 60+ built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
+`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 280+ built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
 
 ### Brand kits (5)
 

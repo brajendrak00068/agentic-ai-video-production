@@ -58,7 +58,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Non-destructive layer trimming, splitting, and sequencing.
-- Caption generation with 60+ typography templates.
+- Caption generation with 280+ typography templates.
 - Color grading, effects, transitions, music and sound effects, and audio level balancing.
 - Verified MP4 video export.
 

@@ -63,7 +63,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Speech-to-text word timing alignment on the active timeline.
-- 60+ caption templates including Hormozi, Spotlight, karaoke, word-pill, phrase lockups, and two-line podcast looks.
+- 280+ caption templates including Hormozi, Spotlight, karaoke, word-pill, phrase lockups, and two-line podcast looks.
 - Animated word entrances and burn-aways; Latin, Indic, Arabic, Cyrillic, and Greek text.
 - Safe-zone placement that avoids covering faces and lower-third graphics.
 - Multi-language subtitle translation.

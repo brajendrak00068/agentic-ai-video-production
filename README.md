@@ -8,7 +8,7 @@
 
 # Levea — Prompt-First AI Video Editor (MCP Server & Cloud Production Harness)
 
-> **Prompt-to-video editing without manual timelines.** Describe the edit in plain language; Levea plans it, edits a real multi-layer project, checks the result on the rendered frames, and exports the MP4. An **open-source MCP client** connects your AI agent (Claude Desktop, Claude Code, Cursor, Cline, Gemini CLI, OpenClaw, Hermes, ChatGPT) to our **cloud GPU production harness**: frame-accurate cuts, 60+ caption templates, 2D and 3D motion graphics reviewed by an AI critic, a licensed music and sound-effects library, voiceovers, and active-speaker reframing, with nothing heavy running on your machine.
+> **Prompt-to-video editing without manual timelines.** Describe the edit in plain language; Levea plans it, edits a real multi-layer project, checks the result on the rendered frames, and exports the MP4. An **open-source MCP client** connects your AI agent (Claude Desktop, Claude Code, Cursor, Cline, Gemini CLI, OpenClaw, Hermes, ChatGPT) to our **cloud GPU production harness**: frame-accurate cuts, 280+ caption templates, 2D and 3D motion graphics reviewed by an AI critic, a licensed music and sound-effects library, voiceovers, and active-speaker reframing, with nothing heavy running on your machine.
 
 [![npm](https://img.shields.io/npm/v/levea-mcp-server?label=npm%20levea-mcp-server)](https://www.npmjs.com/package/levea-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-levea--mcp--server-orange)](https://registry.modelcontextprotocol.io/v0/servers?search=levea-mcp-server)
@@ -76,7 +76,7 @@ Levea separates probabilistic creative reasoning from deterministic project exec
         Multimodal Planner (frontier LLM: prompt, transcript, frames, scene)
                                   │
                                   ▼
-                Typed Action Plan (186 canonical actions)
+                Typed Action Plan (189 canonical actions)
                                   │
                                   ▼
      Plan Compiler (schema validation, parameter binding, dependency order)
@@ -88,10 +88,10 @@ Levea separates probabilistic creative reasoning from deterministic project exec
       Execution Harness ── typed, audited operations ──▶ Scene IR
       │                                                (timeline, tracks, layers;
       │                                                 every revision saved)
-      ├── Perception: transcript, faces, active speaker, shot cuts, on-screen text
+      ├── Perception: transcript, faces, active speaker, shot cuts, on-screen text, hand pose, lip-sync scoring
       ├── Editing: cuts, ripple, slip/slide, reframe, multicam, speed ramps
-      ├── Captions: 60+ templates, word-level sync, Latin/Indic/Arabic/Cyrillic/Greek
-      ├── Audio: licensed music + SFX library, sound design, EBU R128, ducking, voiceover
+      ├── Captions: 280+ templates, word-level sync, Latin/Indic/Arabic/Cyrillic/Greek
+      ├── Audio: licensed music + SFX library, sound design, EBU R128, ducking, voiceover, DJ mixes
       ├── Motion graphics (HyperFrames): 2D motion design, 3D character films, charts
       ├── Generation jobs: images, B-roll video, music, voice (async artifacts)
       └── Rendering (Vulkan / WebGPU): 160+ transitions, ~100 GPU effect presets
@@ -313,6 +313,10 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | *"Speed-ramp into the jump and use J-cuts between speakers"* | Speed ramps / time remap and J/L, match, and smash cuts as typed editing techniques. |
 | *"Push the camera in slowly with a little parallax"* | Keyframed 3D camera moves with depth-based parallax. |
 | *"Match the color of the second camera to the first"* | Auto color and shot-to-shot color matching, plus film looks, film burn, and lens flares. |
+| *"Dub this into Spanish in my voice and lip-sync it"* | Translated dub in a cloned voice, lip-synced to the speaker's mouth. Mouth-to-audio sync is measured and verified, and the dub is checked by listening to it (right language, intelligible). Lines that had to be shortened to fit are reported. |
+| *"Put the price tag in her hand and keep it there"* | Hand tracking: the overlay follows the palm, can grow and shrink with the hand, and hides while the hand is out of view. |
+| *"Mix these four songs into one continuous DJ set"* | Beat-matched, harmonically mixed program: each track's tempo and musical key are measured, tracks are time-stretched and key-shifted (Camelot wheel) so they mix. |
+| *"Cut a reel from this explainer and keep the slides readable"* | Slides, diagrams, and designed graphics are cropped to their content and shown with a headline on a matched background instead of a tiny letterboxed strip. |
 
 ---
 
@@ -329,7 +333,7 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | **Editorial reasoning** | You listen and hunt for the climax | Agent surfaces narrative peaks and high-retention moments |
 | **Verification & Repair** | You eyeball it and manually re-render | Every edit is checked on the rendered frames; failures are repaired automatically and reported with a typed verification report |
 | **Multi-platform export** | One render per aspect ratio | TikTok + Reels + Shorts + YouTube in one pass |
-| **Extensibility** | Plugins call external binaries | 186 typed canonical actions orchestrated through a deterministic Workflow DAG |
+| **Extensibility** | Plugins call external binaries | 189 typed canonical actions orchestrated through a deterministic Workflow DAG |
 
 ---
 
@@ -353,6 +357,7 @@ Levea checks its own work before it reports success.
 - **Every task is verified when it runs:** typed checks such as "the layer exists", "the timing matches the request", "no graphic covers a face", or "captions stay in sync". A failed check names the invariant, what was expected, and what was found.
 - **A repair loop fixes what failed:** it proposes typed fixes (any canonical action), applies them, and verifies again, until the check passes or the request's time and model-call budget runs out. A fix is refused if the request prohibits it, if it would destroy the user's own layers, or if it would break a task that already passed.
 - **A final review looks at the rendered frames** of the finished edit and can make further fixes.
+- **The agent inspects the result the way an editor would:** it watches the rendered video, listens to the rendered audio (is the dub in the right language, intelligible, on-content?), reads color scopes (crushed blacks, clipped whites, flat saturation), previews the frame inside the TikTok / Reels / Shorts interface to check nothing sits under the app's buttons, and measures lip sync on dubbed footage.
 - **The result says what happened:** `verificationReport.status` is `verified` only when that final review approved the edit; `unverified` means no verdict was reached (the edit is kept, never reported as verified), with every failed check and what repair tried.
 - **Corrections are a follow-up prompt** with the same `project_id`. Every revision is saved, so a change can be undone.
 
@@ -364,19 +369,20 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ### Supported Production Paths
 - **Project and timeline state:** Full NLE track and clip operations (insert, overwrite, lift, extract, ripple delete/trim, slip, slide, freeze frame, reverse), multi-track management, nesting containers, and durable linear undo/redo.
-- **Captions:** automatic captions, word timing, keyword emphasis, 60+ caption templates (Hormozi, Spotlight, Karaoke, Typewriter, phrase lockups, two-line podcast looks, …), animated word entrances and burn-aways, and Latin, Indic, Arabic, Cyrillic, and Greek text.
+- **Captions:** automatic captions, word timing, keyword emphasis, 280+ caption templates (Hormozi, Spotlight, Karaoke, Typewriter, phrase lockups, two-line podcast looks, …), animated word entrances and burn-aways, and Latin, Indic, Arabic, Cyrillic, and Greek text.
 - **Motion graphics:** lower thirds, title cards, charts, counters, flow diagrams, collage layouts, text behind the subject, and full motion-graphic films (2D motion design and 3D character films with camera, lighting, music, and sound design). Every graphic is placed clear of faces and reviewed by an AI critic before it ships.
 - **Editing techniques:** speed ramps and time remap, J/L, match, and smash cuts, keyframed 3D camera moves with depth parallax, AI outpainting to new aspect ratios, eye-contact correction, face retouch, style packages, and 160+ transitions.
-- **Layout and perception:** multi-cam synchronization and active-speaker cuts, scene and shot cut analysis, face detection and tracking, face identity search across a project's clips, on-screen text-region **detection and OCR recognition**, safe zones, and explicit-region tracking or masking.
+- **Layout and perception:** multi-cam synchronization and active-speaker cuts, scene and shot cut analysis, face detection and tracking, face identity search across a project's clips, on-screen text-region **detection and OCR recognition**, safe zones, and explicit-region tracking or masking, and hand tracking (attach a sticker, label, or prop to a hand's palm).
 - **Compositing and color:** chroma key, masks, blend modes (29 modes), adjustment layers, alpha-matte background replacement, on-screen text / logo / watermark removal, auto color and shot matching, LUTs (including your own .cube files), and ~100 GPU effect presets (lens flares, film burn, bloom, rain, smoke, fire, glitch, portal, lightning, …).
-- **Audio:** a reviewed, licensed music and sound-effects library, sound design (effects on cuts and beats, room tone), music fitted to the video length, silence and filler-word cleanup, word-level muting, crossfades, EQ, denoise, EBU R128 loudness normalization, voiceover, **voice cloning** and voice conversion, speech-aware ducking, beat- and drop-synced edits, and vocal / instrumental separation.
-- **Autonomous Directing:** automated cold-open hook extraction, hook-first trims to a target length, podcast polish macros, contextual B-roll placement, auto lower thirds, and slideshow generation.
-- **Sources and delivery:** public video links (including Google Drive files and folders) checked before planning, and MP4 export in every platform aspect ratio.
-- **Verification:** typed task contracts, checks on the rendered frames, requirement tracking, an automatic repair loop, plan approval (`requirePlanApproval` + `planDecision`), and a typed `verificationReport` on every result.
+- **Audio:** a reviewed, licensed music and sound-effects library, sound design (effects on cuts and beats, room tone), music fitted to the video length, silence and filler-word cleanup, word-level muting, crossfades, EQ, denoise, EBU R128 loudness normalization, voiceover, **voice cloning** and voice conversion, speech-aware ducking, beat- and drop-synced edits, measured music structure (sections and drops), musical key detection, **DJ mixes** (beat-matched, harmonic track-to-track mixing), vocal / instrumental separation, and **lip-synced dubbing** (translated voice in the speaker's cloned voice, with measured mouth-to-audio sync).
+- **Autonomous Directing:** automated cold-open hook extraction, hook-first trims to a target length, podcast polish macros, contextual B-roll placement, auto lower thirds, slideshow generation, and reels cut from explainer videos with slides and diagrams cropped to their content.
+- **Sources and delivery:** public video links (including Google Drive files and folders) checked before planning (Drive files that hit Google's download quota are fetched in the background instead of failing), and MP4 export in every platform aspect ratio.
+- **Verification:** typed task contracts, checks on the rendered frames, requirement tracking, the agent watching and listening to the rendered result (color scopes, platform-UI preview, audio-content and lip-sync checks), brand kits with hard enforcement (off-palette colors fail the check and are repaired), an automatic repair loop, plan approval (`requirePlanApproval` + `planDecision`), and a typed `verificationReport` on every result.
 
 ### Model- or Deployment-Dependent
 - Generated video, images, B-roll, music, sound effects, voiceover, and voice cloning quality/availability vary by model tier and quota (all are wired as canonical actions in production).
 - Neural alpha matting and background replacement quality.
+- Lip-sync dubbing quality (a lip-sync step passes only on its measured mouth-to-audio sync).
 - **CJK caption rendering:** right-to-left shaping ships in production; CJK glyph coverage depends on font fallback.
 
 ---

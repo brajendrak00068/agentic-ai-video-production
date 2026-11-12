@@ -12,7 +12,7 @@ This folder contains the configuration and OpenAPI specification for a **Custom 
 2. Switch to the **Configure** tab:
    - **Logo / Avatar**: Click the circle icon at the top and upload `logo.png` (from this folder).
    - **Name**: `Levea — AI Video Editor`
-   - **Description**: `Autonomous prompt-to-video editor. Generate viral clips, 60+ caption templates, vertical 9:16 reframe, motion graphics, voiceovers & B-roll.`
+   - **Description**: `Autonomous prompt-to-video editor. Generate viral clips, 280+ caption templates, vertical 9:16 reframe, motion graphics, voiceovers & B-roll.`
    - **Instructions**: Copy & paste from `INSTRUCTIONS.md`.
    - **Conversation Starters**: See `INSTRUCTIONS.md`.
 
