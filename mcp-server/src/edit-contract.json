@@ -44,7 +44,7 @@
       "doc": "Public source video URL when starting a new project.",
       "schema": {
         "type": "string",
-        "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. Local file paths are not supported."
+        "description": "Optional public source video URL (HTTP/HTTPS: S3, Google Drive public link, Dropbox, direct MP4) for a new project. A local file path cannot be read directly: upload the file first (with the MCP server: call asset_upload_url, PUT the bytes to uploadUrl, then pass the returned fileUrl here)."
       }
     },
     {
@@ -58,7 +58,7 @@
       "doc": "Input media (video, image, audio) as public HTTP/HTTPS URLs.",
       "schema": {
         "type": "array",
-        "description": "Optional input media assets. URLs must be public HTTP/HTTPS links.",
+        "description": "Optional input media assets. URLs must be public HTTP/HTTPS links; upload local files first (with the MCP server: asset_upload_url, then use the returned fileUrl).",
         "items": {
           "type": "object",
           "required": [
