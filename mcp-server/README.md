@@ -88,7 +88,7 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 |---|---|
 | **Edit** (one entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
-| Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (60+ built-in + your saved) |
+| Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (280+ built-in + your saved) |
 | Brand kits | `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit` (palette · fonts · logo · voice · gradeBias · enforcement) |
 | Projects | `list_projects` · `get_project` · `create_project` · `delete_project` |
 | Assets | `asset_upload_url` (signed PUT) · `list_assets` · `delete_asset` · `transcribe_asset` |
@@ -157,7 +157,7 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 - **Shape & transform** — clip shapes (circle, dome, star, hexagon, polygon), crop, 3D rotation / perspective, glow, shadow, gradient fills
 - **Lighting** — up to 8 scene lights illuminating 3D-transformed layers
 - **Reframe & layout** — caption-safe vertical reframe (9:16) + vertical montage, split screen (top/bottom, L/R, PiP, grid)
-- **Track** — motion / face tracking with zoom-follow, branding overlays
+- **Track** — motion / face tracking with zoom-follow, hand tracking (an overlay follows the palm), branding overlays
 - **Camera** — keyframed 3D camera moves (push-in, orbit, drift) with depth-based parallax
 
 ### 📊 Motion graphics & data viz
@@ -171,7 +171,7 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 ### 💬 Captions & text
 - **Generate** — auto-captions from the transcript
-- **Style** — 60+ built-in templates (Hormozi, Spotlight, Karaoke, phrase lockups, two-line podcast looks, …), or an AI director that picks/generates one at runtime
+- **Style** — 280+ built-in templates (Hormozi, Spotlight, Karaoke, phrase lockups, two-line podcast looks, …), or an AI director that picks/generates one at runtime
 - **Scripts** — Latin, Indic, Arabic, Cyrillic, and Greek text
 - **Animate** — per-word animations (typewriter, slide, fade, scale, rotate, bounce, flip, swing, elastic, blur, glitch, wave — each with a matching exit)
 - **Typography** — crisp scalable glyphs (MSDF), stroke / outline, drop shadow, gradient fill, background pill / box, per-word karaoke fill + underline
@@ -182,6 +182,8 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 - **Mix** — auto-duck (sidechain music vs voice), loudness (LUFS) normalize + true-peak limiting, denoise, crossfade, EQ presets (bass-boost, vocal-clarity, warm, bright), vocal / instrumental separation
 - **Library** — a reviewed, licensed music and sound-effects library; music fitted to the video length; sound design (effects on cuts and beats, room tone)
 - **Generate** — SFX, music (mood/genre/BPM), voiceover (TTS or cloned voice), voice conversion
+- **Dub** — translated dubs in a cloned voice, lip-synced to the speaker with measured mouth-to-audio sync; the dub is verified by listening to it (language, intelligibility)
+- **DJ mix** — several tracks as one beat-matched, harmonically mixed program (tempo and musical key measured per track); music structure (sections, drops) measured from the audio
 - **Sync** — external master audio alignment (timecode / explicit offset)
 - **Visualize** — waveforms (bars, wave, circular)
 

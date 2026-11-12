@@ -53,7 +53,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Timeline trimming, splitting, hook-first trims to a target length, and face-tracked aspect-ratio reframing.
-- 60+ caption templates, title cards, and motion graphics placed clear of every face.
+- 280+ caption templates, title cards, and motion graphics placed clear of every face.
 - 2D and 3D motion-graphic films, reviewed by an AI critic before they ship.
 - A licensed music and sound-effects library, sound design, voiceover, and loudness-balanced mixing.
 - Color grading, ~100 GPU effect presets, 160+ transitions, speed ramps, and keyframed camera moves.
