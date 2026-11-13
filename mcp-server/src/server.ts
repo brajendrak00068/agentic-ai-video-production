@@ -108,7 +108,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'update_layer',
     description:
-      'Deterministic edit: set static properties on one existing layer of a project, committed immediately (no planner, no export). E.g. {"x": 540, "y": 960}, {"scale": 1.2}, {"opacity": 0.5}, {"volume": 0.3}, {"visible": false}, {"z_index": 4}. Not for moving a layer in time or animating it — use autonomous_edit for those. Get layer ids from get_project (project.scene.layers[].id).',
+      'Deterministic edit: set registry properties on one existing layer of a project, committed immediately (no planner, no export). E.g. {"x": 540, "y": 960}, {"scale": 1.2}, {"opacity": 0.5}, {"volume": 0.3}, {"visible": false}, {"z_index": 4}, or its timeline window {"start_time": 2, "end_time": 8}. Unknown keys are ignored, and an update that changes nothing is an error (NO_CHANGE). Not for keyframed animation (use autonomous_edit), and not "text" on a caption group (refused: it would overwrite every caption). Get layer ids from get_project (project.scene.layers[].id).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -122,14 +122,14 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'delete_layer',
     description:
-      'Deterministic edit: permanently delete one or more layers of a project, committed immediately. close_gap: true ripples the timeline closed. To hide a layer temporarily use update_layer with {"visible": false} instead.',
+      'Deterministic edit: permanently delete one or more named layers of a project, committed immediately. close_gap: true ripples the timeline closed and works with a single layer_id only. Selectors such as "all" or "@…" are refused, and so is a delete that would leave the project empty. To hide a layer temporarily use update_layer with {"visible": false} instead.',
     inputSchema: {
       type: 'object',
       properties: {
         project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
         layer_id: { type: 'string', description: 'One layer to delete.' },
         layer_ids: { type: 'array', items: { type: 'string' }, description: 'Several layers to delete (alternative to layer_id).' },
-        close_gap: { type: 'boolean', description: 'Ripple later layers left to close the gap.' },
+        close_gap: { type: 'boolean', description: 'Ripple later layers left to close the gap (single layer_id only).' },
       },
       required: ['project_id'],
     },
@@ -137,7 +137,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'trim_layer',
     description:
-      'Deterministic edit: shorten a layer, committed immediately. Either a relative trim (edge "start" | "end" + seconds to remove) or an absolute playable range of the layer\'s source (start_time + end_time, seconds). Does not move the layer on the timeline.',
+      'Deterministic edit: shorten a layer, committed immediately. Either a relative trim (edge "start" | "end" + seconds to remove) or an absolute range in TIMELINE seconds (start_time + end_time: the part of the layer\'s current window to keep). On a single-source cut timeline the trim ripples later segments closed. A trim that removes nothing is an error (NO_CHANGE).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -145,8 +145,8 @@ const TOOL_DEFS: Tool[] = [
         layer_id: { type: 'string', description: 'Id of the layer to trim.' },
         edge: { type: 'string', enum: ['start', 'end'], description: '[relative] Which edge to trim.' },
         seconds: { type: 'number', description: '[relative] Seconds to remove from that edge (> 0).' },
-        start_time: { type: 'number', description: '[absolute] Range start, seconds (>= 0).' },
-        end_time: { type: 'number', description: '[absolute] Range end, seconds (> start_time).' },
+        start_time: { type: 'number', description: '[absolute] Range start, timeline seconds (>= 0).' },
+        end_time: { type: 'number', description: '[absolute] Range end, timeline seconds (> start_time).' },
       },
       required: ['project_id', 'layer_id'],
     },
@@ -154,7 +154,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'apply_transition',
     description:
-      'Deterministic edit: apply a named transition between two adjacent clips, committed immediately (the same operation as the editor\'s transition picker). type is one of ~170 names, e.g. fade, cross_dissolve, dip_to_black, slide_left, push_left, wipe_left, zoom_in, whip_pan, light_leak, glitch, zoom_blur, page_curl, crt_power_off. An unknown name is rejected with the reason.',
+      'Deterministic edit: apply a named transition between two adjacent clips, committed immediately (the same operation as the editor\'s transition picker). type is one of ~170 names, e.g. fade, cross_dissolve, dip_to_black, slide_left, push_left, wipe_left, zoom_in, whip_pan, light_leak, glitch, zoom_blur, page_curl, crt_power_off. An unknown name is rejected with the reason. Both layer ids must exist in the project. object_match_cut and parallax_occlusion need face tracking and are refused here — ask autonomous_edit for those.',
     inputSchema: {
       type: 'object',
       properties: {
