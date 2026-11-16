@@ -63,11 +63,12 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 
 ## Capabilities
 
-- Timeline trimming, splitting, hook-first trims to a target length, and face-tracked aspect-ratio reframing.
-- 280+ caption templates, title cards, and motion graphics placed clear of every face.
-- 2D and 3D motion-graphic films, reviewed by an AI critic before they ship.
-- A licensed music and sound-effects library, sound design, voiceover, and loudness-balanced mixing.
-- Color grading, ~100 GPU effect presets, 160+ transitions, speed ramps, and keyframed camera moves.
+- Timeline trimming, splitting, hook-first trims to a target length, non-destructive warp stabilization, and face-tracked aspect-ratio reframing.
+- 280+ caption templates, 59 title-card and graphic templates, 3D extruded bevelled titles, and motion graphics placed clear of every face.
+- 2D and 3D motion-graphic films, reviewed by an AI critic before they ship, plus native After Effects shape layers (Trim Paths, Repeaters, SDF shape modifiers, spatial Bezier motion paths with auto-orient, graph-editor velocity easing, and echo motion trails).
+- Motion tracking: 2D feature-region tracking (position, rotation, scale), live `track_attach` null parenting, hand palm attachment, planar corner-pinning, and 3D camera solve scene anchors.
+- A licensed music and sound-effects library, sound design, voiceover, voice cloning, lip-synced dubbing, harmonic DJ mixing, and EBU R128 loudness-balanced mixing.
+- Color grading and VFX compositing: Keylight screen color key, color range key, spill suppression, monotone cubic curves, CMYK selective color, custom `.cube` 3D LUTs, depth-aware camera lens blur (iris bokeh), clip lens flares, two-tone threshold glow, ordered multi-effect stacks (`fx_stack`), SVG Bezier masks (`mask_path`), track mattes, behind-subject occlusion, 29 blend modes, 328 procedural VFX presets, and 170+ transitions.
 - Every edit checked on the rendered frames, with a typed verification report and MP4 rendering.
 
 ## Response fields

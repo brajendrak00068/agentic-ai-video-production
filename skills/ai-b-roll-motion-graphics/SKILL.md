@@ -64,7 +64,8 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Contextual B-roll placement aligned to transcript timestamps.
-- Animated charts, stat counters, flow diagrams, lower thirds, collage layouts, and text behind the subject.
+- Animated charts, stat counters, flow diagrams, lower thirds, collage layouts, 3D extruded bevelled titles (`title_3d`), and text or graphics placed behind the subject (`occlusion: "behind_subject"`).
+- Native After Effects shape layers with arc-length Trim Paths, Repeaters, SDF shape modifiers (pucker & bloat, zig zag, wiggle paths, round corners, offset paths), spatial Bezier motion paths with auto-orient, graph-editor velocity easing, and echo motion trails.
 - Standalone 2D and 3D character motion-graphic films with camera moves, lighting, music, and sound design.
 - Every graphic placed clear of faces and reviewed by an AI critic against a craft checklist.
 - Picture-in-picture and split-screen layout composition with safe-zone aware positioning.

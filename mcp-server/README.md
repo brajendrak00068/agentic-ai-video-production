@@ -149,24 +149,24 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 - **Safety** — gap healing, audio normalize, duration reconcile (pre-export pass), multi-step undo / redo
 
 ### 🎬 Visual editing
-- **Color grade** — brightness, contrast, saturation, hue, lift/gamma/gain, RGB curves, LUT / film-look presets (including your own .cube files), auto color, shot-to-shot color matching, vignette, chromatic aberration
-- **VFX** — ~100 GPU effect presets: lens flares, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, lens blur, slit-scan, glassmorphism, bokeh, portal, …
-- **Transitions** — 160+ named transitions (wipes, whips, light-band reveals, glitches, CRT power-off, …)
-- **Editing techniques** — speed ramps and time remap, J/L, match, and smash cuts, AI outpainting to a new aspect ratio, eye-contact correction, face retouch
-- **Composite** — chroma key, AI background removal (alpha matte), masking (luma / alpha / depth, with boolean multi-mask)
-- **Blend & opacity** — 29 blend modes (multiply, screen, overlay, color dodge / burn, difference, hue / saturation / color / luminosity, additive) + per-layer & group opacity
-- **Shape & transform** — clip shapes (circle, dome, star, hexagon, polygon), crop, 3D rotation / perspective, glow, shadow, gradient fills
+- **Color grade** — brightness, contrast, saturation, hue, lift/gamma/gain, monotone cubic RGB curves, CMYK per-hue selective color, 5-point histogram levels, LUT / film-look presets (including your own `.cube` 1D/3D files), auto color, shot-to-shot color matching, vignette, chromatic aberration
+- **VFX & optics** — 328 procedural VFX presets + ordered multi-effect stacks (`fx_stack`, up to 4 chained effects per layer), depth-map-driven `camera_lens_blur` (64-tap polygonal iris bokeh + highlight bloom), optical `clip_lens_flare`, After Effects two-tone threshold `glow` (`glow_threshold`, `glow_color_b`, `glow_composite`), layer `echo` motion trails, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, slit-scan, glassmorphism, bokeh, portal, …
+- **Transitions** — 170+ named transitions (wipes, whips, twitch cut hits, light-band reveals, glitches, CRT power-off, …)
+- **Editing techniques** — speed ramps, time remap, and stepped `posterize_time_fps`, J/L, match, and smash cuts, non-destructive warp stabilization (smooth camera path + border-hiding auto-scale), AI outpainting to a new aspect ratio, eye-contact correction, face retouch
+- **Composite** — Keylight-grade `screen_color_key` (with despill, clip black/white, softness, shrink/grow), Lab/YUV/RGB `color_range_key`, `spill_suppressor`, AI background removal (alpha matte), custom SVG Bezier `mask_path`, feathered/inverted mattes, track mattes (`alpha`, `inv_alpha`, `luma`, `inv_luma`), and universal behind-subject occlusion (`occlusion: "behind_subject"`)
+- **Blend & opacity** — all 29 After Effects blend modes (multiply, screen, overlay, color dodge / burn, classic dodge / burn, linear burn / light, vivid / pin light, hard mix, difference, exclusion, subtract, divide, hue / saturation / color / luminosity, additive) + per-layer & group opacity
+- **Shape & transform** — native shape layers with arc-length Trim Paths (`trim_start`, `trim_end`, `trim_offset`, `trim_mode`), After Effects Repeater (`repeater_count`, per-copy offset/scale/rotation, opacity ramp), SDF shape modifiers (pucker & bloat, round corners, zig zag, wiggle paths, offset paths), clip shapes (circle, dome, star, hexagon, polygon), crop, 3D rotation / perspective, spatial Bezier motion paths (`motion_path_svg` + `auto_orient`), and graph-editor velocity/influence easing (`ease_in` / `ease_out`)
 - **Lighting** — up to 8 scene lights illuminating 3D-transformed layers
 - **Reframe & layout** — caption-safe vertical reframe (9:16) + vertical montage, split screen (top/bottom, L/R, PiP, grid)
-- **Track** — motion / face tracking with zoom-follow, hand tracking (an overlay follows the palm), branding overlays
+- **Track** — 2D feature-region tracking (position, rotation, scale), live `track_attach` null parenting, planar corner-pinning, monocular 3D camera solve (`scene_anchor_3d`), face tracking with zoom-follow, hand tracking (an overlay follows the palm), branding overlays
 - **Camera** — keyframed 3D camera moves (push-in, orbit, drift) with depth-based parallax
 
 ### 📊 Motion graphics & data viz
 *Every graphic is placed clear of faces and reviewed by an AI critic before it reaches the timeline:*
 - **Data** — transcript-driven charts (bar, line, pie), stat callouts, animated counters
-- **Lower-thirds & cards** — lower-thirds, title / chapter cards, checklists, keyword pills
+- **Lower-thirds & cards** — lower-thirds, 59 title / chapter / graphic templates, real 3D extruded bevelled titles (`title_3d` with PBR materials, environment lighting, and camera moves), checklists, keyword pills
 - **Diagrams** — flowcharts, timelines, geo callouts
-- **Layouts** — collage layouts, text behind the subject, sticker cut-outs
+- **Layouts** — collage layouts, any-layer behind-the-subject occlusion, sticker cut-outs
 - **Films** — standalone motion-graphic films from one sentence: 2D motion design and 3D character films with camera moves, lighting, music, and sound design
 - **CTAs** — animated subscribe / call-to-action buttons
 
