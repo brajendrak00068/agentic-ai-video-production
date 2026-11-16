@@ -206,6 +206,18 @@
       }
     },
     {
+      "name": "style_reference_url",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "A reference video whose editing style the result should match (pacing, captions, framing, zooms, transitions, grade).",
+      "schema": {
+        "type": "string",
+        "description": "Optional link to a style-reference video (YouTube, TikTok, Instagram, Drive, or a direct file URL). The editor downloads and measures it (cuts, beats, caption look, transitions, grade) and edits the user's footage to match its style. Its footage, wording, logos and music are never reused. Use this instead of pasting the link into the prompt when the link is a reference, not footage to edit."
+      }
+    },
+    {
       "name": "flaggedIssues",
       "placement": "top",
       "surfaces": [

@@ -45,6 +45,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - `editedPlan` (object, optional): The user's edited version of a plan returned by an approval pause.
 - `planDecision` (string, optional): Set to `"approve"` to approve the plan from an approval pause; resend it with that response's `workingMemory`.
 - `attachedImages` (array, optional): Reference image URLs for planning (style, branding).
+- `style_reference_url` (string, optional): A reference video whose editing style the result should match (pacing, captions, framing, zooms, transitions, grade).
 - `flaggedIssues` (array, optional): Specific problems the user flagged that this run must fix.
 - `brandId` (string, optional): Brand kit to apply to this call.
 - `projectBrandId` (string, optional): Default brand kit for the project; persists across calls.

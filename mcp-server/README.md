@@ -303,6 +303,7 @@ curl -sS -X POST "$LEVEA_API_URL/api/v1/misc/openclaw/v1/execute" \
 | `editedPlan` | The user's edited version of a plan returned by an approval pause. |
 | `planDecision` | Set to `"approve"` to approve the plan from an approval pause; resend it with that response's `workingMemory`. |
 | `attachedImages` | Reference image URLs for planning (style, branding). |
+| `style_reference_url` | A reference video whose editing style the result should match (pacing, captions, framing, zooms, transitions, grade). |
 | `flaggedIssues` | Specific problems the user flagged that this run must fix. |
 | `brandId` | Brand kit to apply to this call. |
 | `projectBrandId` | Default brand kit for the project; persists across calls. |
