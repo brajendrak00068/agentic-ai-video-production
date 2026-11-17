@@ -8,9 +8,9 @@ license: MIT
 
 # Levea Video Editing
 
-Use the `levea_video_edit` tool to perform video edits. Send the complete user intent as one natural-language
-`prompt`; the Levea backend plans, executes, verifies, repairs, and exports. Do not split one request into many
-small tool calls.
+Levea supports two editing modes:
+- **Mode A — Goal Delegation (`levea_video_edit`):** Send the complete user intent as one natural-language `prompt`; the Levea backend ReAct agent inspects, executes, verifies, repairs, and exports.
+- **Mode B — Direct Canonical Tools (`levea_search_tools` → `levea_get_action_schema` → `levea_execute_action` / `levea_execute_batch` → `levea_render_preview` → `EXPORT_VIDEO`):** Drive any of the 189+ canonical actions and 13 read tools directly on `project_id`, inspect GPU-composited JPEG screenshots via `levea_render_preview`, and export without invoking the planner.
 
 ## When to use
 

@@ -6,11 +6,13 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 `levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
-## Tools
+## Tools (34 Annotated Tools Unlocking All 189+ Canonical Actions & 13 Read Tools)
 
-The surface is **one agentic edit tool, four deterministic edit tools, plus management & polling**. Anything that needs judgment goes through `autonomous_edit` (the backend planner owns intent decomposition); the four deterministic tools are typed single-step nudges on a project you already have; the rest is typed state-management you'd otherwise have to call raw HTTP for.
+The surface supports **two complementary execution modes** plus typed management & polling:
+- **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's internal **Closed-Loop Multimodal ReAct Agent** (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
+- **Mode B — Universal Direct Canonical Control (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **189+ canonical actions** and **13 read/inspection tools** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
 
-### Edit (1 + 2 variants)
+### Mode A: Goal Delegation (1 + 2 variants)
 
 | Tool | Mutates? | Async? |
 |---|---|---|
@@ -18,16 +20,19 @@ The surface is **one agentic edit tool, four deterministic edit tools, plus mana
 | `autonomous_edit_streaming` (SSE — emits per-step progress notifications) | Yes | Yes |
 | `queue_edit` (fire-and-forget; returns `taskId` for `check_task_status`) | Yes | Yes |
 
-### Deterministic edits (4)
+### Mode B: Universal Direct Canonical Suite (5) + Layer Shortcuts (4)
 
 | Tool | What it does |
 |---|---|
-| `update_layer` | Set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`, …) |
-| `delete_layer` | Delete one or more layers; `close_gap: true` ripples the timeline closed |
-| `trim_layer` | Shorten a layer: `edge` + `seconds`, or an absolute `start_time` + `end_time` |
-| `apply_transition` | Put a named transition (~170 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
-
-Each one runs a single typed action on the project's committed scene and saves it immediately: no planner, no auto-export, seconds not minutes. All four require `project_id`; read layer ids from `get_project` (`project.scene.layers[].id`). A bad request comes back as `isError` naming what it needs; `PROJECT_REVISION_CONFLICT` means the project changed while the edit applied and nothing was saved, so read the project again and retry.
+| `search_tools` | Search all 189+ canonical actions and 13 read tools by keyword/category; returns matching actions and the 5-phase NLE `editorialPlaybook` |
+| `get_action_schema` | Fetch the full JSON `inputSchema` and parameter constraints for any canonical action or read tool |
+| `execute_action` | Execute any single canonical action (all 189+ actions, e.g. `REMOVE_SILENCES`, `VERTICAL_REFRAME`, `COLOR_GRADE`, `GENERATE_CAPTIONS`, `PLAN_MOTION_GRAPHICS`, `GENERATE_MUSIC`, `AUTO_DUCK`, `EXPORT_VIDEO`) or read tool (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, `shot_timeline`, `read_source_transcript`, `measure_audio`, `measure_picture`, `measure_color`) directly on `project_id`. Pass `video_url` or `assets` on the first call to bootstrap a new project |
+| `execute_batch` | Execute an ordered array of `{ action, params }` steps in one atomic round-trip with automatic `SAFE_ZONE_REPAIR`, `FinalTimelineReconciler`, layout de-stacking, async generator harvesting, and project commit |
+| `render_preview` | Render real GPU-composited JPEG screenshots at `timestamps: [...]` (with optional `0..1` `region` crop) showing all live video layers, captions, title cards, grades, and VFX; returns native MCP `image` blocks + `frames[]` so the agent can visually verify frames before `EXPORT_VIDEO` |
+| `update_layer` | Shortcut: set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`, …) |
+| `delete_layer` | Shortcut: delete one or more layers; `close_gap: true` ripples the timeline closed |
+| `trim_layer` | Shortcut: shorten a layer (`edge` + `seconds`, or `start_time` + `end_time`) |
+| `apply_transition` | Shortcut: put a named transition (~170 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
 
 ### Job / task polling (3)
 
@@ -55,13 +60,16 @@ Each one runs a single typed action on the project's committed scene and saves i
 
 Full input schemas are returned by `tools/list` over MCP.
 
-### Why one agentic edit tool (not many)?
+### When to use Mode A (`autonomous_edit`) vs. Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview`)
 
-There is no per-capability shim (`add_captions`, `generate_viral_clips`, `remove_silence`, `export_video`, …) and no `editor_execute` escape hatch in the editing path. The backend planner is the specialist; exposing typed editing shims would encourage calling LLMs to dispatch them in isolation and lose multi-step intent that only the full prompt carries. Send the user's intent to `autonomous_edit` verbatim — the planner picks the right canonical actions (`GENERATE_VIRAL_CLIPS`, `GENERATE_CAPTIONS`, `EXPORT_VIDEO`, …) server-side.
-
-The four deterministic tools are the exception, for a different job: an agent that has already looked at the project and wants one exact change ("move the logo 40 px left", "trim 0.5 s off the end of clip 3") would otherwise pay a full planner run for it. Use them for exact, already-decided changes; use `autonomous_edit` whenever the change needs a decision (what to cut, which look, where things go) or touches many layers.
-
-The non-editing tools (brand kit CRUD, project CRUD, asset upload, caption template CRUD) are **state management**, not editing — they don't decide what to do with the scene, they just give integrators typed access to the surrounding data so they can build full integrations through one API key instead of mixing JWT and MCP.
+- **Use Mode A (`autonomous_edit`)** when the user gives a broad or creative goal ("Turn this podcast into 3 viral TikTok clips with Hormozi captions, B-roll, and music"). One call runs our backend ReAct loop + 100+ craft skills end-to-end.
+- **Use Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`)** when your agent wants 100% direct deterministic control, surgical <50ms tweaks, custom timestamp math from local files, or an interactive `observe → edit → render_preview screenshot → adjust → export` loop without invoking our internal planner.
+- **5-Phase NLE Execution Order for Mode B:**
+  1. **Inspect:** `list_layers`, `query_transcript`, `list_sources`
+  2. **Structure & Cuts:** `CLEAR`, `REGISTER_REMOTE_ASSET`, `SET_SOURCE_RANGE`, `TRIM_LAYER`, `SPLIT_LAYER`, `REMOVE_SILENCES`, `CONFIGURE_CANVAS`, `VERTICAL_REFRAME` *(always cut and resize before adding timed overlays/captions)*
+  3. **Visuals & Overlays:** `COLOR_GRADE`, `APPLY_VFX`, `TITLE_CARD`, `PLAN_MOTION_GRAPHICS`, `GENERATE_CAPTIONS`, `STYLE_CAPTIONS`
+  4. **Audio Mix:** `CLEAN_AUDIO`, `GENERATE_VOICEOVER`, `GENERATE_MUSIC`, `ADD_SFX`, `AUTO_DUCK`
+  5. **Visual Screenshot Check & Deliver:** Call `render_preview` (`RENDER_PREVIEW`) to inspect GPU-composited JPEG screenshots, fix any visual overlap, then call `EXPORT_VIDEO` / `GENERATE_VIRAL_CLIPS`.
 
 ## How to call it well
 

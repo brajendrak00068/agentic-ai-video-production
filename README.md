@@ -63,46 +63,47 @@ Unlike traditional one-shot AI video generators that output locked, un-editable 
 
 ## 🏗️ Platform Architecture
 
-Levea separates probabilistic creative reasoning from deterministic project execution: a language model decides *what* to do, as a typed plan; deterministic code decides *how*, changes the project, and checks the result.
+Levea separates probabilistic creative reasoning from deterministic project execution, and supports **two complementary execution modes** over the exact same **189+ canonical actions**, **13 read/inspection tools**, and **cloud GPU compositor**:
+
+- **Mode A — Goal Delegation (`autonomous_edit`):** Send a natural-language brief; Levea's internal **Closed-Loop Multimodal ReAct Agent** inspects the footage, plans and executes canonical actions iteratively, checks GPU-rendered frames, repairs any issue, and exports.
+- **Mode B — Direct Tool Control (`search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** External agents with their own harness (Claude Code, Cursor, OpenCode, Cline, Hermes) can bypass `autonomous_edit` completely, discover any of the 189+ canonical actions on demand, execute single steps or atomic batches, inspect real GPU-composited JPEG screenshots via `render_preview` (just like `ffmpeg` frame grabs), and export.
 
 ```text
-        Creative Intent + Source Media (video links, transcript, references)
-                                  │
-                                  ▼
-          Production Pipeline + Director Skills
-          (reel, podcast, documentary, motion graphics, …)
-                                  │
-                                  ▼
-        Multimodal Planner (frontier LLM: prompt, transcript, frames, scene)
-                                  │
-                                  ▼
-                Typed Action Plan (189 canonical actions)
-                                  │
-                                  ▼
-     Plan Compiler (schema validation, parameter binding, dependency order)
-                                  │
-                                  ▼
-          Workflow DAG (tasks, dependencies, gates, verifiers)
-                                  │
-                                  ▼
-      Execution Harness ── typed, audited operations ──▶ Scene IR
-      │                                                (timeline, tracks, layers;
-      │                                                 every revision saved)
-      ├── Perception: transcript, faces, active speaker, shot cuts, on-screen text, hand pose, lip-sync scoring
-      ├── Editing: cuts, ripple, slip/slide, reframe, multicam, speed ramps
-      ├── Captions: 280+ templates, word-level sync, Latin/Indic/Arabic/Cyrillic/Greek
-      ├── Audio: licensed music + SFX library, sound design, EBU R128, ducking, voiceover, DJ mixes
-      ├── Motion graphics (HyperFrames): 2D motion design, 3D extruded titles, 3D character films, charts
-      ├── Generation jobs: images, B-roll video, music, voice (async artifacts)
-      └── Rendering (Vulkan / WebGPU): 170+ transitions, 328 procedural VFX, Keylight keying, camera lens blur, Trim Paths & Repeaters
-                                  │
-                                  ▼
-      Verification: each task's checks, then a final review of the rendered frames
-              │  fails                                  ▲
-              └──▶ Repair loop: typed fixes, re-verified ┘
-                                  │ passes (or budget spent: reported, never hidden)
-                                  ▼
-      Editable Scene + verification report ──▶ MP4 / multi-platform export
+         Creative Intent + Source Media (video links, transcript, references)
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                             ▼
+     MODE A: Goal Delegation          MODE B: Direct Tool Control
+   (`autonomous_edit` / `queue_edit`) (`search_tools` / `execute_action`
+                    │                  / `execute_batch` / `render_preview`)
+                    ▼                             │
+   Closed-Loop Multimodal ReAct Agent             │
+   (Inspect ──▶ Act ──▶ Observe ──▶               │
+    Checklist Gate ──▶ Visual QA)                 │
+                    │                             │
+                    └──────────────┬──────────────┘
+                                   ▼
+       Universal Canonical Execution Spine (189+ Actions & 13 Read Tools)
+       (Parameter Normalization + Async Job Auto-Harvest + PowerRegistry)
+                                   │
+                                   ▼
+       Execution Harness ── typed, audited operations ──▶ Scene IR
+       │                                                (timeline, tracks, layers;
+       │                                                 every revision saved)
+       ├── Perception: transcript, faces, active speaker, shot cuts, on-screen text, hand pose, lip-sync scoring
+       ├── Editing: cuts, ripple, slip/slide, reframe, multicam, speed ramps
+       ├── Captions: 280+ templates, word-level sync, Latin/Indic/Arabic/Cyrillic/Greek
+       ├── Audio: licensed music + SFX library, sound design, EBU R128, ducking, voiceover, DJ mixes
+       ├── Motion graphics (HyperFrames): 2D motion design, 3D extruded titles, 3D character films, charts
+       ├── Generation jobs: images, B-roll video, music, voice (auto-harvested onto timeline)
+       └── Rendering (Vulkan / WebGPU): 170+ transitions, 328 procedural VFX, Keylight keying, camera lens blur, Trim Paths & Repeaters
+                                   │
+                                   ▼
+       Automatic NLE Finishing & Visual Screenshot Inspection (`render_preview`)
+       (SAFE_ZONE_REPAIR + FinalTimelineReconciler + Layout De-Stacking + GPU JPEG Frames)
+                                   │
+                                   ▼
+       Editable Scene + verification report ──▶ MP4 / multi-platform export
 ```
 
 ### How the clients connect
@@ -160,11 +161,11 @@ All paths start with `https://api.livecore.ai`.
 | Mistral | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — add as a Le Chat connector |
 | Any remote-MCP client | [Hosted MCP URL](https://api.livecore.ai/api/v1/misc/mcp) — OAuth 2.1 sign-in or `Authorization: Bearer <key>` |
 
-### 1. Pipelines and planning
-Each request is matched to a production pipeline (a short-form reel, a podcast cut, a documentary montage, a motion-graphic film, …) whose director skills give the planner its craft rules. The planner reads the prompt, the transcript, sampled frames, and the current scene, and emits a **typed action plan**: canonical actions with typed parameters, never free-form scene edits.
+### 1. Closed-Loop Multimodal ReAct Agent (Mode A) & Direct Tool Control (Mode B)
+When called via `autonomous_edit`, Levea matches the request to a production pipeline (short-form reel, podcast cut, documentary montage, motion-graphic film, …) and runs a **closed-loop multimodal ReAct agent**: it inspects the transcript, shots, and scene (`list_layers`, `query_transcript`, `search_shots`), executes typed canonical actions, observes the updated timeline state and GPU-rendered frames (`RENDER_PREVIEW`), tracks a master checklist, and iterates until every requirement is satisfied. Alternatively, external agents running their own harness can use `search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` to drive the exact same 189+ canonical actions directly without invoking the internal planner.
 
-### 2. Compilation, Workflow DAG and Scene IR
-The **plan compiler** validates every action against its schema, binds parameters, and orders the work into a **Workflow DAG** of tasks, dependencies, gates, and verifiers. Tasks change the **Scene IR** (the serializable project: canvas, tracks, layers, transitions, effects, assets) only through typed, audited operations, so every edit is inspectable and repeatable, and the project never belongs to the language model.
+### 2. Universal Canonical Execution Spine & Scene IR
+Every action — whether chosen by our internal ReAct agent or called directly by an external agent via `execute_action` / `execute_batch` — passes through the same **Universal Canonical Execution Spine**: forgiving parameter normalization, synchronous auto-harvesting of async generators (`GENERATE_MUSIC`, `GENERATE_VOICEOVER`, `GENERATE_BROLL`, `PLAN_MOTION_GRAPHICS`), and automatic NLE finishing (`SAFE_ZONE_REPAIR`, `FinalTimelineReconciler`, and layout de-stacking). Tasks mutate the **Scene IR** (the serializable project: canvas, tracks, layers, transitions, effects, assets) only through typed, audited operations, so every edit is inspectable and repeatable.
 
 ### 3. Execution Harness
 Typed operators run on the cloud GPU cluster: perception, editing, captions, audio, and rendering through native Vulkan (export) and browser WebGPU (preview) from one shared scene-preparation path. Motion graphics come from HyperFrames: editorial layouts, data charts, stat cards, diagrams, and short 3D character films with their own camera, lighting, music, and sound design. Every motion graphic is reviewed by an AI critic against a craft checklist and revised before it reaches the timeline.
@@ -333,7 +334,7 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | **Editorial reasoning** | You listen and hunt for the climax | Agent surfaces narrative peaks and high-retention moments |
 | **Verification & Repair** | You eyeball it and manually re-render | Every edit is checked on the rendered frames; failures are repaired automatically and reported with a typed verification report |
 | **Multi-platform export** | One render per aspect ratio | TikTok + Reels + Shorts + YouTube in one pass |
-| **Extensibility** | Plugins call external binaries | 189 typed canonical actions orchestrated through a deterministic Workflow DAG |
+| **Extensibility** | Plugins call external binaries | 189+ typed canonical actions & 13 read tools driven by a closed-loop ReAct agent or called directly via `execute_action` / `execute_batch` |
 
 ---
 
@@ -387,20 +388,30 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ---
 
-## 📂 MCP Tool Surface
+## 📂 MCP Tool Surface (34 Annotated Tools Unlocking All 189+ Canonical Actions)
 
-The MCP server (`levea-mcp-server`, 29 tools) exposes one high-level editing entry point, four deterministic single-step edits, and typed management and polling tools. The OpenClaw and Hermes plugins expose the five edit and polling tools.
+The MCP server (`levea-mcp-server`, 34 tools) exposes **both** high-level goal delegation (`autonomous_edit`) **and** direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), alongside typed management and polling tools. The OpenClaw and Hermes plugins expose the same dual-mode editing and discovery surface.
 
 | Group | Tools | Description |
 | --- | --- | --- |
-| **Edit** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Single-entry edit prompts, SSE progress streaming, and asynchronous queuing. |
-| **Deterministic edits** | `update_layer`, `delete_layer`, `trim_layer`, `apply_transition` | One exact change to an existing project (move / fade a layer, delete, trim, add a named transition), saved in seconds with no planner run. For agents that have already decided the change. |
+| **Mode A: Goal Delegation** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Send a natural-language brief; the backend ReAct agent inspects, edits, verifies on rendered frames, and exports. |
+| **Mode B: Universal Direct Canonical Suite (189+ Actions & 13 Read Tools)** | `search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview` | Discover any of the 189+ canonical actions and 13 read tools on demand, execute single actions or atomic batches (with automatic safe-zone repair, timeline reconciliation, and async generator harvesting), and inspect real GPU-composited JPEG screenshots (`render_preview`, like `ffmpeg` frame grabs) without calling `autonomous_edit`. |
+| **Deterministic Layer Shortcuts** | `update_layer`, `delete_layer`, `trim_layer`, `apply_transition` | Fast typed shortcuts for single-layer property updates, deletes, trims, and ~170 named transitions. |
 | **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, generation jobs, and the active task of a project. |
-| **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
+| **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (280+ built-in: Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
 | **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, voice tone, and grading rules. |
 | **Projects** | `list_projects`, `get_project`, `create_project`, `delete_project` | Project workspace management. |
 | **Assets** | `asset_upload_url`, `list_assets`, `delete_asset`, `transcribe_asset` | Signed upload URLs, asset listing and deletion, and transcription. |
 | **Diagnostics** | `editor_health` | Unauthenticated connectivity check. |
+
+### When to Use Mode A (`autonomous_edit`) vs. Mode B (`execute_action` / `execute_batch` / `render_preview`)
+
+| Scenario | Best Mode | Why |
+|---|---|---|
+| Broad creative brief / full video from prompt | **Mode A (`autonomous_edit`)** | Backend ReAct loop + 100+ craft skills handle decomposition, pacing, and verification in 1 call |
+| Exact parameter tweak, custom timestamp math, or local-file-driven script | **Mode B (`execute_action` / `execute_batch`)** | Instant (<50ms), zero backend LLM cost, 100% deterministic control over all 189+ actions |
+| Visual QA loop (like Claude Code `ffmpeg` frame check) | **Mode B (`render_preview` → `execute_action`)** | Returns real GPU-composited JPEG screenshots (`frames[]` + MCP `image` blocks) so your agent can visually verify and nudge layers |
+| Heavy first draft + surgical fine-tuning | **Hybrid (Mode A → Mode B)** | Fast first draft via `autonomous_edit`, instant pixel-level polish via `execute_action` / `render_preview` |
 
 Every edit result carries a `verificationReport` (`verified`, `rejected`, `unverified`, or `not_applicable`, plus each requirement that failed its check and what repair tried) and `qualityNotes`.
 

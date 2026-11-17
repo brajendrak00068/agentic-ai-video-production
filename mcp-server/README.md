@@ -92,14 +92,15 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 
 > Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`.
 
-### Tools the AI sees
+### Tools the AI sees (34 Annotated Tools Unlocking All 189+ Canonical Actions & 13 Read Tools)
 
-**One editing entry point. Everything else is typed state-management and polling** — so integrators can build full editing experiences through one API key instead of mixing JWT and MCP.
+**Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's internal ReAct loop (**Mode A: `autonomous_edit`**) or drive any of the **189+ canonical actions** and **13 read/inspection tools** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
 
 | Group | Tools |
 |---|---|
-| **Edit** (one entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
-| **Deterministic edits** (one typed action each, no planner) | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — exact changes to an existing project, saved immediately; layer ids from `get_project` |
+| **Mode A: Goal Delegation** (1 entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
+| **Mode B: Universal Direct Canonical Suite** (189+ actions & 13 read tools) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) |
+| **Deterministic Layer Shortcuts** | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — fast typed shortcuts for single-layer updates, deletes, trims, and ~170 named transitions |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
 | Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (280+ built-in + your saved) |
 | Brand kits | `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit` (palette · fonts · logo · voice · gradeBias · enforcement) |
@@ -107,9 +108,9 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 | Assets | `asset_upload_url` (signed PUT) · `list_assets` · `delete_asset` · `transcribe_asset` |
 | Diagnostics | `editor_health` |
 
-**No edit shims** (`add_captions`, `generate_viral_clips`, …) and no `editor_execute` escape hatch. The backend's planner is the specialist — fragmenting the editing surface encourages calling LLMs to second-guess the planner and lose multi-step intent. State-management tools (brand / project / asset / caption-template CRUD) aren't editing, so they don't fragment intent — they just give integrators typed access.
+Every direct tool call (`execute_action` / `execute_batch`) runs through the same safety spine as `autonomous_edit`: forgiving parameter normalization, synchronous auto-harvesting of async generators, `SAFE_ZONE_REPAIR`, `FinalTimelineReconciler`, and layout de-stacking.
 
-→ For agent-integration details (schemas, async semantics, error handling, plan approval), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
+→ For agent-integration details (Mode A vs. Mode B, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
 
 ---
 

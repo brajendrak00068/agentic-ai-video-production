@@ -43,9 +43,10 @@ server directly to your Hermes MCP config (see [`mcp.json`](./mcp.json)):
 
 ## Tools
 
-The full `levea-mcp-server` surface (29 tools): the edit tool `autonomous_edit`
-plus streaming, async queue, four deterministic single-step edits
-(`update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), job and task
+The full `levea-mcp-server` surface (34 tools): the high-level ReAct edit tool `autonomous_edit`
+plus streaming, async queue, the universal direct canonical suite (`search_tools`, `get_action_schema`,
+`execute_action`, `execute_batch`, `render_preview` unlocking all 189+ canonical actions and 13 read tools),
+four deterministic layer shortcuts (`update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), job and task
 status, caption templates, brand kits,
-projects, assets, and `editor_health`. One brain, one entry point; see the
+projects, assets, and `editor_health`. See the
 [MCP server README](../mcp-server/README.md).

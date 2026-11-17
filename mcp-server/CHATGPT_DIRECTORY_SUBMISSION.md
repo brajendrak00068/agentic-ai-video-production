@@ -17,7 +17,7 @@ same tools, ~85% shared material).
 | Public MCP endpoint (universal URL — one endpoint for all users) | ✅ **LIVE** — `https://api.livecore.ai/api/v1/misc/mcp` (Streamable HTTP, stateless) |
 | OAuth for MCP | ✅ OAuth 2.1 + PKCE; **RFC 7591 dynamic client registration** (`/api/v1/misc/oauth/register`), RFC 8414 + RFC 9728 well-known metadata, `/openai-apps-challenge` endpoint already in prod |
 | API-key auth for review test creds (no MFA) | ✅ `Authorization: Bearer <key>` — keys never need SMS/email codes |
-| Tool annotations (`readOnlyHint` / `destructiveHint` / `openWorldHint`) | ✅ All 29 tools annotated (`src/server.ts` `TOOL_ANNOTATIONS`); enforced at server build — a tool without annotations throws |
+| Tool annotations (`readOnlyHint` / `destructiveHint` / `openWorldHint`) | ✅ All 34 tools annotated (`src/server.ts` `TOOL_ANNOTATIONS`); enforced at server build — a tool without annotations throws |
 | Logo | ✅ `icon-512.png` (512×512) `[VERIFY: portal's exact logo spec]` |
 | Organization verification | ❌ Human — see §1 |
 | `api.apps.write` permission | ❌ Human — see §1 |
@@ -62,7 +62,7 @@ MCP Server URL:  https://api.livecore.ai/api/v1/misc/mcp
   `[VERIFY: exactly how the portal wants the key delivered — connection setting or
   credential field.]`
 
-**Step 2 — Scan Tools.** Verify the import matches §3 exactly (29 tools, titles,
+**Step 2 — Scan Tools.** Verify the import matches §3 exactly (34 tools, titles,
 annotations, schemas, instructions). If anything is stale or wrong: fix the server,
 deploy, **Scan Tools again**, then submit. Justifications must match the advertised
 annotations — never argue a tool is "functionally read-only" against a
@@ -145,6 +145,11 @@ Source of truth: `src/server.ts` `TOOL_ANNOTATIONS` (2026-11-12). "—" = hint a
 | `delete_asset` | Delete asset | false | true | false | Irreversible deletion of media. |
 | `transcribe_asset` | Transcribe asset | false | false | false | Creates a transcript artifact for an asset already in the caller's account. |
 | `editor_health` | Check editor health | true | — | false | Unauthenticated connectivity probe; returns backend health only. |
+| `search_tools` | Search canonical editor tools | true | — | false | Read-only search over the 189+ canonical actions and 13 read tools plus the editorial playbook. |
+| `get_action_schema` | Get canonical action schema | true | — | false | Read-only JSON schema lookup for a canonical action or read tool. |
+| `execute_action` | Execute canonical editor action | false | true | true | Executes a single canonical action on the project scene (can cut/replace content or fetch caller-supplied media URLs). |
+| `execute_batch` | Execute canonical action batch | false | true | true | Executes an ordered batch of canonical actions on the project scene with automatic finishing and commit. |
+| `render_preview` | Render GPU preview screenshots | true | — | false | Read-only GPU compositor frame grab at specified timestamps; returns JPEG preview screenshots without mutating the project. |
 
 Reads intentionally omit `destructiveHint` (absence = not destructive). If OpenAI's
 scanner prefers an explicit `false`, add it to the `read()` helper, redeploy, rescan.

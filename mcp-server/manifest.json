@@ -2050,6 +2050,370 @@
             "assistant"
           ]
         }
+      },
+      "search_tools": {
+        "description": "Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category. Returns matching actions, parameter lists, and the 5-phase NLE editorialPlaybook (1. Inspect -> 2. Structure & Cuts -> 3. Visuals & Overlays -> 4. Audio Mix -> 5. RENDER_PREVIEW screenshot check & EXPORT_VIDEO). Use this when driving edits directly with execute_action / execute_batch instead of autonomous_edit.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional search keyword (e.g. \"caption\", \"color\", \"trim\", \"music\", \"vfx\", \"export\")."
+            },
+            "category": {
+              "type": "string",
+              "description": "Optional domain/category filter."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max actions to return (default 50)."
+            }
+          },
+          "required": []
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Search canonical editor tools",
+          "readOnlyHint": true,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "get_action_schema": {
+        "description": "Fetch the full JSON inputSchema, parameter constraints, and description for any canonical editor action (e.g. COLOR_GRADE, TRIM_LAYER, GENERATE_CAPTIONS, PLAN_MOTION_GRAPHICS, RENDER_PREVIEW, EXPORT_VIDEO) or read tool (e.g. list_layers, query_transcript, inspect_layer).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Canonical action name or read tool name."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Get canonical action schema",
+          "readOnlyHint": true,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "execute_action": {
+        "description": "Execute any single canonical editor action (all 189+ actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Canonical action name (e.g. REGISTER_REMOTE_ASSET, SET_SOURCE_RANGE, TRIM_LAYER, REMOVE_SILENCES, CONFIGURE_CANVAS, VERTICAL_REFRAME, COLOR_GRADE, APPLY_VFX, TITLE_CARD, PLAN_MOTION_GRAPHICS, GENERATE_CAPTIONS, STYLE_CAPTIONS, CLEAN_AUDIO, GENERATE_VOICEOVER, GENERATE_MUSIC, ADD_SFX, AUTO_DUCK, RENDER_PREVIEW, EXPORT_VIDEO) or read tool name (e.g. list_layers, query_transcript)."
+            },
+            "action_params": {
+              "type": "object",
+              "description": "Parameters for the canonical action (see get_action_schema)."
+            },
+            "project_id": {
+              "type": "string",
+              "description": "Project id for state persistence across calls."
+            },
+            "video_url": {
+              "type": "string",
+              "description": "Optional source video URL to seed a new project."
+            },
+            "assets": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "description": "Optional media assets to seed a new project."
+            },
+            "scene": {
+              "type": "object",
+              "description": "Optional inline scene."
+            },
+            "include_scene": {
+              "type": "boolean",
+              "description": "If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers)."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Execute canonical editor action",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "execute_batch": {
+        "description": "Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs SAFE_ZONE_REPAIR, FinalTimelineReconciler, layout de-stacking, async generator harvesting, and commits the updated scene to project_id.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "actions": {
+              "type": "array",
+              "description": "Ordered list of { action, params } steps to execute.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            },
+            "project_id": {
+              "type": "string",
+              "description": "Project id for state persistence across calls."
+            },
+            "video_url": {
+              "type": "string",
+              "description": "Optional source video URL to seed a new project."
+            },
+            "assets": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "description": "Optional media assets to seed a new project."
+            },
+            "scene": {
+              "type": "object",
+              "description": "Optional inline scene."
+            },
+            "include_scene": {
+              "type": "boolean",
+              "description": "If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers)."
+            }
+          },
+          "required": [
+            "actions"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Execute canonical action batch",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "render_preview": {
+        "description": "Render real GPU-composited JPEG screenshots of the live project timeline at specified timestamps (and optional normalized 0..1 region crop) — the Levea equivalent of ffmpeg frame extraction, showing all video layers, captions, title cards, color grades, masks, and VFX shaders. Returns native MCP image blocks so you can visually inspect the frames before calling EXPORT_VIDEO.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "Project id to render."
+            },
+            "timestamps": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "Timeline timestamps in seconds to capture (e.g. [1.0, 5.0, 12.0])."
+            },
+            "region": {
+              "type": "object",
+              "description": "Optional normalized zoom region { x, y, width, height } in 0..1 coordinates.",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              }
+            },
+            "scene": {
+              "type": "object",
+              "description": "Optional inline scene."
+            }
+          },
+          "required": []
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Render GPU preview screenshots",
+          "readOnlyHint": true,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
       }
     }
   },
@@ -2169,6 +2533,26 @@
     {
       "name": "editor_health",
       "description": "Connectivity diagnostic against LEVEA_API_URL. Unauthenticated."
+    },
+    {
+      "name": "search_tools",
+      "description": "Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category. Returns matching actions, parameter lists, and the 5-phase NLE editorialPlaybook (1. Inspect -> 2. Structure & Cuts -> 3. Visuals & Overlays -> 4. Audio Mix -> 5. RENDER_PREVIEW screenshot check & EXPORT_VIDEO). Use this when driving edits directly with execute_action / execute_batch instead of autonomous_edit."
+    },
+    {
+      "name": "get_action_schema",
+      "description": "Fetch the full JSON inputSchema, parameter constraints, and description for any canonical editor action (e.g. COLOR_GRADE, TRIM_LAYER, GENERATE_CAPTIONS, PLAN_MOTION_GRAPHICS, RENDER_PREVIEW, EXPORT_VIDEO) or read tool (e.g. list_layers, query_transcript, inspect_layer)."
+    },
+    {
+      "name": "execute_action",
+      "description": "Execute any single canonical editor action (all 189+ actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project."
+    },
+    {
+      "name": "execute_batch",
+      "description": "Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs SAFE_ZONE_REPAIR, FinalTimelineReconciler, layout de-stacking, async generator harvesting, and commits the updated scene to project_id."
+    },
+    {
+      "name": "render_preview",
+      "description": "Render real GPU-composited JPEG screenshots of the live project timeline at specified timestamps (and optional normalized 0..1 region crop) — the Levea equivalent of ffmpeg frame extraction, showing all video layers, captions, title cards, color grades, masks, and VFX shaders. Returns native MCP image blocks so you can visually inspect the frames before calling EXPORT_VIDEO."
     }
   ],
   "homepage": "https://livecore.ai/",

@@ -413,6 +413,108 @@ const TOOL_DEFS: Tool[] = [
     description: 'Connectivity diagnostic against LEVEA_API_URL. Unauthenticated.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
+
+  // ── Direct Canonical Tool Suite (Mode B: Bypass autonomous_edit) ─────────
+  {
+    name: 'search_tools',
+    description:
+      'Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category. Returns matching actions, parameter lists, and the 5-phase NLE editorialPlaybook (1. Inspect -> 2. Structure & Cuts -> 3. Visuals & Overlays -> 4. Audio Mix -> 5. RENDER_PREVIEW screenshot check & EXPORT_VIDEO). Use this when driving edits directly with execute_action / execute_batch instead of autonomous_edit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Optional search keyword (e.g. "caption", "color", "trim", "music", "vfx", "export").' },
+        category: { type: 'string', description: 'Optional domain/category filter.' },
+        limit: { type: 'number', description: 'Max actions to return (default 50).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_action_schema',
+    description:
+      'Fetch the full JSON inputSchema, parameter constraints, and description for any canonical editor action (e.g. COLOR_GRADE, TRIM_LAYER, GENERATE_CAPTIONS, PLAN_MOTION_GRAPHICS, RENDER_PREVIEW, EXPORT_VIDEO) or read tool (e.g. list_layers, query_transcript, inspect_layer).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'Canonical action name or read tool name.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'execute_action',
+    description:
+      'Execute any single canonical editor action (all 189+ actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'Canonical action name (e.g. REGISTER_REMOTE_ASSET, SET_SOURCE_RANGE, TRIM_LAYER, REMOVE_SILENCES, CONFIGURE_CANVAS, VERTICAL_REFRAME, COLOR_GRADE, APPLY_VFX, TITLE_CARD, PLAN_MOTION_GRAPHICS, GENERATE_CAPTIONS, STYLE_CAPTIONS, CLEAN_AUDIO, GENERATE_VOICEOVER, GENERATE_MUSIC, ADD_SFX, AUTO_DUCK, RENDER_PREVIEW, EXPORT_VIDEO) or read tool name (e.g. list_layers, query_transcript).' },
+        action_params: { type: 'object', description: 'Parameters for the canonical action (see get_action_schema).' },
+        project_id: { type: 'string', description: 'Project id for state persistence across calls.' },
+        video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
+        assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
+        scene: { type: 'object', description: 'Optional inline scene.' },
+        include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'execute_batch',
+    description:
+      'Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs SAFE_ZONE_REPAIR, FinalTimelineReconciler, layout de-stacking, async generator harvesting, and commits the updated scene to project_id.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actions: {
+          type: 'array',
+          description: 'Ordered list of { action, params } steps to execute.',
+          items: {
+            type: 'object',
+            properties: {
+              action: { type: 'string' },
+              params: { type: 'object' },
+            },
+            required: ['action'],
+          },
+        },
+        project_id: { type: 'string', description: 'Project id for state persistence across calls.' },
+        video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
+        assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
+        scene: { type: 'object', description: 'Optional inline scene.' },
+        include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
+      },
+      required: ['actions'],
+    },
+  },
+  {
+    name: 'render_preview',
+    description:
+      'Render real GPU-composited JPEG screenshots of the live project timeline at specified timestamps (and optional normalized 0..1 region crop) — the Levea equivalent of ffmpeg frame extraction, showing all video layers, captions, title cards, color grades, masks, and VFX shaders. Returns native MCP image blocks so you can visually inspect the frames before calling EXPORT_VIDEO.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Project id to render.' },
+        timestamps: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Timeline timestamps in seconds to capture (e.g. [1.0, 5.0, 12.0]).',
+        },
+        region: {
+          type: 'object',
+          description: 'Optional normalized zoom region { x, y, width, height } in 0..1 coordinates.',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+        },
+        scene: { type: 'object', description: 'Optional inline scene.' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // Human-readable titles + safety hints for every tool (MCP tool annotations).
@@ -426,7 +528,8 @@ type ToolName =
   | 'list_brand_kits' | 'get_brand_kit' | 'create_brand_kit' | 'update_brand_kit' | 'delete_brand_kit'
   | 'list_projects' | 'get_project' | 'create_project' | 'delete_project'
   | 'asset_upload_url' | 'list_assets' | 'delete_asset' | 'transcribe_asset'
-  | 'editor_health';
+  | 'editor_health'
+  | 'search_tools' | 'get_action_schema' | 'execute_action' | 'execute_batch' | 'render_preview';
 
 const read = (title: string): ToolAnnotations => ({ title, readOnlyHint: true, openWorldHint: false });
 const write = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: false, openWorldHint: false });
@@ -466,6 +569,11 @@ const TOOL_ANNOTATIONS = {
   delete_asset: destructive('Delete asset'),
   transcribe_asset: write('Transcribe asset'),
   editor_health: read('Check editor health'),
+  search_tools: read('Search canonical editor tools'),
+  get_action_schema: read('Get canonical action schema'),
+  execute_action: edit('Execute canonical editor action'),
+  execute_batch: edit('Execute canonical action batch'),
+  render_preview: read('Render GPU preview screenshots'),
 } satisfies Record<ToolName, ToolAnnotations>;
 
 export const TOOLS: Tool[] = TOOL_DEFS.map((tool) => {
@@ -519,22 +627,43 @@ const STRUCTURED_TEXT_MAX_CHARS = 60_000;
  * an over-long result says how much was cut and that the full object is in
  * structuredContent.
  */
-function resultContent(text: string, structured: unknown): Array<{ type: 'text'; text: string }> {
-  const blocks: Array<{ type: 'text'; text: string }> = [{ type: 'text', text }];
+type McpContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
+function resultContent(text: string, structured: unknown): McpContentBlock[] {
+  const blocks: McpContentBlock[] = [{ type: 'text', text }];
   if (structured === undefined || structured === null) return blocks;
+  const rawObj = (structured as any)?.raw ?? structured;
+  const mcpBlocks = Array.isArray(rawObj?.mcpContent) ? rawObj.mcpContent : [];
   let json: string;
   try {
-    json = JSON.stringify(structured, null, 2);
+    json = JSON.stringify(structured, (k, v) => {
+      if ((k === 'base64' || k === 'dataUrl' || k === 'frameImages' || k === 'mcpContent') && mcpBlocks.length > 0) {
+        return '[omitted from text block — attached as MCP image block]';
+      }
+      return v;
+    }, 2);
   } catch (err) {
     blocks.push({ type: 'text', text: `(result data could not be serialized as text: ${err instanceof Error ? err.message : String(err)}; it is in structuredContent)` });
     return blocks;
   }
-  if (json === undefined) return blocks;
-  if (json.length > STRUCTURED_TEXT_MAX_CHARS) {
-    const cut = json.length - STRUCTURED_TEXT_MAX_CHARS;
-    json = `${json.slice(0, STRUCTURED_TEXT_MAX_CHARS)}\n… (${cut} more characters cut; the full result is in structuredContent)`;
+  if (json !== undefined) {
+    if (json.length > STRUCTURED_TEXT_MAX_CHARS) {
+      const cut = json.length - STRUCTURED_TEXT_MAX_CHARS;
+      json = `${json.slice(0, STRUCTURED_TEXT_MAX_CHARS)}\n… (${cut} more characters cut; the full result is in structuredContent)`;
+    }
+    blocks.push({ type: 'text', text: json });
   }
-  blocks.push({ type: 'text', text: json });
+  for (const blk of mcpBlocks) {
+    if (blk && blk.type === 'image' && typeof blk.data === 'string' && blk.data.length > 0) {
+      blocks.push({
+        type: 'image',
+        data: blk.data,
+        mimeType: typeof blk.mimeType === 'string' ? blk.mimeType : 'image/jpeg',
+      });
+    }
+  }
   return blocks;
 }
 
@@ -804,10 +933,36 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       return ok(`${h.ok ? '✅ backend reachable' : '❌ backend unreachable'}\n${h.detail}`, h);
     }
 
-    default:
-      return fail(
-        `❌ Unknown MCP tool: ${name}. Available: ${TOOLS.map((t) => t.name).join(', ')}.`
-      );
+    case 'search_tools':
+    case 'get_action_schema':
+    case 'execute_action':
+    case 'execute_batch': {
+      const pid = str(a.project_id) || str(a.projectId);
+      const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
+      const head = r.success === false
+        ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
+        : `✅ ${name}: ${r.observation || r.message || 'completed'}`;
+      return ok(head, r);
+    }
+
+    case 'render_preview': {
+      const pid = str(a.project_id) || str(a.projectId);
+      const r = (await executeDeterministicTool('RENDER_PREVIEW', pid, a, ctx.signal)) as Record<string, unknown>;
+      const head = r.success === false
+        ? `❌ render_preview failed: ${r.error || r.message || 'unknown'}`
+        : `✅ render_preview: ${r.observation || r.message || 'rendered preview frames'}`;
+      return ok(head, r);
+    }
+
+    default: {
+      // Allow calling any of the 189+ canonical actions or 13 read tools directly by name.
+      const pid = str(a.project_id) || str(a.projectId);
+      const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
+      const head = r.success === false
+        ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
+        : `✅ ${name}: ${r.observation || r.message || 'completed'}`;
+      return ok(head, r);
+    }
   }
 }
 

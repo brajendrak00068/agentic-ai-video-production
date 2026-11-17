@@ -567,8 +567,16 @@ export function toOpenClawToolResult(result: EditorResponse) {
   const details = backendStatus && backendStatus !== normalizedStatus
     ? { ...result, backendStatus, status: normalizedStatus }
     : { ...result, status: normalizedStatus };
+  const mcpBlocks = Array.isArray((result as any)?.mcpContent) ? (result as any).mcpContent : [];
+  const imageBlocks = mcpBlocks
+    .filter((blk: any) => blk && blk.type === 'image' && typeof blk.data === 'string' && blk.data.length > 0)
+    .map((blk: any) => ({
+      type: 'image' as const,
+      data: blk.data,
+      mimeType: typeof blk.mimeType === 'string' ? blk.mimeType : 'image/jpeg',
+    }));
   return {
-    content: [{ type: 'text' as const, text: displayMessage(result) }],
+    content: [{ type: 'text' as const, text: displayMessage(result) }, ...imageBlocks],
     // OpenClaw's AgentToolResult contract calls the structured payload
     // `details` (MCP calls the analogous field `structuredContent`). Preserve
     // the entire backend object; clients must not reconstruct state from text.
@@ -577,6 +585,26 @@ export function toOpenClawToolResult(result: EditorResponse) {
     // as backendStatus so normalization never destroys transport evidence.
     details,
   };
+}
+
+export async function handleUniversalToolOperation(
+  toolName: string,
+  params: Record<string, any> = {},
+  context: OperationContext = {},
+): Promise<EditorResponse> {
+  const projectId = firstString(params?.project_id, params?.projectId);
+  const body: Record<string, any> = {
+    tool: toolName,
+    params,
+    ...(projectId ? { projectId, project_id: projectId } : {}),
+    ...(params?.scene !== undefined ? { scene: params.scene } : {}),
+  };
+  return callBackend('POST', '/execute', body, context, {
+    label: toolName,
+    requireMessage: false,
+    requireVerification: false,
+    fallbackProjectId: projectId,
+  });
 }
 
 // Tool input schemas come from the edit contract (contract/edit-contract.json).
@@ -682,6 +710,108 @@ export default definePluginEntry({
       parameters: ACTIVE_TASK_PARAMETERS,
       execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
         toOpenClawToolResult(await handleActiveTaskOperation(String(params?.project_id || ''), { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'search_tools',
+      label: 'Search Canonical Editor Tools',
+      description: 'Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category, and retrieve the 5-phase NLE editorialPlaybook.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Optional search keyword.' },
+          category: { type: 'string', description: 'Optional domain/category filter.' },
+          limit: { type: 'number', description: 'Max actions to return.' },
+        },
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('search_tools', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'get_action_schema',
+      label: 'Get Canonical Action Schema',
+      description: 'Fetch the full JSON inputSchema and parameter constraints for any canonical editor action or read tool.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', minLength: 1, description: 'Canonical action name or read tool name.' },
+        },
+        required: ['action'],
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('get_action_schema', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'execute_action',
+      label: 'Execute Canonical Editor Action',
+      description: 'Execute any single canonical editor action (all 189+ actions) or read tool directly on a project scene without autonomous_edit.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', minLength: 1, description: 'Canonical action name or read tool name.' },
+          action_params: { type: 'object', description: 'Parameters for the canonical action.' },
+          project_id: { type: 'string', description: 'Stable project identifier.' },
+          video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
+          assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
+          scene: { type: 'object', description: 'Optional inline scene.' },
+        },
+        required: ['action'],
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('execute_action', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'execute_batch',
+      label: 'Execute Canonical Action Batch',
+      description: 'Execute an ordered array of canonical actions in one atomic round-trip with automatic safe-zone repair, timeline reconciliation, layout de-stacking, and project commit.',
+      parameters: {
+        type: 'object',
+        properties: {
+          actions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                action: { type: 'string' },
+                params: { type: 'object' },
+              },
+              required: ['action'],
+            },
+          },
+          project_id: { type: 'string', description: 'Stable project identifier.' },
+          video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
+          assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
+          scene: { type: 'object', description: 'Optional inline scene.' },
+        },
+        required: ['actions'],
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('execute_batch', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'render_preview',
+      label: 'Render GPU Preview Screenshots',
+      description: 'Render real GPU-composited JPEG screenshots of the live project timeline at specified timestamps (and optional 0..1 region crop) and return image blocks for visual inspection before EXPORT_VIDEO.',
+      parameters: {
+        type: 'object',
+        properties: {
+          project_id: { type: 'string', description: 'Stable project identifier.' },
+          timestamps: { type: 'array', items: { type: 'number' }, description: 'Timeline timestamps in seconds.' },
+          region: { type: 'object', description: 'Optional normalized zoom region { x, y, width, height } in 0..1.' },
+          scene: { type: 'object', description: 'Optional inline scene.' },
+        },
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('RENDER_PREVIEW', params, { toolCallId, signal })),
     });
   },
 });

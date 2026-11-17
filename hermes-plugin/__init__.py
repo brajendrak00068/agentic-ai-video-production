@@ -424,6 +424,47 @@ def handle_active_task(args: dict, **kwargs) -> str:
         return json.dumps({"success": False, "status": "error", "code": "PLUGIN_ERROR", "message": str(error)})
 
 
+def _handle_universal_tool(tool_name: str, args: dict) -> str:
+    try:
+        args = args or {}
+        project_id = _first_string(args.get("project_id"), args.get("projectId"))
+        body: dict = {"tool": tool_name, "params": args}
+        if project_id:
+            body["projectId"] = project_id
+            body["project_id"] = project_id
+        if "scene" in args and args["scene"] is not None:
+            body["scene"] = args["scene"]
+        res = _call_backend(
+            "POST", "/execute", body, label=tool_name,
+            require_message=False, require_verification=False,
+            fallback_project_id=project_id)
+        if not args.get("include_scene") and isinstance(res, dict):
+            res.pop("scene", None)
+        return _to_tool_result(res)
+    except Exception as error:
+        return json.dumps({"success": False, "status": "error", "code": "PLUGIN_ERROR", "message": str(error)})
+
+
+def handle_search_tools(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("search_tools", args)
+
+
+def handle_get_action_schema(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("get_action_schema", args)
+
+
+def handle_execute_action(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("execute_action", args)
+
+
+def handle_execute_batch(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("execute_batch", args)
+
+
+def handle_render_preview(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("RENDER_PREVIEW", args)
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -487,12 +528,99 @@ ACTIVE_TASK_SCHEMA = {
     },
 }
 
+SEARCH_TOOLS_SCHEMA = {
+    "name": "levea_search_tools",
+    "description": "Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category, and retrieve the 5-phase NLE editorialPlaybook.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Optional search keyword."},
+            "category": {"type": "string", "description": "Optional domain/category filter."},
+            "limit": {"type": "number", "description": "Max actions to return."},
+        },
+        "additionalProperties": False,
+    },
+}
+
+GET_ACTION_SCHEMA_SCHEMA = {
+    "name": "levea_get_action_schema",
+    "description": "Fetch the full JSON inputSchema and parameter constraints for any canonical editor action or read tool.",
+    "parameters": {
+        "type": "object",
+        "properties": {"action": {"type": "string", "minLength": 1, "description": "Canonical action name or read tool name."}},
+        "required": ["action"],
+        "additionalProperties": False,
+    },
+}
+
+EXECUTE_ACTION_SCHEMA = {
+    "name": "levea_execute_action",
+    "description": "Execute any single canonical editor action (all 189+ actions) or read tool directly on a project scene without autonomous_edit.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "minLength": 1, "description": "Canonical action name or read tool name."},
+            "action_params": {"type": "object", "description": "Parameters for the canonical action."},
+            "project_id": _PROJECT_ID,
+            "video_url": {"type": "string", "description": "Optional source video URL to seed a new project."},
+            "assets": {"type": "array", "items": {"type": "object"}, "description": "Optional media assets to seed a new project."},
+            "scene": {"type": "object", "description": "Optional inline scene."},
+        },
+        "required": ["action"],
+        "additionalProperties": False,
+    },
+}
+
+EXECUTE_BATCH_SCHEMA = {
+    "name": "levea_execute_batch",
+    "description": "Execute an ordered array of canonical actions in one atomic round-trip with automatic safe-zone repair, timeline reconciliation, layout de-stacking, and project commit.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "actions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"action": {"type": "string"}, "params": {"type": "object"}},
+                    "required": ["action"],
+                },
+            },
+            "project_id": _PROJECT_ID,
+            "video_url": {"type": "string", "description": "Optional source video URL to seed a new project."},
+            "assets": {"type": "array", "items": {"type": "object"}, "description": "Optional media assets to seed a new project."},
+            "scene": {"type": "object", "description": "Optional inline scene."},
+        },
+        "required": ["actions"],
+        "additionalProperties": False,
+    },
+}
+
+RENDER_PREVIEW_SCHEMA = {
+    "name": "levea_render_preview",
+    "description": "Render real GPU-composited JPEG screenshots of the live project timeline at specified timestamps (and optional 0..1 region crop) for visual inspection before EXPORT_VIDEO.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_id": _PROJECT_ID,
+            "timestamps": {"type": "array", "items": {"type": "number"}, "description": "Timeline timestamps in seconds."},
+            "region": {"type": "object", "description": "Optional normalized zoom region { x, y, width, height } in 0..1."},
+            "scene": {"type": "object", "description": "Optional inline scene."},
+        },
+        "additionalProperties": False,
+    },
+}
+
 _TOOLS = (
     (VIDEO_EDIT_SCHEMA, handle_video_edit, "🎬"),
     (QUEUE_EDIT_SCHEMA, handle_queue_edit, "📥"),
     (JOB_STATUS_SCHEMA, handle_job_status, "📦"),
     (TASK_STATUS_SCHEMA, handle_task_status, "⏳"),
     (ACTIVE_TASK_SCHEMA, handle_active_task, "🔗"),
+    (SEARCH_TOOLS_SCHEMA, handle_search_tools, "🔍"),
+    (GET_ACTION_SCHEMA_SCHEMA, handle_get_action_schema, "📋"),
+    (EXECUTE_ACTION_SCHEMA, handle_execute_action, "⚡"),
+    (EXECUTE_BATCH_SCHEMA, handle_execute_batch, "🚀"),
+    (RENDER_PREVIEW_SCHEMA, handle_render_preview, "🖼️"),
 )
 
 

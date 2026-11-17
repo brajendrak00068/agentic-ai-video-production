@@ -11,8 +11,8 @@ else is paste-ready.
 
 | Requirement | Status |
 |---|---|
-| MCP server (29 tools) | ✅ Published: npm `levea-mcp-server`, registry `io.github.brajendrak00068/levea-mcp-server` |
-| Hosted Streamable HTTP transport (multi-tenant, per-request auth) | ✅ In production via misc-service `src/routes/mcp.routes.ts` (serves this package's 29 tools); `levea-mcp-http-server` binary added for self-host parity |
+| MCP server (34 tools) | ✅ Published: npm `levea-mcp-server`, registry `io.github.brajendrak00068/levea-mcp-server` |
+| Hosted Streamable HTTP transport (multi-tenant, per-request auth) | ✅ In production via misc-service `src/routes/mcp.routes.ts` (serves this package's 34 tools); `levea-mcp-http-server` binary added for self-host parity |
 | **Public hosted endpoint** | ✅ **LIVE** — `https://api.livecore.ai/api/v1/misc/mcp` (Streamable HTTP; OAuth 2.1 + API-key Bearer; RFC 9728 challenge verified 2026-11-05) |
 | OAuth 2.1 | ✅ Built-in authorization server (`McpOAuthService.ts`), scope `levea`; read-only-scope note in §5 |
 | Backend API | ✅ Live: `https://api.livecore.ai/api/v1/misc/openclaw/v1/*` |
@@ -29,7 +29,7 @@ else is paste-ready.
 ## 1. Endpoint — already live (no deployment needed)
 
 The hosted MCP endpoint runs in production today (misc-service `src/routes/mcp.routes.ts`,
-serving this package's 29 tools — no forked tool list):
+serving this package's 34 tools — no forked tool list):
 
 ```
 POST https://api.livecore.ai/api/v1/misc/mcp   (Streamable HTTP, stateless)
@@ -181,9 +181,11 @@ irreversible `delete_*` tools.
 | `list_assets` | Read | none |
 | `list_caption_templates` / `list_brand_kits` / `get_brand_kit` | Read | none |
 | `check_job_status` / `check_task_status` / `get_active_task` | Read | none |
+| `search_tools` / `get_action_schema` / `render_preview` | Read | none (tool discovery, schema lookup, and read-only GPU frame preview) |
 | `autonomous_edit` | **Write** | plans + executes a full edit; may auto-queue an export job; supports `requirePlanApproval` pause-before-execute |
 | `autonomous_edit_streaming` | **Write** | same as above, with per-step progress notifications |
 | `queue_edit` | **Write** | fire-and-forget edit; returns `taskId` |
+| `execute_action` / `execute_batch` | **Write** | runs one or an ordered batch of typed canonical actions on a project's scene with automatic safe-zone repair and timeline reconciliation |
 | `update_layer` / `trim_layer` / `apply_transition` | **Write** | one typed change to an existing project's scene, saved immediately (no planner, no export) |
 | `create_project` | **Write** | creates a project |
 | `create_brand_kit` / `update_brand_kit` | **Write** | brand kit state |

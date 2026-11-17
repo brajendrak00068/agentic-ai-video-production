@@ -18,6 +18,7 @@ Levea is a hosted video editor that is itself an agent: send the user's brief to
 
 ## Tips
 
+- **Mode A vs. Mode B:** Use `autonomous_edit` for broad creative briefs. For surgical <50ms tweaks, custom timestamp math, or direct step-by-step control without the planner, use `search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) → `EXPORT_VIDEO`.
 - Name caption looks in the prompt ("Hormozi-style", "karaoke", "Spotlight") or pass `captionTemplatePreset`; `list_caption_templates` lists exact ids.
 - Brand kits (`list_brand_kits`, `create_brand_kit`) carry colors, fonts, logo, and grading; pass `brandId`.
-- Read-only questions about a video ("what does the transcript say?") go to `autonomous_edit` too and don't trigger an export.
+- Read-only questions about a video ("what does the transcript say?") go to `autonomous_edit` (or `execute_action` with `query_transcript` / `list_layers`) and don't trigger an export.

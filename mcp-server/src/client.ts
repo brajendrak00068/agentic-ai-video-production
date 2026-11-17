@@ -298,38 +298,49 @@ export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal): 
 }
 
 /**
- * Run one deterministic edit tool (update_layer, delete_layer, trim_layer,
- * apply_transition) on a project's committed scene via /v1/execute. One
- * canonical action with typed params, no planner; the backend commits the
- * result to the project and answers 400 naming what a bad request needs.
+ * Run a deterministic or universal canonical tool (update_layer, delete_layer,
+ * trim_layer, apply_transition, search_tools, get_action_schema, execute_action,
+ * execute_batch, render_preview, or any canonical action / read tool) via
+ * /v1/execute without invoking the autonomous_edit planner.
  *
- * The backend echoes the whole edited scene; it is dropped here (the caller
- * reads it with get_project) so a one-layer nudge does not flood the calling
- * model's context. `layerCount` is kept as a cheap sanity signal.
+ * The backend echoes the whole edited scene; unless `params.include_scene === true`
+ * it is dropped here (the caller gets `liveLayers` + `layerCount` and can read
+ * the full scene with `get_project`) so multi-step edits do not flood the
+ * calling model's context window.
  */
 export async function executeDeterministicTool(
   tool: string,
-  projectId: string,
+  projectId: string | undefined,
   params: Record<string, unknown>,
   hostSignal?: AbortSignal,
 ): Promise<unknown> {
   const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
+  const resolvedProjectId = projectId || (typeof params?.project_id === 'string' && params.project_id.trim() ? params.project_id.trim() : undefined);
   try {
     const res = await http2().post(
       v1('/execute'),
-      { tool, params, projectId, project_id: projectId },
+      {
+        tool,
+        params,
+        ...(resolvedProjectId ? { projectId: resolvedProjectId, project_id: resolvedProjectId } : {}),
+        ...(params?.scene !== undefined ? { scene: params.scene } : {}),
+      },
       { signal: call.signal },
     );
     const d = (res.data || {}) as Record<string, unknown>;
     const { scene, ...rest } = d;
     const layers = (scene as { layers?: unknown } | undefined)?.layers;
-    const out: Record<string, unknown> = { ...rest, projectId };
+    const out: Record<string, unknown> = {
+      ...rest,
+      ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}),
+      ...(params?.include_scene === true && scene !== undefined ? { scene } : {}),
+    };
     if (Array.isArray(layers)) out.layerCount = layers.length;
     if (res.status >= 400 && out.success === undefined) out.success = false;
     if (res.status >= 400) out.httpStatus = res.status;
     return out;
   } catch (err) {
-    if (hostSignal?.aborted) return { success: false, status: 'cancelled', error: `Cancelled by the client; ${tool} may still have been applied.`, projectId };
+    if (hostSignal?.aborted) return { success: false, status: 'cancelled', error: `Cancelled by the client; ${tool} may still have been applied.`, ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}) };
     return describeError(err, `execute(${tool})`);
   } finally {
     call.dispose();
