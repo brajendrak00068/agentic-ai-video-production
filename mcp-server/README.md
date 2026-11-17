@@ -59,15 +59,27 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
 
 ### Hosted endpoint — no install
 
-Clients that connect to a remote MCP server by URL (Smithery, Claude / ChatGPT connectors, Cursor remote servers) can skip `npx` entirely:
+Clients that connect to a remote MCP server by URL (Smithery, Claude / ChatGPT connectors, Cursor remote servers, Grok Bot) can skip `npx` entirely:
 
 ```
 URL:    https://api.livecore.ai/api/v1/misc/mcp      (Streamable HTTP, stateless)
-Auth:   OAuth 2.1 sign-in (clients that support it open your Levea account in the browser)
-        or Header: Authorization: Bearer your-key-from-livecore.ai
+Auth:   OAuth 2.1 with PKCE (S256) + Dynamic Client Registration (RFC 7591) — no API key required
+Scope:  levea  (vendor-advertised in RFC 9728 & RFC 8414 metadata)
+        or Header: Authorization: Bearer your-key-from-livecore.ai (optional fallback for non-OAuth clients)
 ```
 
-Same tools, same backend. Clients that can't set headers may pass `?apiKey=...` instead. Every request is authenticated, including the tool list; an unauthenticated call gets `401` with a `WWW-Authenticate` challenge that points OAuth clients at the sign-in flow.
+| OAuth 2.1 / MCP Auth Endpoint | Value |
+|---|---|
+| **MCP Server URL** | `https://api.livecore.ai/api/v1/misc/mcp` |
+| **Protected Resource Metadata (RFC 9728)** | `https://api.livecore.ai/.well-known/oauth-protected-resource/api/v1/misc/mcp` |
+| **Authorization Server Metadata (RFC 8414)** | `https://api.livecore.ai/.well-known/oauth-authorization-server` |
+| **Dynamic Client Registration (RFC 7591)** | `https://api.livecore.ai/api/v1/misc/oauth/register` |
+| **Authorization Endpoint** | `https://api.livecore.ai/api/v1/misc/oauth/authorize` |
+| **Token Endpoint** | `https://api.livecore.ai/api/v1/misc/oauth/token` |
+| **Advertised OAuth Scope** | `levea` (`scopes_supported: ["levea"]`, `code_challenge_methods_supported: ["S256"]`) |
+| **Account & Pricing** | Free tier available (3 cloud edits/month, 720p export, watermark) + paid plans at https://livecore.ai |
+
+Same tools, same backend. OAuth-capable clients (Cursor, Grok Bot, Claude.ai, ChatGPT) register dynamically and open the Levea browser sign-in flow automatically with the `levea` scope — **no API key or client ID is needed** for both listing tools and running video edits. Non-OAuth clients can pass `Authorization: Bearer <LEVEA_API_KEY>` (or `?apiKey=...`). Every request is authenticated; an unauthenticated call returns `401` with `WWW-Authenticate: Bearer realm="levea", resource_metadata="https://api.livecore.ai/.well-known/oauth-protected-resource/api/v1/misc/mcp", scope="levea"`.
 
 Every client calls the **same backend**: this MCP server, the hosted endpoint, the OpenClaw and Hermes plugins, and the ChatGPT action share one tool contract.
 

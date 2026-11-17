@@ -83,6 +83,19 @@ Fields you'll see on success: `success`, `message`, `videoUrl`, `jobId`, `status
 
 ## Auth & config
 
+### 1. Hosted Streamable HTTP MCP (`https://api.livecore.ai/api/v1/misc/mcp`) — OAuth 2.1 (no API key needed)
+
+Remote MCP clients (Cursor, Grok Bot, Claude.ai Connectors, ChatGPT) connect directly to `https://api.livecore.ai/api/v1/misc/mcp` using **MCP OAuth 2.1 with PKCE (`S256`) and Dynamic Client Registration (RFC 7591)**:
+
+- **Advertised OAuth Scope**: `levea`
+- **Protected Resource Metadata (RFC 9728)**: `https://api.livecore.ai/.well-known/oauth-protected-resource/api/v1/misc/mcp`
+- **Authorization Server Metadata (RFC 8414)**: `https://api.livecore.ai/.well-known/oauth-authorization-server`
+- **Dynamic Client Registration (RFC 7591)**: `https://api.livecore.ai/api/v1/misc/oauth/register`
+
+With OAuth 2.1 (`scope="levea"`), no API key or `LEVEA_API_KEY` variable is needed to list tools or run video edits.
+
+### 2. Local stdio MCP (`npx -y levea-mcp-server`) — Bearer API key
+
 Set via the MCP client's `mcpServers[].env`. Canonical (v0.3.0+):
 
 | Var | Required | Value |
