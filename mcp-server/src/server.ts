@@ -418,13 +418,18 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'search_tools',
     description:
-      'Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category. Returns matching actions, parameter lists, and the 5-phase NLE editorialPlaybook (1. Inspect -> 2. Structure & Cuts -> 3. Visuals & Overlays -> 4. Audio Mix -> 5. RENDER_PREVIEW screenshot check & EXPORT_VIDEO). Use this when driving edits directly with execute_action / execute_batch instead of autonomous_edit.',
+      'Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Optional search keyword (e.g. "caption", "color", "trim", "music", "vfx", "export").' },
+        query: { type: 'string', description: 'Optional search keyword (e.g. "karaoke", "hormozi", "lens_blur", "whip_pan", "teal_orange", "chromakey").' },
+        catalog: {
+          type: 'string',
+          enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes'],
+          description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "actions", or "all" (default).',
+        },
         category: { type: 'string', description: 'Optional domain/category filter.' },
-        limit: { type: 'number', description: 'Max actions to return (default 50).' },
+        limit: { type: 'number', description: 'Max items to return (default 50).' },
       },
       required: [],
     },
