@@ -1,7 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.brajendrak00068/levea-mcp-server",
-  "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export",
+  "title": "Levea — Autonomous AI Video Editor (37 Tools, 280+ Caption Templates, OAuth 2.1)",
+  "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export.",
+  "websiteUrl": "https://livecore.ai",
   "status": "active",
   "version": "0.7.0",
   "repository": {
@@ -9,6 +11,13 @@
     "source": "github",
     "subfolder": "mcp-server"
   },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/brajendrak00068/agentic-ai-video-production/main/mcp-server/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
@@ -42,8 +51,8 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Bearer <your Levea API key>. Generate one at https://livecore.ai/?openclaw=1&utm_source=mcp-registry&utm_medium=hosted-mcp&utm_campaign=levea-mcp-server",
-          "isRequired": true,
+          "description": "Bearer <your Levea API key> (or connect with OAuth 2.1). Generate one at https://livecore.ai/?openclaw=1&utm_source=mcp-registry&utm_medium=hosted-mcp&utm_campaign=levea-mcp-server",
+          "isRequired": false,
           "isSecret": true
         }
       ]

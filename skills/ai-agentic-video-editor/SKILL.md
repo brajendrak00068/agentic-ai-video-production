@@ -1,7 +1,7 @@
 ---
 name: ai-agentic-video-editor
-description: "Compile and execute multi-step video editing plans with automated timeline verification."
-version: 1.0.29
+description: "Autonomous timeline AI video editor for TikTok, Reels, YouTube Shorts, and podcasts. Use when editing videos from natural language or canonical actions: smart jump cuts, silence removal, 9:16 active-speaker reframing, 280+ animated captions and subtitles, B-roll cutaways, After Effects motion graphics, VFX keying, color grading, voiceover, audio cleanup, and cloud MP4 export."
+version: 1.0.32
 author: brajendrak00068
 license: MIT
 ---

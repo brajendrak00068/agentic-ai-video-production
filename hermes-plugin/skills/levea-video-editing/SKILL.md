@@ -1,7 +1,7 @@
 ---
 name: levea-video-editing
-description: "Plan, run, and verify video edits with the Levea autonomous editor tools (levea_video_edit, queue and status polling)."
-version: 1.0.0
+description: "AI video editor and autonomous editing agent for TikTok, Reels, YouTube Shorts, and podcasts (levea_video_edit + 189+ canonical actions). Use when the user wants to edit a video, cut silences, add 280+ animated captions or subtitles, reframe 16:9 to 9:16 vertical, insert B-roll, motion graphics, VFX, color grading, voiceover, or export MP4."
+version: 1.0.1
 author: brajendrak00068
 license: MIT
 ---
