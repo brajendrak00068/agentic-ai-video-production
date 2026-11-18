@@ -1,7 +1,7 @@
 ---
 name: ai-b-roll-motion-graphics
-description: "Insert contextual B-roll cutaways, animated data charts, lower thirds, and callout overlays on video timelines."
-version: 1.0.4
+description: "Insert AI B-roll cutaways, explainer video visuals, product demo callouts, documentary archive montages, data charts, lower thirds, and title cards onto video timelines."
+version: 1.0.6
 author: brajendrak00068
 license: MIT
 ---

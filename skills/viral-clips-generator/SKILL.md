@@ -1,7 +1,7 @@
 ---
 name: viral-clips-generator
-description: "Identify high-engagement moments in long-form recordings and extract standalone short-form video clips."
-version: 1.0.4
+description: "Extract viral clips, podcast highlights, UGC ads, and faceless videos from long recordings (Opus Clip / CapCut alternative): trim video, cut video, merge clips, 9:16 reframe, and 280+ kinetic captions."
+version: 1.0.6
 author: brajendrak00068
 license: MIT
 ---

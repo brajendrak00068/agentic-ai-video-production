@@ -1,7 +1,7 @@
 ---
 name: after-effects-motion-graphics
-description: "Author After Effects-grade shape layers with Trim Paths, Repeaters, and SDF modifiers, spatial Bezier motion paths with auto-orient, graph-editor velocity easing, echo trails, and 3D extruded bevelled titles."
-version: 1.0.0
+description: "Create After Effects, Remotion, and HyperFrames motion graphics: title cards, lower thirds, kinetic typography, 3D extruded bevelled titles, shape layers with Trim Paths and Repeaters, Bezier motion paths, and animated charts."
+version: 1.0.1
 author: brajendrak00068
 license: MIT
 ---

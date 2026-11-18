@@ -1,7 +1,7 @@
 ---
 name: tiktok-reels-shorts-editor
-description: "Reframe horizontal 16:9 footage into 9:16 vertical short-form videos with subject tracking and captions."
-version: 1.0.4
+description: "Edit and reframe 16:9 videos into 9:16 vertical short-form videos for TikTok, Instagram Reels, and YouTube Shorts (短视频 / 视频剪辑) with active-speaker face tracking, crop/resize, and 280+ animated captions."
+version: 1.0.6
 author: brajendrak00068
 license: MIT
 ---

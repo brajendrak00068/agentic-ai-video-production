@@ -1,7 +1,7 @@
 ---
 name: silence-removal-audio-cleanup
-description: "Remove dead air, pauses, and filler words from video and audio timelines with automatic music ducking."
-version: 1.0.4
+description: "Remove silences, dead air, pauses, and filler words (um, uh) on word boundaries, clean audio noise, generate AI voiceovers and TTS, add background music and sound effects (SFX), and auto-duck music under speech (-18 LUFS)."
+version: 1.0.6
 author: brajendrak00068
 license: MIT
 ---

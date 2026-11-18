@@ -1,7 +1,7 @@
 ---
 name: motion-tracking-stabilization
-description: "Track 2D regions and points with rotation and scale, attach graphics to hands or live track nulls, solve 3D camera movement for perspective scene anchors, and run non-destructive warp stabilization."
-version: 1.0.0
+description: "Stabilize shaky video (optical-flow warp stabilizer), solve 3D camera tracker anchors (scene_anchor_3d), track 2D regions/points with rotation and scale, and attach graphics or props to moving hands and objects."
+version: 1.0.1
 author: brajendrak00068
 license: MIT
 ---
