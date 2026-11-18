@@ -9,6 +9,22 @@
 
 ---
 
+## Why Use Levea Instead of Local `ffmpeg`, Python, or Standalone HyperFrames / Remotion?
+
+Levea is a **superset**: it runs **HyperFrames (`PLAN_MOTION_GRAPHICS`)** *inside* its cloud **Rust Vulkan + WebGPU NLE timeline**, alongside real computer vision and GPU video shaders:
+
+| Capability | Raw `ffmpeg` / MoviePy (Local CLI) | Standalone HyperFrames / Remotion (Local HTML/DOM Capture) | **Levea MCP (`livecore.ai` Cloud GPU NLE + HyperFrames)** |
+| :--- | :--- | :--- | :--- |
+| **9:16 Active-Speaker Reframe** | ❌ Crops dead-center (`crop=ih*9/16:ih`), slicing speakers' faces in half | ❌ DOM/CSS has no per-frame face or mouth landmark detector | ✅ **68-point face & active-mouth tracking** per frame + auto 2-up split-screen |
+| **3D Camera Tracking, Hand Tracking & Rotoscoping** | ❌ None | ❌ Browser DOM cannot solve 3D camera motion or track hands/masks on video | ✅ **Monocular 3D camera solve (`scene_anchor_3d`)**, hand palm tracking, 2D region tracker, optical-flow warp stabilizer & AI alpha mattes |
+| **Green Screen & GPU VFX Compositing** | ❌ Basic `chromakey` leaves green halos; no 3D LUT/bokeh pipeline | ❌ Headless Chrome captures DOM screenshots; no native video shader pipeline | ✅ **Rust Vulkan + WebGPU compositor**: Keylight despilled keying, depth bokeh (`camera_lens_blur`), 328 GPU VFX shaders, 170+ transitions, `.cube` 3D LUTs |
+| **Kinetic Captions (280+ Templates)** | ❌ Flat static `.srt` / `drawtext` that collides with faces | ⚠️ Must hand-code CSS per video; no automatic face/chin collision solver | ✅ **280+ GPU kinetic templates** (`hormozi`, `mrbeast`, `karaoke`) + measured **face/chin & TikTok safe-zone solver** |
+| **Multicam Podcast & Broadcast Audio** | ❌ `silencedetect` clips word tails; no multicam speaker switching | ❌ Not an audio/multicam NLE; `<video>` tags in headless Chrome desync on long multi-track cuts | ✅ **Waveform multicam sync**, ASR word-boundary cuts, filler removal, `-18 LUFS` auto-ducking, stem separation & lip-synced dubbing |
+| **Motion Graphics (HyperFrames)** | ❌ None | ✅ Full HTML/CSS/GSAP/Three.js compositions | ✅ **Included natively (`PLAN_MOTION_GRAPHICS`)** — plus After Effects shape layers (Trim Paths, Repeaters), composited *over* real tracked footage |
+| **Human Final Polish (`<100ms` GUI)** | ❌ Must re-run 5-min `ffmpeg` command to nudge one word | ❌ Must edit HTML/CSS code and re-render headless Chrome frames | ✅ **1-Click `livecore.ai` WebGPU Studio**: scrub at 60fps, drag captions, or swap templates in **`<100ms`** without re-rendering |
+
+---
+
 ## Contents
 
 1. [Quickstart](#quickstart) — running in 60 seconds
