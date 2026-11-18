@@ -121,6 +121,7 @@ provides_tools:
   - levea_search_skills
   - levea_load_skill
   - levea_read_skill_resource
+  - levea_asset_upload_url
 requires_env:
   - name: LEVEA_API_KEY
     description: "Levea API key (sign in at livecore.ai and generate one from your account)"

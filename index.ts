@@ -98,7 +98,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.2.10';
+const PLUGIN_VERSION = '1.2.11';
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 
@@ -538,6 +538,23 @@ function handleError(error: any, projectIdValue?: string, toolCallIdValue?: stri
   return { ...common, success: false, message: firstString(error?.message) || 'Unknown editor transport error.', code: error?.code || 'TRANSPORT_ERROR' };
 }
 
+const DIRECT_RESULT_TEXT_KEYS = [
+  'actions',
+  'readTools',
+  'catalogs',
+  'editorialPlaybook',
+  'inputSchema',
+  'parameters',
+  'skills',
+  'content',
+  'resource',
+  'liveLayers',
+  'actionsExecuted',
+  'deliverableWarnings',
+  'uploadUrl',
+  'fileUrl',
+] as const;
+
 function displayMessage(result: EditorResponse): string {
   const parts = [result.message];
   if (result.projectId) parts.push(`project: ${result.projectId}`);
@@ -545,6 +562,20 @@ function displayMessage(result: EditorResponse): string {
   if (result.taskId !== undefined) parts.push(`task: ${String(result.taskId)}`);
   if (result.jobId !== undefined) parts.push(`job: ${String(result.jobId)}`);
   if (result.status) parts.push(`status: ${result.status}`);
+  const structuredExtra: Record<string, unknown> = {};
+  for (const key of DIRECT_RESULT_TEXT_KEYS) {
+    if ((result as any)[key] !== undefined) {
+      structuredExtra[key] = (result as any)[key];
+    }
+  }
+  if (Object.keys(structuredExtra).length > 0) {
+    try {
+      const json = JSON.stringify(structuredExtra, null, 2);
+      parts.push(json.length > 50_000 ? `${json.slice(0, 50_000)}\n… (truncated)` : json);
+    } catch {
+      // ignore serialization failure
+    }
+  }
   return parts.join('\n');
 }
 
@@ -592,6 +623,23 @@ export async function handleUniversalToolOperation(
   params: Record<string, any> = {},
   context: OperationContext = {},
 ): Promise<EditorResponse> {
+  if (toolName === 'asset_upload_url') {
+    const fileName = firstString(params?.fileName, params?.filename);
+    if (!fileName) {
+      return { success: false, message: 'Missing required parameter: fileName.', code: 'MISSING_FILE_NAME' };
+    }
+    return callBackend(
+      'POST',
+      '/assets/upload-url',
+      {
+        fileName,
+        ...(params?.contentType ? { contentType: String(params.contentType) } : {}),
+        ...(params?.projectId || params?.project_id ? { projectId: String(params.projectId || params.project_id) } : {}),
+      },
+      context,
+      { label: 'asset_upload_url', requireMessage: false, requireVerification: false },
+    );
+  }
   const projectId = firstString(params?.project_id, params?.projectId);
   const body: Record<string, any> = {
     tool: toolName,
@@ -599,12 +647,17 @@ export async function handleUniversalToolOperation(
     ...(projectId ? { projectId, project_id: projectId } : {}),
     ...(params?.scene !== undefined ? { scene: params.scene } : {}),
   };
-  return callBackend('POST', '/execute', body, context, {
+  const res = await callBackend('POST', '/execute', body, context, {
     label: toolName,
     requireMessage: false,
     requireVerification: false,
     fallbackProjectId: projectId,
   });
+  if (!params?.include_scene && res && typeof res === 'object') {
+    const { scene: _omittedScene, ...rest } = res as Record<string, any>;
+    return rest as EditorResponse;
+  }
+  return res;
 }
 
 // Tool input schemas come from the edit contract (contract/edit-contract.json).
@@ -763,6 +816,7 @@ export default definePluginEntry({
           video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
           assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
           scene: { type: 'object', description: 'Optional inline scene.' },
+          include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response.' },
         },
         required: ['action'],
         additionalProperties: false,
@@ -793,6 +847,7 @@ export default definePluginEntry({
           video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
           assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
           scene: { type: 'object', description: 'Optional inline scene.' },
+          include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response.' },
         },
         required: ['actions'],
         additionalProperties: false,
@@ -867,6 +922,24 @@ export default definePluginEntry({
       },
       execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
         toOpenClawToolResult(await handleUniversalToolOperation('read_skill_resource', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'asset_upload_url',
+      label: 'Get Asset Upload URL',
+      description: 'Generate a presigned PUT upload URL to upload a local video, audio, or image file to Levea cloud storage, then pass the returned fileUrl as video_url or assets.',
+      parameters: {
+        type: 'object',
+        properties: {
+          fileName: { type: 'string', minLength: 1, description: 'File name (e.g. "clip.mp4").' },
+          contentType: { type: 'string', description: 'Optional MIME type (e.g. "video/mp4").' },
+          projectId: { type: 'string', description: 'Optional project identifier.' },
+        },
+        required: ['fileName'],
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('asset_upload_url', params, { toolCallId, signal })),
     });
   },
 });

@@ -477,6 +477,26 @@ def handle_read_skill_resource(args: dict, **kwargs) -> str:
     return _handle_universal_tool("read_skill_resource", args)
 
 
+def handle_asset_upload_url(args: dict, **kwargs) -> str:
+    try:
+        args = args or {}
+        file_name = _first_string(args.get("fileName"), args.get("filename"))
+        if not file_name:
+            return json.dumps({"success": False, "status": "error", "code": "MISSING_FILE_NAME",
+                               "message": "Missing required parameter: fileName."})
+        body: dict = {"fileName": file_name}
+        if args.get("contentType"):
+            body["contentType"] = str(args["contentType"])
+        project_id = _first_string(args.get("projectId"), args.get("project_id"))
+        if project_id:
+            body["projectId"] = project_id
+        return _to_tool_result(_call_backend(
+            "POST", "/assets/upload-url", body, label="asset_upload_url",
+            require_message=False, require_verification=False, fallback_project_id=project_id))
+    except Exception as error:
+        return json.dumps({"success": False, "status": "error", "code": "PLUGIN_ERROR", "message": str(error)})
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -582,6 +602,7 @@ EXECUTE_ACTION_SCHEMA = {
             "video_url": {"type": "string", "description": "Optional source video URL to seed a new project."},
             "assets": {"type": "array", "items": {"type": "object"}, "description": "Optional media assets to seed a new project."},
             "scene": {"type": "object", "description": "Optional inline scene."},
+            "include_scene": {"type": "boolean", "description": "If true, include the full raw scene JSON in the response."},
         },
         "required": ["action"],
         "additionalProperties": False,
@@ -606,6 +627,7 @@ EXECUTE_BATCH_SCHEMA = {
             "video_url": {"type": "string", "description": "Optional source video URL to seed a new project."},
             "assets": {"type": "array", "items": {"type": "object"}, "description": "Optional media assets to seed a new project."},
             "scene": {"type": "object", "description": "Optional inline scene."},
+            "include_scene": {"type": "boolean", "description": "If true, include the full raw scene JSON in the response."},
         },
         "required": ["actions"],
         "additionalProperties": False,
@@ -668,6 +690,21 @@ READ_SKILL_RESOURCE_SCHEMA = {
     },
 }
 
+ASSET_UPLOAD_URL_SCHEMA = {
+    "name": "levea_asset_upload_url",
+    "description": "Generate a presigned PUT upload URL to upload a local video, audio, or image file to Levea cloud storage, then pass the returned fileUrl as video_url or assets.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "fileName": {"type": "string", "minLength": 1, "description": "File name (e.g. 'clip.mp4')."},
+            "contentType": {"type": "string", "description": "Optional MIME type (e.g. 'video/mp4')."},
+            "projectId": {"type": "string", "description": "Optional project identifier."},
+        },
+        "required": ["fileName"],
+        "additionalProperties": False,
+    },
+}
+
 _TOOLS = (
     (VIDEO_EDIT_SCHEMA, handle_video_edit, "🎬"),
     (QUEUE_EDIT_SCHEMA, handle_queue_edit, "📥"),
@@ -682,6 +719,7 @@ _TOOLS = (
     (SEARCH_SKILLS_SCHEMA, handle_search_skills, "📚"),
     (LOAD_SKILL_SCHEMA, handle_load_skill, "📖"),
     (READ_SKILL_RESOURCE_SCHEMA, handle_read_skill_resource, "📄"),
+    (ASSET_UPLOAD_URL_SCHEMA, handle_asset_upload_url, "☁️"),
 )
 
 
