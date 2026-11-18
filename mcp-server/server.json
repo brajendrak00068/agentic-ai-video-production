@@ -22,7 +22,7 @@
     {
       "registryType": "npm",
       "identifier": "levea-mcp-server",
-      "version": "0.7.1",
+      "version": "0.6.8",
       "transport": {
         "type": "stdio"
       },

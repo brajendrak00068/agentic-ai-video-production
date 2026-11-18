@@ -1,7 +1,7 @@
 ---
 name: vfx-compositing-keying
 description: "Composite video layers with green screen chroma key (Keylight spill suppression), AI background removal without green screen, rotoscoping, color grading, .cube 3D LUTs, depth bokeh camera lens blur, glow, face blur, watermark removal, Bezier masks, and 328 GPU VFX."
-version: 1.0.2
+version: 1.0.3
 author: brajendrak00068
 license: MIT
 ---
