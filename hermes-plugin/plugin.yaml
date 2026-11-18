@@ -1,5 +1,5 @@
 name: levea-video-editor
-version: 1.1.3
+version: 1.1.4
 manifest_version: 2
 description: "AI video editor and agentic video editing agent via Levea: a podcast editor, podcast clips maker and social media video editor that turns long-form videos, podcasts and interviews into short-form viral clips, podcast highlights, YouTube Shorts, Instagram Reels and TikToks from one natural-language prompt. Describe the edit in plain language (trim, 9:16 vertical video reframe with active-speaker face tracking, automatic animated captions, B-roll, multicam podcast editing, audio cleanup, AI voiceover, color grading, motion graphics, MP4 export) and get a verified, publish-ready MP4. Video repurposing and content repurposing for creators, podcasters and YouTubers. Includes durable queue and status polling tools."
 author: brajendrak00068
@@ -113,6 +113,14 @@ provides_tools:
   - levea_job_status
   - levea_task_status
   - levea_active_task
+  - levea_search_tools
+  - levea_get_action_schema
+  - levea_execute_action
+  - levea_execute_batch
+  - levea_render_preview
+  - levea_search_skills
+  - levea_load_skill
+  - levea_read_skill_resource
 requires_env:
   - name: LEVEA_API_KEY
     description: "Levea API key (sign in at livecore.ai and generate one from your account)"

@@ -17,7 +17,7 @@ same tools, ~85% shared material).
 | Public MCP endpoint (universal URL — one endpoint for all users) | ✅ **LIVE** — `https://api.livecore.ai/api/v1/misc/mcp` (Streamable HTTP, stateless) |
 | OAuth for MCP | ✅ OAuth 2.1 + PKCE; **RFC 7591 dynamic client registration** (`/api/v1/misc/oauth/register`), RFC 8414 + RFC 9728 well-known metadata, `/openai-apps-challenge` endpoint already in prod |
 | API-key auth for review test creds (no MFA) | ✅ `Authorization: Bearer <key>` — keys never need SMS/email codes |
-| Tool annotations (`readOnlyHint` / `destructiveHint` / `openWorldHint`) | ✅ All 34 tools annotated (`src/server.ts` `TOOL_ANNOTATIONS`); enforced at server build — a tool without annotations throws |
+| Tool annotations (`readOnlyHint` / `destructiveHint` / `openWorldHint`) | ✅ All 37 tools annotated (`src/server.ts` `TOOL_ANNOTATIONS`); enforced at server build — a tool without annotations throws |
 | Logo | ✅ `icon-512.png` (512×512) `[VERIFY: portal's exact logo spec]` |
 | Organization verification | ❌ Human — see §1 |
 | `api.apps.write` permission | ❌ Human — see §1 |
@@ -62,7 +62,7 @@ MCP Server URL:  https://api.livecore.ai/api/v1/misc/mcp
   `[VERIFY: exactly how the portal wants the key delivered — connection setting or
   credential field.]`
 
-**Step 2 — Scan Tools.** Verify the import matches §3 exactly (34 tools, titles,
+**Step 2 — Scan Tools.** Verify the import matches §3 exactly (37 tools, titles,
 annotations, schemas, instructions). If anything is stale or wrong: fix the server,
 deploy, **Scan Tools again**, then submit. Justifications must match the advertised
 annotations — never argue a tool is "functionally read-only" against a

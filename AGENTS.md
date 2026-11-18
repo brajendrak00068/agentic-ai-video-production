@@ -6,11 +6,11 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 `levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
-## Tools (34 Annotated Tools Unlocking All 189+ Canonical Actions & 13 Read Tools)
+## Tools (37 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
 
 The surface supports **two complementary execution modes** plus typed management & polling:
 - **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's internal **Closed-Loop Multimodal ReAct Agent** (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
-- **Mode B — Universal Direct Canonical Control (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **189+ canonical actions** and **13 read/inspection tools** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
+- **Mode B — Universal Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **189+ canonical actions**, **13 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
 
 ### Mode A: Goal Delegation (1 + 2 variants)
 
@@ -20,15 +20,18 @@ The surface supports **two complementary execution modes** plus typed management
 | `autonomous_edit_streaming` (SSE — emits per-step progress notifications) | Yes | Yes |
 | `queue_edit` (fire-and-forget; returns `taskId` for `check_task_status`) | Yes | Yes |
 
-### Mode B: Universal Direct Canonical Suite (5) + Layer Shortcuts (4)
+### Mode B: Universal Direct Canonical Suite (8) + Layer Shortcuts (4)
 
 | Tool | What it does |
 |---|---|
-| `search_tools` | Search all 189+ canonical actions and 13 read tools by keyword/category; returns matching actions and the 5-phase NLE `editorialPlaybook` |
+| `search_tools` | Search all 189+ canonical actions, 13 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`, `properties`, `animatable`); returns matching actions/presets and the 5-phase NLE `editorialPlaybook` |
 | `get_action_schema` | Fetch the full JSON `inputSchema` and parameter constraints for any canonical action or read tool |
 | `execute_action` | Execute any single canonical action (all 189+ actions, e.g. `REMOVE_SILENCES`, `VERTICAL_REFRAME`, `COLOR_GRADE`, `GENERATE_CAPTIONS`, `PLAN_MOTION_GRAPHICS`, `GENERATE_MUSIC`, `AUTO_DUCK`, `EXPORT_VIDEO`) or read tool (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, `shot_timeline`, `read_source_transcript`, `measure_audio`, `measure_picture`, `measure_color`) directly on `project_id`. Pass `video_url` or `assets` on the first call to bootstrap a new project |
 | `execute_batch` | Execute an ordered array of `{ action, params }` steps in one atomic round-trip with automatic `SAFE_ZONE_REPAIR`, `FinalTimelineReconciler`, layout de-stacking, async generator harvesting, and project commit |
 | `render_preview` | Render real GPU-composited JPEG screenshots at `timestamps: [...]` (with optional `0..1` `region` crop) showing all live video layers, captions, title cards, grades, and VFX; returns native MCP `image` blocks + `frames[]` so the agent can visually verify frames before `EXPORT_VIDEO` |
+| `search_skills` | Search 100+ production craft skills (`SKILL.md` playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) |
+| `load_skill` | Load the full craft playbook (`SKILL.md`) and bundled resource list for one or more skill IDs |
+| `read_skill_resource` | Read a bundled reference or template file belonging to a production skill |
 | `update_layer` | Shortcut: set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`, …) |
 | `delete_layer` | Shortcut: delete one or more layers; `close_gap: true` ripples the timeline closed |
 | `trim_layer` | Shortcut: shorten a layer (`edge` + `seconds`, or `start_time` + `end_time`) |

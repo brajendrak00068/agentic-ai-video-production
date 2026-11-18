@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
-PLUGIN_VERSION = "1.1.3"
+PLUGIN_VERSION = "1.1.4"
 TOOLSET = "levea_video_editor"
 DEFAULT_API_URL = "https://api.livecore.ai"
 def _env_seconds(name: str, fallback: float) -> float:
@@ -465,6 +465,18 @@ def handle_render_preview(args: dict, **kwargs) -> str:
     return _handle_universal_tool("RENDER_PREVIEW", args)
 
 
+def handle_search_skills(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("search_skills", args)
+
+
+def handle_load_skill(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("load_skill", args)
+
+
+def handle_read_skill_resource(args: dict, **kwargs) -> str:
+    return _handle_universal_tool("read_skill_resource", args)
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -530,11 +542,16 @@ ACTIVE_TASK_SCHEMA = {
 
 SEARCH_TOOLS_SCHEMA = {
     "name": "levea_search_tools",
-    "description": "Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category, and retrieve the 5-phase NLE editorialPlaybook.",
+    "description": "Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable) by keyword, category, or catalog filter, and retrieve the 5-phase NLE editorialPlaybook.",
     "parameters": {
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "Optional search keyword."},
+            "catalog": {
+                "type": "string",
+                "enum": ["all", "actions", "captions", "vfx", "transitions", "color_presets", "title_cards", "fonts", "blend_modes", "properties", "animatable"],
+                "description": "Optional catalog filter: captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable, actions, or all.",
+            },
             "category": {"type": "string", "description": "Optional domain/category filter."},
             "limit": {"type": "number", "description": "Max actions to return."},
         },
@@ -610,6 +627,47 @@ RENDER_PREVIEW_SCHEMA = {
     },
 }
 
+SEARCH_SKILLS_SCHEMA = {
+    "name": "levea_search_skills",
+    "description": "Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Search keyword."},
+            "category": {"type": "string", "description": "Optional category filter."},
+            "limit": {"type": "number", "description": "Max skills to return."},
+        },
+        "additionalProperties": False,
+    },
+}
+
+LOAD_SKILL_SCHEMA = {
+    "name": "levea_load_skill",
+    "description": "Load the full craft playbook (SKILL.md) and bundled resource list for one or more skill IDs returned by levea_search_skills.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "skill_id": {"type": "string", "description": "Skill ID to load."},
+            "skill_ids": {"type": "array", "items": {"type": "string"}, "description": "Optional array of skill IDs to load."},
+        },
+        "additionalProperties": False,
+    },
+}
+
+READ_SKILL_RESOURCE_SCHEMA = {
+    "name": "levea_read_skill_resource",
+    "description": "Read a bundled reference or template file belonging to a production skill.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "skill_id": {"type": "string", "description": "Skill ID that owns the resource."},
+            "resource": {"type": "string", "minLength": 1, "description": "Relative path of the resource inside the skill."},
+        },
+        "required": ["resource"],
+        "additionalProperties": False,
+    },
+}
+
 _TOOLS = (
     (VIDEO_EDIT_SCHEMA, handle_video_edit, "🎬"),
     (QUEUE_EDIT_SCHEMA, handle_queue_edit, "📥"),
@@ -621,6 +679,9 @@ _TOOLS = (
     (EXECUTE_ACTION_SCHEMA, handle_execute_action, "⚡"),
     (EXECUTE_BATCH_SCHEMA, handle_execute_batch, "🚀"),
     (RENDER_PREVIEW_SCHEMA, handle_render_preview, "🖼️"),
+    (SEARCH_SKILLS_SCHEMA, handle_search_skills, "📚"),
+    (LOAD_SKILL_SCHEMA, handle_load_skill, "📖"),
+    (READ_SKILL_RESOURCE_SCHEMA, handle_read_skill_resource, "📄"),
 )
 
 

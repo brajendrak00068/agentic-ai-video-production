@@ -388,9 +388,9 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ---
 
-## 📂 MCP Tool Surface (34 Annotated Tools Unlocking All 189+ Canonical Actions)
+## 📂 MCP Tool Surface (37 Annotated Tools Unlocking All 189+ Canonical Actions)
 
-The MCP server (`levea-mcp-server`, 34 tools) exposes **both** high-level goal delegation (`autonomous_edit`) **and** direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), alongside typed management and polling tools. The OpenClaw and Hermes plugins expose the same dual-mode editing and discovery surface.
+The MCP server (`levea-mcp-server`, 37 tools) exposes **both** high-level goal delegation (`autonomous_edit`) **and** direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), alongside typed management and polling tools. The OpenClaw and Hermes plugins expose the same dual-mode editing and discovery surface.
 
 | Group | Tools | Description |
 | --- | --- | --- |

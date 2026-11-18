@@ -98,7 +98,7 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.2.7';
+const PLUGIN_VERSION = '1.2.9';
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 
@@ -715,11 +715,16 @@ export default definePluginEntry({
     api.registerTool({
       name: 'search_tools',
       label: 'Search Canonical Editor Tools',
-      description: 'Search all 189+ canonical video editing actions and 13 read/inspection tools by keyword or category, and retrieve the 5-phase NLE editorialPlaybook.',
+      description: 'Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable) by keyword, category, or catalog filter, and retrieve the 5-phase NLE editorialPlaybook.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Optional search keyword.' },
+          query: { type: 'string', description: 'Optional search keyword (e.g. "karaoke", "hormozi", "lens_blur", "whip_pan", "teal_orange", "chromakey").' },
+          catalog: {
+            type: 'string',
+            enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes', 'properties', 'animatable'],
+            description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
+          },
           category: { type: 'string', description: 'Optional domain/category filter.' },
           limit: { type: 'number', description: 'Max actions to return.' },
         },
@@ -812,6 +817,56 @@ export default definePluginEntry({
       },
       execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
         toOpenClawToolResult(await handleUniversalToolOperation('RENDER_PREVIEW', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'search_skills',
+      label: 'Search Production Craft Skills',
+      description: 'Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search keyword (e.g. "color", "caption", "podcast", "montage", "motion").' },
+          category: { type: 'string', description: 'Optional category filter.' },
+          limit: { type: 'number', description: 'Max skills to return (default 20).' },
+        },
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('search_skills', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'load_skill',
+      label: 'Load Production Craft Skill',
+      description: 'Load the full craft playbook (SKILL.md) and bundled resource list for one or more skill IDs returned by search_skills.',
+      parameters: {
+        type: 'object',
+        properties: {
+          skill_id: { type: 'string', description: 'Skill ID to load (e.g. "color-grading-finishing", "caption-typography").' },
+          skill_ids: { type: 'array', items: { type: 'string' }, description: 'Optional array of skill IDs to load.' },
+        },
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('load_skill', params, { toolCallId, signal })),
+    });
+
+    api.registerTool({
+      name: 'read_skill_resource',
+      label: 'Read Skill Reference Resource',
+      description: 'Read a bundled reference or template file (e.g. "references/..." or "templates/...") belonging to a production skill.',
+      parameters: {
+        type: 'object',
+        properties: {
+          skill_id: { type: 'string', description: 'Skill ID that owns the resource.' },
+          resource: { type: 'string', minLength: 1, description: 'Relative path of the resource inside the skill.' },
+        },
+        required: ['resource'],
+        additionalProperties: false,
+      },
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
+        toOpenClawToolResult(await handleUniversalToolOperation('read_skill_resource', params, { toolCallId, signal })),
     });
   },
 });

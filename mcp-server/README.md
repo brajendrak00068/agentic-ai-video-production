@@ -92,7 +92,7 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 
 > Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`.
 
-### Tools the AI sees (34 Annotated Tools Unlocking All 189+ Canonical Actions & 13 Read Tools)
+### Tools the AI sees (37 Annotated Tools Unlocking All 189+ Canonical Actions & 13 Read Tools)
 
 **Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's internal ReAct loop (**Mode A: `autonomous_edit`**) or drive any of the **189+ canonical actions** and **13 read/inspection tools** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
 
