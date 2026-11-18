@@ -1,7 +1,7 @@
 ---
 name: ai-video-editor
-description: "Edit video timelines with trimming, captions, aspect-ratio reframing, color grading, and MP4 export."
-version: 1.1.9
+description: "AI video editor for TikTok, Reels, YouTube Shorts, and podcasts (37 MCP tools, 280+ animated caption templates, 189+ canonical actions). Use when the user wants to edit a video, cut silences, generate viral clips, reframe 16:9 to 9:16 vertical, add word-by-word captions or subtitles, edit multicam podcasts, insert B-roll, motion graphics, VFX, chroma key, color grading, voiceover, music, or export MP4."
+version: 1.2.0
 author: brajendrak00068
 license: MIT
 ---
