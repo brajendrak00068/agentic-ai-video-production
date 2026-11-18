@@ -24,6 +24,33 @@
 
 ---
 
+## 🚀 30-Second Quick Connect (Claude · ChatGPT · Claude Code · Cursor · OpenClaw · Hermes)
+
+| Where You Work | How to Connect Levea (Copy & Paste) |
+| :--- | :--- |
+| **Claude.ai (Web / Desktop / Mobile)** | **Settings → Connectors → Add custom connector** → Paste **`https://api.livecore.ai/api/v1/misc/mcp`** → Sign in with OAuth 2.1 (zero install). |
+| **ChatGPT (Web / Desktop Connectors)** | **Settings → Connectors → Create** → MCP Server URL: **`https://api.livecore.ai/api/v1/misc/mcp`** (OAuth 2.1 + PKCE automatic). Or use [`chatgpt/openapi.yaml`](./chatgpt/openapi.yaml) for Custom GPT Actions. |
+| **Claude Code (CLI / IDE)** | Run `/plugin marketplace add brajendrak00068/agentic-ai-video-production` then `/plugin install levea-video-editor` (or `claude mcp add --transport http levea https://api.livecore.ai/api/v1/misc/mcp`). |
+| **Claude Desktop (1-Click `.mcpb`)** | Download [`levea-mcp-server-0.7.0.mcpb`](https://github.com/brajendrak00068/agentic-ai-video-production/releases/latest/download/levea-mcp-server-0.7.0.mcpb) and double-click to install in Claude Desktop. |
+| **Cursor / Windsurf / Cline** | Add remote MCP **`https://api.livecore.ai/api/v1/misc/mcp`** (OAuth 2.1) or stdio `npx -y levea-mcp-server` with `LEVEA_API_KEY` from [livecore.ai](https://livecore.ai/?openclaw=1). |
+| **OpenClaw / ClawHub** | `openclaw plugins install clawhub:openclaw-ai-video-editor` + `clawhub install levea-ai-video-editor` |
+| **NousResearch Hermes** | `hermes plugins install levea-video-editor && hermes plugins enable levea-video-editor` |
+| **Agent Skills CLI (`npx skills`)** | `npx skills add brajendrak00068/agentic-ai-video-production` |
+
+### Why Use Levea Inside Claude Code / Cursor Instead of Local `ffmpeg` or Python?
+
+When you ask Claude Code or Cursor to edit a video using local `ffmpeg` or MoviePy, it runs blind shell commands on your CPU. With **Levea MCP (37 tools, 189+ canonical actions, 100+ craft skills)**, Claude gets a cloud **WebGPU / Vulkan NLE engine** plus visual frame verification (`render_preview`):
+
+| Editing Task | Raw `ffmpeg` / Python in Claude Code | Levea MCP Inside Claude / ChatGPT / Cursor |
+| :--- | :--- | :--- |
+| **9:16 Vertical Reframe** | `ffmpeg crop=ih*9/16:ih` crops dead-center and **slices the speaker's face in half** when they move or when 2 people talk. | `VERTICAL_REFRAME` tracks **active-speaker face & mouth landmarks per frame** and auto-switches to 2-up split-screen. |
+| **Animated Captions** | Flat static `.srt` subtitles that crash on missing fonts or cover the speaker's face and TikTok UI buttons. | **280+ GPU-accelerated kinetic templates** (`hormozi`, `mrbeast`, `karaoke`, `viral-pop`) with word-level ASR pops & face avoidance. |
+| **Silence & Viral Clip Cuts** | Decibel threshold cuts mid-breath and cannot find viral hooks or strip filler words (`um`, `uh`). | Cuts on **ASR word boundaries** (`REMOVE_SILENCES`) and extracts top-retention hooks (`GENERATE_VIRAL_CLIPS`). |
+| **B-Roll, Motion Graphics & VFX** | Cannot source B-roll, track 3D cameras, suppress green-screen spill, or render After Effects shape layers. | `PLAN_MOTION_GRAPHICS`, `APPLY_VFX` (**328+ GPU shaders**, Keylight chroma key, 3D camera tracker), `COLOR_GRADE` (50+ LUTs), `AUTO_DUCK`. |
+| **Visual QA & Human Polish** | Blind execution (`exit 0` even if text is cut off); requires a 5-min re-encode to nudge one word. | **`render_preview`** returns real GPU-composited JPEG frames to Claude before export, plus a 1-click **`livecore.ai` WebGPU studio** link for `<100ms` manual tweaks. |
+
+---
+
 ## 🧭 How Levea Routes Your Request
 
 Every request is first classified into **one production type**, from your prompt *and* your footage (is there speech? faces? one long recording or many short clips?). Each production type maps to exactly **one production pipeline**, and the pipeline decides which editing craft (director skills) the planner works with. The planner can still load extra skills while it reviews your footage.
