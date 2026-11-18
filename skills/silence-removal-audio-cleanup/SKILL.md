@@ -1,7 +1,7 @@
 ---
 name: silence-removal-audio-cleanup
 description: "Remove silences, dead air, pauses, and filler words (um, uh) on word boundaries, clean audio noise, generate AI voiceovers and TTS, add background music and sound effects (SFX), and auto-duck music under speech (-18 LUFS)."
-version: 1.0.6
+version: 1.0.7
 author: brajendrak00068
 license: MIT
 ---
@@ -28,7 +28,7 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## Tool interface
 
-Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.
+Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control.
 
 ### Tool parameters
 

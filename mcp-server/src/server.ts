@@ -467,7 +467,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_batch',
     description:
-      'Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs SAFE_ZONE_REPAIR, FinalTimelineReconciler, layout de-stacking, async generator harvesting, and commits the updated scene to project_id.',
+      'Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs safe-zone checks, timeline reconciliation, layout de-stacking, async asset completion, and commits the updated scene to project_id.',
     inputSchema: {
       type: 'object',
       properties: {

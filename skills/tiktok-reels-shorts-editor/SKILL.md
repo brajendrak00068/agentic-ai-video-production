@@ -1,7 +1,7 @@
 ---
 name: tiktok-reels-shorts-editor
 description: "Edit and reframe 16:9 videos into 9:16 vertical short-form videos for TikTok, Instagram Reels, and YouTube Shorts (短视频 / 视频剪辑) with active-speaker face tracking, crop/resize, and 280+ animated captions."
-version: 1.0.6
+version: 1.0.7
 author: brajendrak00068
 license: MIT
 ---
@@ -28,7 +28,7 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## Tool interface
 
-Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.
+Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control.
 
 ### Tool parameters
 

@@ -1,7 +1,7 @@
 ---
 name: motion-tracking-stabilization
-description: "Stabilize shaky video (optical-flow warp stabilizer), solve 3D camera tracker anchors (scene_anchor_3d), track 2D regions/points with rotation and scale, and attach graphics or props to moving hands and objects."
-version: 1.0.1
+description: "Stabilize shaky video (optical-flow warp stabilizer), solve 3D camera tracker anchors, track 2D regions/points with rotation and scale, and attach graphics or props to moving hands and objects."
+version: 1.0.2
 author: brajendrak00068
 license: MIT
 ---
@@ -29,7 +29,7 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## Tool interface
 
-Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.
+Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control.
 
 ### Tool parameters
 
@@ -64,11 +64,11 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 
 ## Capabilities
 
-- 2D Region & Point Tracking: pyramid NCC + Lucas-Kanade feature-region tracking (`tracker: "region"`) that measures position, in-plane rotation, and scale with per-frame confidence and occlusion recovery.
-- Live Track Attach (`attach_mode: "live"`): After Effects null-style parenting (`track_attach`) with pixel or bounding-box-relative offsets (`attach_offset_unit: "box" | "px"`), `attach_scale_follow`, and `rotation_follow` that survive later trims, splits, and speed changes.
-- Hand & Palm Attachment: keypoint-based palm tracking (`hand: "left" | "right" | "any"`, `scale_with_hand: true`) that follows the hand and hides while out of view.
-- Planar & 3D Camera Tracking: 4-corner perspective pinning (`mode: "plane"`) for screen replacement, and monocular 3D camera solve (`mode: "camera"`, `scene_anchor_3d`) for world-anchored 3D layers.
-- Non-Destructive Warp Stabilizer: Shi-Tomasi + KLT + RANSAC camera-path smoothing with Max Scale relaxation and border-hiding auto-scale (`apply: "transform"`).
+- 2D Region & Point Tracking: feature-region tracking that measures position, in-plane rotation, and scale with per-frame confidence and occlusion recovery.
+- Live Track Parenting: After Effects null-style parenting with pixel or bounding-box-relative offsets, scale follow, and rotation follow that survive later trims, splits, and speed changes.
+- Hand & Palm Attachment: keypoint-based palm tracking that follows the hand, scales with depth, and hides while out of view.
+- Planar & 3D Camera Tracking: 4-corner perspective pinning for screen replacement, and monocular 3D camera solve for world-anchored 3D layers.
+- Non-Destructive Warp Stabilizer: camera-path smoothing with max-scale relaxation and border-hiding auto-scale.
 
 ## Response fields
 

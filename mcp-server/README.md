@@ -9,19 +9,19 @@
 
 ---
 
-## Why Use Levea Instead of Local `ffmpeg`, Python, or Standalone HyperFrames / Remotion?
+## Why Use Levea Instead of Local `ffmpeg`, Python, or Standalone HTML/DOM Video Tools?
 
-Levea is a **superset**: it runs **HyperFrames (`PLAN_MOTION_GRAPHICS`)** *inside* its cloud **Rust Vulkan + WebGPU NLE timeline**, alongside real computer vision and GPU video shaders:
+Levea is a **superset**: it runs **2D and 3D motion graphics** *inside* its cloud **GPU NLE timeline**, alongside computer vision and GPU video shaders:
 
-| Capability | Raw `ffmpeg` / MoviePy (Local CLI) | Standalone HyperFrames / Remotion (Local HTML/DOM Capture) | **Levea MCP (`livecore.ai` Cloud GPU NLE + HyperFrames)** |
+| Capability | Raw `ffmpeg` / MoviePy (Local CLI) | Standalone HTML/DOM Video Tools (Local Headless Chrome) | **Levea MCP (`livecore.ai` Cloud GPU NLE + Motion Graphics)** |
 | :--- | :--- | :--- | :--- |
 | **9:16 Active-Speaker Reframe** | ❌ Crops dead-center (`crop=ih*9/16:ih`), slicing speakers' faces in half | ❌ DOM/CSS has no per-frame face or mouth landmark detector | ✅ **68-point face & active-mouth tracking** per frame + auto 2-up split-screen |
-| **3D Camera Tracking, Hand Tracking & Rotoscoping** | ❌ None | ❌ Browser DOM cannot solve 3D camera motion or track hands/masks on video | ✅ **Monocular 3D camera solve (`scene_anchor_3d`)**, hand palm tracking, 2D region tracker, optical-flow warp stabilizer & AI alpha mattes |
-| **Green Screen & GPU VFX Compositing** | ❌ Basic `chromakey` leaves green halos; no 3D LUT/bokeh pipeline | ❌ Headless Chrome captures DOM screenshots; no native video shader pipeline | ✅ **Rust Vulkan + WebGPU compositor**: Keylight despilled keying, depth bokeh (`camera_lens_blur`), 328 GPU VFX shaders, 170+ transitions, `.cube` 3D LUTs |
+| **3D Camera Tracking, Hand Tracking & Rotoscoping** | ❌ None | ❌ Browser DOM cannot solve 3D camera motion or track hands/masks on video | ✅ **Monocular 3D camera solve**, hand palm tracking, 2D region tracker, optical-flow warp stabilizer & AI alpha mattes |
+| **Green Screen & GPU VFX Compositing** | ❌ Basic `chromakey` leaves green halos; no 3D LUT/bokeh pipeline | ❌ Headless Chrome captures DOM screenshots; no native video shader pipeline | ✅ **Cloud GPU compositor**: Keylight-grade despilled keying, depth bokeh, 328 GPU VFX presets, 170+ transitions, `.cube` 3D LUTs |
 | **Kinetic Captions (280+ Templates)** | ❌ Flat static `.srt` / `drawtext` that collides with faces | ⚠️ Must hand-code CSS per video; no automatic face/chin collision solver | ✅ **280+ GPU kinetic templates** (`hormozi`, `mrbeast`, `karaoke`) + measured **face/chin & TikTok safe-zone solver** |
 | **Multicam Podcast & Broadcast Audio** | ❌ `silencedetect` clips word tails; no multicam speaker switching | ❌ Not an audio/multicam NLE; `<video>` tags in headless Chrome desync on long multi-track cuts | ✅ **Waveform multicam sync**, ASR word-boundary cuts, filler removal, `-18 LUFS` auto-ducking, stem separation & lip-synced dubbing |
-| **Motion Graphics (HyperFrames)** | ❌ None | ✅ Full HTML/CSS/GSAP/Three.js compositions | ✅ **Included natively (`PLAN_MOTION_GRAPHICS`)** — plus After Effects shape layers (Trim Paths, Repeaters), composited *over* real tracked footage |
-| **Human Final Polish (`<100ms` GUI)** | ❌ Must re-run 5-min `ffmpeg` command to nudge one word | ❌ Must edit HTML/CSS code and re-render headless Chrome frames | ✅ **1-Click `livecore.ai` WebGPU Studio**: scrub at 60fps, drag captions, or swap templates in **`<100ms`** without re-rendering |
+| **Motion Graphics** | ❌ None | ✅ Full HTML/CSS/GSAP/Three.js compositions | ✅ **Included natively** — 2D/3D motion graphics plus After Effects shape layers (Trim Paths, Repeaters), composited *over* real tracked footage |
+| **Human Final Polish (`<100ms` GUI)** | ❌ Must re-run 5-min `ffmpeg` command to nudge one word | ❌ Must edit HTML/CSS code and re-render headless Chrome frames | ✅ **1-Click `livecore.ai` Web Studio**: scrub at 60fps, drag captions, or swap templates in **`<100ms`** without re-rendering |
 
 ---
 
@@ -108,14 +108,14 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 
 > Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`.
 
-### Tools the AI sees (37 Annotated Tools Unlocking All 189+ Canonical Actions & 13 Read Tools)
+### Tools the AI sees (37 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
 
-**Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's internal ReAct loop (**Mode A: `autonomous_edit`**) or drive any of the **189+ canonical actions** and **13 read/inspection tools** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
+**Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's autonomous editing agent (**Mode A: `autonomous_edit`**) or drive any of the **189+ canonical actions**, **13 read/inspection tools**, and **100+ editing craft skills** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
 
 | Group | Tools |
 |---|---|
 | **Mode A: Goal Delegation** (1 entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
-| **Mode B: Universal Direct Canonical Suite** (189+ actions & 13 read tools) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) |
+| **Mode B: Universal Direct Canonical Suite** (189+ actions, 13 read tools & 100+ skills) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) · `search_skills` · `load_skill` · `read_skill_resource` |
 | **Deterministic Layer Shortcuts** | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — fast typed shortcuts for single-layer updates, deletes, trims, and ~170 named transitions |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
 | Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (280+ built-in + your saved) |
@@ -124,9 +124,20 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 | Assets | `asset_upload_url` (signed PUT) · `list_assets` · `delete_asset` · `transcribe_asset` |
 | Diagnostics | `editor_health` |
 
-Every direct tool call (`execute_action` / `execute_batch`) runs through the same safety spine as `autonomous_edit`: forgiving parameter normalization, synchronous auto-harvesting of async generators, `SAFE_ZONE_REPAIR`, `FinalTimelineReconciler`, and layout de-stacking.
+Every direct tool call (`execute_action` / `execute_batch`) includes automatic parameter validation, async asset completion, safe-zone checks, timeline reconciliation, and layout de-stacking.
 
-→ For agent-integration details (Mode A vs. Mode B, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
+### How Skills Work & How to Use Your Own Custom Skills (`SKILL.md`)
+
+1. **100+ Built-In Craft Skills (`search_skills` → `load_skill` → `read_skill_resource`):**
+   - In **Mode A (`autonomous_edit`)**, Levea automatically loads the right craft skills for your prompt.
+   - In **Mode B**, your agent can call `search_skills` (e.g. `query: "captions"`, `"color"`, `"podcast"`), call `load_skill` to pull the full `SKILL.md` craft playbook into its context, and call `read_skill_resource` to inspect reference guides or templates before running `execute_action` / `execute_batch`.
+2. **12 Installable Client Skills (`npx skills add brajendrak00068/agentic-ai-video-production`):**
+   - Ready-made `SKILL.md` packages in [`skills/`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills) (`levea-ai-video-editor`, `viral-clips-generator`, `tiktok-reels-shorts-editor`, `auto-captions-subtitles`, `multicam-podcast-video-editor`, `silence-removal-audio-cleanup`, `ai-b-roll-motion-graphics`, `after-effects-motion-graphics`, `vfx-compositing-keying`, `motion-tracking-stabilization`).
+3. **Bring Your Own Custom `SKILL.md`:**
+   - Drop a custom `SKILL.md` into `.claude/skills/<name>/SKILL.md` (Claude Code), `.cursor/skills/<name>/SKILL.md` (Cursor), `~/.openclaw/skills/<name>/SKILL.md` (OpenClaw), or `~/.hermes/skills/<name>/SKILL.md` (Hermes).
+   - Encode your channel's `brandId`, `captionTemplatePreset` (e.g. `hormozi`), `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Mode A) or an exact `execute_batch` + `render_preview` action sequence (Mode B). Your agent can even call `load_skill` inside your custom skill to combine Levea's built-in craft rules with your own house rules.
+
+→ For agent-integration details (Mode A vs. Mode B, custom skills, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
 
 ---
 
@@ -179,21 +190,21 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 ### 🎬 Visual editing
 - **Color grade** — brightness, contrast, saturation, hue, lift/gamma/gain, monotone cubic RGB curves, CMYK per-hue selective color, 5-point histogram levels, LUT / film-look presets (including your own `.cube` 1D/3D files), auto color, shot-to-shot color matching, vignette, chromatic aberration
-- **VFX & optics** — 328 procedural VFX presets + ordered multi-effect stacks (`fx_stack`, up to 4 chained effects per layer), depth-map-driven `camera_lens_blur` (64-tap polygonal iris bokeh + highlight bloom), optical `clip_lens_flare`, After Effects two-tone threshold `glow` (`glow_threshold`, `glow_color_b`, `glow_composite`), layer `echo` motion trails, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, slit-scan, glassmorphism, bokeh, portal, …
+- **VFX & optics** — 328 procedural VFX presets + ordered multi-effect stacks (up to 4 chained effects per layer), depth-map-driven camera lens blur (polygonal iris bokeh + highlight bloom), optical lens flares, After Effects two-tone threshold glow, layer echo motion trails, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, slit-scan, glassmorphism, bokeh, portal, …
 - **Transitions** — 170+ named transitions (wipes, whips, twitch cut hits, light-band reveals, glitches, CRT power-off, …)
-- **Editing techniques** — speed ramps, time remap, and stepped `posterize_time_fps`, J/L, match, and smash cuts, non-destructive warp stabilization (smooth camera path + border-hiding auto-scale), AI outpainting to a new aspect ratio, eye-contact correction, face retouch
-- **Composite** — Keylight-grade `screen_color_key` (with despill, clip black/white, softness, shrink/grow), Lab/YUV/RGB `color_range_key`, `spill_suppressor`, AI background removal (alpha matte), custom SVG Bezier `mask_path`, feathered/inverted mattes, track mattes (`alpha`, `inv_alpha`, `luma`, `inv_luma`), and universal behind-subject occlusion (`occlusion: "behind_subject"`)
+- **Editing techniques** — speed ramps, time remap, and posterize time, J/L, match, and smash cuts, non-destructive warp stabilization (smooth camera path + border-hiding auto-scale), AI outpainting to a new aspect ratio, eye-contact correction, face retouch
+- **Composite** — Keylight-grade screen color key (with despill, clip black/white, softness, shrink/grow), Lab/YUV/RGB color range key, spill suppression, AI background removal (alpha matte), custom SVG Bezier masks, feathered/inverted mattes, track mattes (`alpha`, `inv_alpha`, `luma`, `inv_luma`), and universal behind-subject occlusion
 - **Blend & opacity** — all 29 After Effects blend modes (multiply, screen, overlay, color dodge / burn, classic dodge / burn, linear burn / light, vivid / pin light, hard mix, difference, exclusion, subtract, divide, hue / saturation / color / luminosity, additive) + per-layer & group opacity
-- **Shape & transform** — native shape layers with arc-length Trim Paths (`trim_start`, `trim_end`, `trim_offset`, `trim_mode`), After Effects Repeater (`repeater_count`, per-copy offset/scale/rotation, opacity ramp), SDF shape modifiers (pucker & bloat, round corners, zig zag, wiggle paths, offset paths), clip shapes (circle, dome, star, hexagon, polygon), crop, 3D rotation / perspective, spatial Bezier motion paths (`motion_path_svg` + `auto_orient`), and graph-editor velocity/influence easing (`ease_in` / `ease_out`)
+- **Shape & transform** — native shape layers with arc-length Trim Paths, After Effects Repeater (per-copy offset/scale/rotation, opacity ramp), shape modifiers (pucker & bloat, round corners, zig zag, wiggle paths, offset paths), clip shapes (circle, dome, star, hexagon, polygon), crop, 3D rotation / perspective, spatial Bezier motion paths with auto-orient, and graph-editor velocity/influence easing
 - **Lighting** — up to 8 scene lights illuminating 3D-transformed layers
 - **Reframe & layout** — caption-safe vertical reframe (9:16) + vertical montage, split screen (top/bottom, L/R, PiP, grid)
-- **Track** — 2D feature-region tracking (position, rotation, scale), live `track_attach` null parenting, planar corner-pinning, monocular 3D camera solve (`scene_anchor_3d`), face tracking with zoom-follow, hand tracking (an overlay follows the palm), branding overlays
+- **Track** — 2D feature-region tracking (position, rotation, scale), live null parenting, planar corner-pinning, monocular 3D camera solve, face tracking with zoom-follow, hand tracking (an overlay follows the palm), branding overlays
 - **Camera** — keyframed 3D camera moves (push-in, orbit, drift) with depth-based parallax
 
 ### 📊 Motion graphics & data viz
 *Every graphic is placed clear of faces and reviewed by an AI critic before it reaches the timeline:*
 - **Data** — transcript-driven charts (bar, line, pie), stat callouts, animated counters
-- **Lower-thirds & cards** — lower-thirds, 59 title / chapter / graphic templates, real 3D extruded bevelled titles (`title_3d` with PBR materials, environment lighting, and camera moves), checklists, keyword pills
+- **Lower-thirds & cards** — lower-thirds, 59 title / chapter / graphic templates, real 3D extruded bevelled titles (with PBR materials, environment lighting, and camera moves), checklists, keyword pills
 - **Diagrams** — flowcharts, timelines, geo callouts
 - **Layouts** — collage layouts, any-layer behind-the-subject occlusion, sticker cut-outs
 - **Films** — standalone motion-graphic films from one sentence: 2D motion design and 3D character films with camera moves, lighting, music, and sound design
@@ -261,7 +272,7 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 Pair these with `requirePlanApproval: true` for propose-only mode — the agent stops after planning and waits for your approval (see [Plan approval](#plan-approval)).
 
-**3. Full creative briefs** — multi-step orchestrations executed end-to-end. The agent decomposes the brief into a DAG of canonical actions, plans the order, executes through safety gates, verifies each step, and exports every requested format. Use SSE to watch each step land in real time.
+**3. Full creative briefs** — multi-step orchestrations executed end-to-end. The agent plans the edit, executes each step, verifies the result on the rendered frames, and exports every requested format. Use SSE to watch each step land in real time.
 
 <details>
 <summary>Example brief (~20 actions composed in one planned run)</summary>
@@ -417,7 +428,7 @@ Pass `requirePlanApproval: true` to make the agent stop after planning. It retur
 
 ### Verification report
 
-Every edit result carries `verificationReport`: `status` is `verified` (approved on the rendered frames), `rejected`, `unverified` (no verdict could be reached; the edit is kept but never reported as verified), or `not_applicable`, plus every task that failed its check, what the repair loop tried, and whether it was repaired. `qualityNotes` lists advisory notes, and `modelsUsed` names the models the edit called.
+Every edit result carries `verificationReport`: `status` is `verified` (approved on the rendered frames), `rejected`, `unverified` (no verdict could be reached; the edit is kept but never reported as verified), or `not_applicable`, plus every task that failed its check, what the repair loop tried, and whether it was repaired. `qualityNotes` lists advisory notes.
 
 ---
 

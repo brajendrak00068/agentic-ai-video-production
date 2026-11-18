@@ -1,7 +1,7 @@
 ---
 name: ai-b-roll-motion-graphics
 description: "Insert AI B-roll cutaways, explainer video visuals, product demo callouts, documentary archive montages, data charts, lower thirds, and title cards onto video timelines."
-version: 1.0.6
+version: 1.0.7
 author: brajendrak00068
 license: MIT
 ---
@@ -28,7 +28,7 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## Tool interface
 
-Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.
+Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control.
 
 ### Tool parameters
 
@@ -64,8 +64,8 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Contextual B-roll placement aligned to transcript timestamps.
-- Animated charts, stat counters, flow diagrams, lower thirds, collage layouts, 3D extruded bevelled titles (`title_3d`), and text or graphics placed behind the subject (`occlusion: "behind_subject"`).
-- Native After Effects shape layers with arc-length Trim Paths, Repeaters, SDF shape modifiers (pucker & bloat, zig zag, wiggle paths, round corners, offset paths), spatial Bezier motion paths with auto-orient, graph-editor velocity easing, and echo motion trails.
+- Animated charts, stat counters, flow diagrams, lower thirds, collage layouts, 3D extruded bevelled titles, and text or graphics placed behind the subject.
+- Native After Effects shape layers with arc-length Trim Paths, Repeaters, shape modifiers (pucker & bloat, zig zag, wiggle paths, round corners, offset paths), spatial Bezier motion paths with auto-orient, graph-editor velocity easing, and echo motion trails.
 - Standalone 2D and 3D character motion-graphic films with camera moves, lighting, music, and sound design.
 - Every graphic placed clear of faces and reviewed by an AI critic against a craft checklist.
 - Picture-in-picture and split-screen layout composition with safe-zone aware positioning.

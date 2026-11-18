@@ -9,7 +9,7 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 ## Tools (37 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
 
 The surface supports **two complementary execution modes** plus typed management & polling:
-- **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's internal **Closed-Loop Multimodal ReAct Agent** (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
+- **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
 - **Mode B — Universal Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **189+ canonical actions**, **13 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
 
 ### Mode A: Goal Delegation (1 + 2 variants)
@@ -27,7 +27,7 @@ The surface supports **two complementary execution modes** plus typed management
 | `search_tools` | Search all 189+ canonical actions, 13 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`, `properties`, `animatable`); returns matching actions/presets and the 5-phase NLE `editorialPlaybook` |
 | `get_action_schema` | Fetch the full JSON `inputSchema` and parameter constraints for any canonical action or read tool |
 | `execute_action` | Execute any single canonical action (all 189+ actions, e.g. `REMOVE_SILENCES`, `VERTICAL_REFRAME`, `COLOR_GRADE`, `GENERATE_CAPTIONS`, `PLAN_MOTION_GRAPHICS`, `GENERATE_MUSIC`, `AUTO_DUCK`, `EXPORT_VIDEO`) or read tool (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, `shot_timeline`, `read_source_transcript`, `measure_audio`, `measure_picture`, `measure_color`) directly on `project_id`. Pass `video_url` or `assets` on the first call to bootstrap a new project |
-| `execute_batch` | Execute an ordered array of `{ action, params }` steps in one atomic round-trip with automatic `SAFE_ZONE_REPAIR`, `FinalTimelineReconciler`, layout de-stacking, async generator harvesting, and project commit |
+| `execute_batch` | Execute an ordered array of `{ action, params }` steps in one atomic round-trip with automatic safe-zone checks, timeline reconciliation, layout de-stacking, async asset completion, and project commit |
 | `render_preview` | Render real GPU-composited JPEG screenshots at `timestamps: [...]` (with optional `0..1` `region` crop) showing all live video layers, captions, title cards, grades, and VFX; returns native MCP `image` blocks + `frames[]` so the agent can visually verify frames before `EXPORT_VIDEO` |
 | `search_skills` | Search 100+ production craft skills (`SKILL.md` playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) |
 | `load_skill` | Load the full craft playbook (`SKILL.md`) and bundled resource list for one or more skill IDs |
@@ -65,7 +65,7 @@ Full input schemas are returned by `tools/list` over MCP.
 
 ### When to use Mode A (`autonomous_edit`) vs. Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview`)
 
-- **Use Mode A (`autonomous_edit`)** when the user gives a broad or creative goal ("Turn this podcast into 3 viral TikTok clips with Hormozi captions, B-roll, and music"). One call runs our backend ReAct loop + 100+ craft skills end-to-end.
+- **Use Mode A (`autonomous_edit`)** when the user gives a broad or creative goal ("Turn this podcast into 3 viral TikTok clips with Hormozi captions, B-roll, and music"). One call runs Levea's autonomous editing agent + 100+ craft skills end-to-end.
 - **Use Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`)** when your agent wants 100% direct deterministic control, surgical <50ms tweaks, custom timestamp math from local files, or an interactive `observe → edit → render_preview screenshot → adjust → export` loop without invoking our internal planner.
 - **5-Phase NLE Execution Order for Mode B:**
   1. **Inspect:** `list_layers`, `query_transcript`, `list_sources`
@@ -73,6 +73,16 @@ Full input schemas are returned by `tools/list` over MCP.
   3. **Visuals & Overlays:** `COLOR_GRADE`, `APPLY_VFX`, `TITLE_CARD`, `PLAN_MOTION_GRAPHICS`, `GENERATE_CAPTIONS`, `STYLE_CAPTIONS`
   4. **Audio Mix:** `CLEAN_AUDIO`, `GENERATE_VOICEOVER`, `GENERATE_MUSIC`, `ADD_SFX`, `AUTO_DUCK`
   5. **Visual Screenshot Check & Deliver:** Call `render_preview` (`RENDER_PREVIEW`) to inspect GPU-composited JPEG screenshots, fix any visual overlap, then call `EXPORT_VIDEO` / `GENERATE_VIRAL_CLIPS`.
+
+### How Skills Work (Built-In Craft Skills & Custom User `SKILL.md` Playbooks)
+
+1. **Discover & Load Levea's 100+ Built-In Craft Skills over MCP:**
+   - Call `search_skills({ query: "..." })` to find domain playbooks (captions, color grading, podcast cuts, documentary montage, motion graphics, VFX, audio mastering).
+   - Call `load_skill({ skill_id: "..." })` to load the full `SKILL.md` craft instructions and list of bundled resources into your context.
+   - Call `read_skill_resource({ skill_id: "...", resource: "references/..." })` to read specific reference tables or templates before executing actions via `execute_action` / `execute_batch`.
+2. **Use or Author Custom `SKILL.md` Playbooks:**
+   - Users can install our 12 starter skills (`npx skills add brajendrak00068/agentic-ai-video-production` or `clawhub install levea-ai-video-editor`) or place their own custom `SKILL.md` in `.claude/skills/`, `.cursor/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/`, or `~/.config/opencode/skills/`.
+   - A custom `SKILL.md` can specify a fixed `brandId`, `captionTemplatePreset`, `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Mode A) or a deterministic `execute_batch` + `render_preview` recipe (Mode B), and can call `load_skill` to compose Levea's built-in craft skills with the user's custom rules.
 
 ## How to call it well
 

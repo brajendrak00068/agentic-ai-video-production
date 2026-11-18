@@ -28,6 +28,15 @@ Optional: `LEVEA_API_URL` (defaults to `https://api.livecore.ai`).
 | `levea_job_status` | Read an export/render job; `wait: true` polls until it finishes (up to 10 min). |
 | `levea_task_status` | Read a queued edit by `taskId`. |
 | `levea_active_task` | Reconnect to the running edit for a `project_id`. |
+| `levea_search_tools` | Search all 189+ canonical editing actions, 13 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`). |
+| `levea_get_action_schema` | Fetch the full JSON inputSchema and parameter constraints for any canonical action or read tool. |
+| `levea_execute_action` | Execute any single canonical action or read tool directly on a project scene. |
+| `levea_execute_batch` | Execute an ordered batch of canonical actions in one atomic round-trip with automatic timeline reconciliation and project commit. |
+| `levea_render_preview` | Render GPU-composited JPEG screenshots at specified timestamps for visual inspection before `EXPORT_VIDEO`. |
+| `levea_search_skills` | Search 100+ production craft skills (`SKILL.md` playbooks across editing, color grading, captions, audio, motion graphics, VFX). |
+| `levea_load_skill` | Load the full craft playbook (`SKILL.md`) and resource list for one or more skill IDs. |
+| `levea_read_skill_resource` | Read a bundled reference or template file belonging to a production skill. |
+| `levea_asset_upload_url` | Get a signed PUT URL to upload a local media file so its `fileUrl` can be passed to `video_url` or `assets`. |
 
 A bundled skill, `levea-video-editor:levea-video-editing`, teaches the agent the edit → poll → follow-up workflow.
 

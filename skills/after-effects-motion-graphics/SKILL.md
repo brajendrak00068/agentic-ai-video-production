@@ -1,7 +1,7 @@
 ---
 name: after-effects-motion-graphics
-description: "Create After Effects, Remotion, and HyperFrames motion graphics: title cards, lower thirds, kinetic typography, 3D extruded bevelled titles, shape layers with Trim Paths and Repeaters, Bezier motion paths, and animated charts."
-version: 1.0.1
+description: "Create After Effects-style motion graphics: title cards, lower thirds, kinetic typography, 3D extruded bevelled titles, shape layers with Trim Paths and Repeaters, Bezier motion paths, and animated charts."
+version: 1.0.2
 author: brajendrak00068
 license: MIT
 ---
@@ -22,14 +22,14 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## When to use
 
-- Drawing vector shapes, custom SVG Bezier paths, arrows, underlines, and outlines onto the frame using arc-length Trim Paths (`trim_start`, `trim_end`, `trim_offset`, `trim_mode`).
-- Building geometric bursts, echoed rings, and step-and-repeat grids with the After Effects Repeater (`repeater_count`, per-copy offset/scale/rotation, start-to-end opacity ramp) and SDF shape modifiers (pucker & bloat, zig zag, wiggle paths, round corners, offset paths).
-- Animating layers along curved spatial Bezier motion paths (`motion_path_svg` + `auto_orient`) with graph-editor velocity/influence handles (`ease_in` / `ease_out`), layer `echo` motion trails, or stepped `posterize_time_fps`.
-- Creating real 3D extruded, bevelled hero titles (`title_3d`) with PBR materials (chrome, metal, glossy, glass, brushed metal), environment lighting, and 3D camera moves.
+- Drawing vector shapes, custom SVG Bezier paths, arrows, underlines, and outlines onto the frame using arc-length Trim Paths.
+- Building geometric bursts, echoed rings, and step-and-repeat grids with the After Effects Repeater (per-copy offset/scale/rotation, start-to-end opacity ramp) and shape modifiers (pucker & bloat, zig zag, wiggle paths, round corners, offset paths).
+- Animating layers along curved spatial Bezier motion paths with auto-orient, graph-editor velocity/influence handles, layer echo motion trails, or posterize time.
+- Creating real 3D extruded, bevelled hero titles with PBR materials (chrome, metal, glossy, glass, brushed metal), environment lighting, and 3D camera moves.
 
 ## Tool interface
 
-Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool to run edits against a project timeline.
+Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control.
 
 ### Tool parameters
 
@@ -64,10 +64,10 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 
 ## Capabilities
 
-- Shape Layer Trim Paths & Repeater: arc-length `trim_start`, `trim_end`, `trim_offset`, `trim_mode` (`simultaneous` | `individual`), `dash_array`, and `repeater_count` with compounded per-copy offset, scale, rotation, anchor, and opacity ramp.
-- SDF Shape Modifiers: `shape_pucker_bloat`, `shape_round_corners`, `shape_zigzag_size/ridges/smooth`, `shape_wiggle_size/detail/speed/seed`, and `shape_offset`.
-- Keyframe Graph & Spatial Paths: value-space cubic Bezier `ease_in` / `ease_out` (`{ speed, influence }`), arc-length `motion_path_svg` / `motion_path_points` with `auto_orient`, AE text range and wiggly selectors, layer `echo` ghost trails, and `posterize_time_fps`.
-- Real 3D Extruded Titles (`title_3d`): true extruded glyph geometry with customizable depth, bevel width/rings, 7 PBR materials, 5 environment lighting rigs, and 6 camera moves.
+- Shape Layer Trim Paths & Repeater: arc-length trim start/end/offset, dash arrays, and repeaters with compounded per-copy offset, scale, rotation, anchor, and opacity ramp.
+- Shape Modifiers: pucker & bloat, round corners, zig zag, wiggle paths, and offset paths.
+- Keyframe Graph & Spatial Paths: value-space cubic Bezier velocity/influence easing, arc-length spatial motion paths with auto-orient, text range and wiggly selectors, layer echo ghost trails, and posterize time.
+- Real 3D Extruded Titles: true extruded glyph geometry with customizable depth, bevel width/rings, 7 PBR materials, 5 environment lighting rigs, and 6 camera moves.
 
 ## Response fields
 
