@@ -425,8 +425,8 @@ const TOOL_DEFS: Tool[] = [
         query: { type: 'string', description: 'Optional search keyword (e.g. "karaoke", "hormozi", "lens_blur", "whip_pan", "teal_orange", "chromakey").' },
         catalog: {
           type: 'string',
-          enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes'],
-          description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "actions", or "all" (default).',
+          enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes', 'properties', 'animatable'],
+          description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
         },
         category: { type: 'string', description: 'Optional domain/category filter.' },
         limit: { type: 'number', description: 'Max items to return (default 50).' },
@@ -520,6 +520,46 @@ const TOOL_DEFS: Tool[] = [
       required: [],
     },
   },
+  {
+    name: 'search_skills',
+    description:
+      'Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search keyword (e.g. "color", "caption", "podcast", "montage", "motion").' },
+        category: { type: 'string', description: 'Optional category filter.' },
+        limit: { type: 'number', description: 'Max skills to return (default 20).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'load_skill',
+    description:
+      'Load the full craft playbook (SKILL.md) and bundled resource list for one or more skill IDs returned by search_skills.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skill_id: { type: 'string', description: 'Skill ID to load (e.g. "color-grading-finishing", "caption-typography").' },
+        skill_ids: { type: 'array', items: { type: 'string' }, description: 'Optional array of skill IDs to load.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'read_skill_resource',
+    description:
+      'Read a bundled reference or template file (e.g. "references/..." or "templates/...") belonging to a production skill.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skill_id: { type: 'string', description: 'Skill ID that owns the resource.' },
+        resource: { type: 'string', description: 'Relative path of the resource inside the skill.' },
+      },
+      required: ['resource'],
+    },
+  },
 ];
 
 // Human-readable titles + safety hints for every tool (MCP tool annotations).
@@ -534,7 +574,8 @@ type ToolName =
   | 'list_projects' | 'get_project' | 'create_project' | 'delete_project'
   | 'asset_upload_url' | 'list_assets' | 'delete_asset' | 'transcribe_asset'
   | 'editor_health'
-  | 'search_tools' | 'get_action_schema' | 'execute_action' | 'execute_batch' | 'render_preview';
+  | 'search_tools' | 'get_action_schema' | 'execute_action' | 'execute_batch' | 'render_preview'
+  | 'search_skills' | 'load_skill' | 'read_skill_resource';
 
 const read = (title: string): ToolAnnotations => ({ title, readOnlyHint: true, openWorldHint: false });
 const write = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: false, openWorldHint: false });
@@ -579,6 +620,9 @@ const TOOL_ANNOTATIONS = {
   execute_action: edit('Execute canonical editor action'),
   execute_batch: edit('Execute canonical action batch'),
   render_preview: read('Render GPU preview screenshots'),
+  search_skills: read('Search production craft skills'),
+  load_skill: read('Load production craft skill'),
+  read_skill_resource: read('Read skill reference resource'),
 } satisfies Record<ToolName, ToolAnnotations>;
 
 export const TOOLS: Tool[] = TOOL_DEFS.map((tool) => {
