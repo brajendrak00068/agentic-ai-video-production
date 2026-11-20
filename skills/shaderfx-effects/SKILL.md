@@ -201,7 +201,7 @@ ABI v3 (ADR 0002) adds five optional features to the v2 contract above. Every v2
 
 `FxCtx` gains one field in v3: `frame: u32` = `floor(local_time × scene fps)`, the frame index since the layer started (the scene fps is baked in at apply time; 30 when the scene names none).
 
-Leave `abi` out of a v3 manifest (or write 2). The server switches to v3 by itself when a feature below is present, and an explicit `"abi": 3` is currently rejected (`manifest.abi must be 2`).
+You can leave `abi` out of a v3 manifest: the server switches to v3 by itself when a feature below is present. `"abi": 2` and `"abi": 3` are both accepted (saved v3 effects come back from `GET_SHADER_EFFECT` with `abi: 3`), but the features you use decide the ABI, not this field.
 
 | feature | manifest declares | apply / create supplies | author uses |
 |---|---|---|---|
