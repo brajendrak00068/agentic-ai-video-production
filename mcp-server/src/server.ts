@@ -418,7 +418,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'search_tools',
     description:
-      'Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook.',
+      'Search every directly callable editing action, the read/inspection tools, AND preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, color LUTs, title cards, fonts, blend modes) by keyword, category, or catalog filter. With a query, matching actions come back WITH their parameter specs (required params end in "*"), so you usually do not need get_action_schema. Also returns the editorialPlaybook (fastest call pattern + NLE order). Call once with no query to see the whole surface.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -429,7 +429,8 @@ const TOOL_DEFS: Tool[] = [
           description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
         },
         category: { type: 'string', description: 'Optional domain/category filter.' },
-        limit: { type: 'number', description: 'Max items to return (default 50).' },
+        limit: { type: 'number', description: 'Max actions to return (default: all matches; preset catalogs default to 50).' },
+        include_schemas: { type: 'boolean', description: 'Force parameter specs on (true) or off (false). Default: on when 25 or fewer actions match.' },
       },
       required: [],
     },
@@ -442,8 +443,9 @@ const TOOL_DEFS: Tool[] = [
       type: 'object',
       properties: {
         action: { type: 'string', description: 'Canonical action name or read tool name.' },
+        actions: { type: 'array', items: { type: 'string' }, description: 'Several action names at once (up to 40) — one round trip instead of many.' },
       },
-      required: ['action'],
+      required: [],
     },
   },
   {
@@ -467,7 +469,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_batch',
     description:
-      'Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs safe-zone checks, timeline reconciliation, layout de-stacking, async asset completion, and commits the updated scene to project_id.',
+      'Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true) rejects it before anything runs, listing every bad step with suggestions. Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1024,10 +1026,27 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
  * the stdio binary connects it to stdin/stdout; a hosted endpoint connects a
  * fresh instance per HTTP request inside `runWithLeveaConfig`.
  */
+/**
+ * Sent in the MCP `initialize` result so every client (Claude, Cursor, Codex,
+ * OpenClaw, Hermes, …) sees how to use the surface before its first call,
+ * instead of discovering it only if it happens to call search_tools.
+ */
+export const LEVEA_MCP_INSTRUCTIONS = [
+  'Levea is a cloud video editor. Two ways to use it:',
+  'A) Broad creative goal ("make 3 vertical clips with captions and music"): send the user\'s brief verbatim to autonomous_edit (or queue_edit + check_task_status for long edits). Never re-call it to check progress; on status "running" poll get_active_task.',
+  'B) You drive the edit yourself (surgical changes, your own plan): use the direct tools. Fastest pattern, 3-4 calls total:',
+  '  1. execute_batch of read tools (list_layers, query_transcript, list_sources, shot_timeline) — pass video_url or assets on this first call to seed a new project; keep the returned project_id and pass it on every later call. Do not send the scene back; the server keeps it.',
+  '  2. ONE execute_batch with every edit in NLE order: structure & cuts (SET_SOURCE_RANGE, TRIM_LAYER, SPLIT_LAYER, REMOVE_SILENCES, CONFIGURE_CANVAS, VERTICAL_REFRAME) before visuals (COLOR_GRADE, APPLY_VFX, TITLE_CARD, GENERATE_CAPTIONS, STYLE_CAPTIONS) before audio (CLEAN_AUDIO, GENERATE_MUSIC, ADD_SFX, AUTO_DUCK, MASTER_AUDIO).',
+  '  3. render_preview at 2-4 timestamps and look at the frames; fix what you see with one more batch.',
+  '  4. execute_action EXPORT_VIDEO → videoUrl, or a jobId to poll with check_job_status.',
+  'Unsure of an action\'s params? search_tools with a query returns matching actions with param specs; get_action_schema takes actions: [..] for several at once. A batch (max 25 steps) is checked before anything runs and is atomic (allow_partial: true to keep successful steps); destructive actions need confirm_destructive: true. The server adds no creative content of its own on this path, and masters loudness at export if you skipped MASTER_AUDIO.',
+  'Craft playbooks: search_skills / load_skill. Brand kits and caption templates: list_brand_kits, list_caption_templates.',
+].join('\n');
+
 export function createLeveaMcpServer(): Server {
   const server = new Server(
     { name: 'levea-mcp-server', version: PKG_VERSION },
-    { capabilities: { tools: {} } }
+    { capabilities: { tools: {} }, instructions: LEVEA_MCP_INSTRUCTIONS }
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
