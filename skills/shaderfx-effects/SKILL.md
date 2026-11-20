@@ -199,33 +199,35 @@ The harness clamps what `fx` returns to 0..1, multiplies by the layer opacity, a
 
 ABI v3 (ADR 0002) adds five optional features to the v2 contract above. Every v2 effect keeps working unchanged. The server picks the ABI automatically: v3 when an effect uses any feature below, else v2. A v3 effect that uses none of them renders exactly like v2. Everything above (FxCtx, helpers, output modes, params, `param_keyframes`, transitions) still applies.
 
-`FxCtx` gains one field in v3: `frame: u32`, the frame index since the layer started.
+`FxCtx` gains one field in v3: `frame: u32` = `floor(local_time × scene fps)`, the frame index since the layer started (the scene fps is baked in at apply time; 30 when the scene names none).
+
+Leave `abi` out of a v3 manifest (or write 2). The server switches to v3 by itself when a feature below is present, and an explicit `"abi": 3` is currently rejected (`manifest.abi must be 2`).
 
 | feature | manifest declares | apply / create supplies | author uses |
 |---|---|---|---|
 | Named textures (≤ 4) | `textures: [{ name }]` | `textures: [{ name, layer_id \| asset_url, space? }]` | `tex_<name>(uv)`, `tex_size_<name>()` |
-| Feedback | `feedback: { enabled: true, warmup_sec?, clear? }` | `feedback` (same shape) | `prev(uv)`, `c.frame` |
+| Feedback | `feedback: { enabled: true, warmup_sec?, clear? }` (or `true`) | `feedback` (same shape) | `prev(uv)`, `c.frame` |
 | Multi-pass (≤ 4) | `passes: [{ name, scale? }]` | (source defines the passes) | `fn pass_<name>(c: FxCtx)`, `buf_<name>(uv)` |
-| Data buffer | (nothing) | `data: number[]` or `data_url` | `data(i)`, `data_len()`, `data_vec2(i)`, `data_vec4(i)` |
+| Data buffer | optional `data` / `data_url` | `data: number[]`, or `data_url` (+ `data_columns` for CSV) | `data(i)`, `data_len()`, `data_vec2(i)`, `data_vec4(i)` |
 | Geometry | `geometry: { mode, count }` | `geometry` (same shape) | `fn instance(i, c)`, optional `fn shade(p, c)` |
 
-`CREATE_SHADER_EFFECT` and `APPLY_SHADER_EFFECT` both accept `textures`, `feedback`, `data` / `data_url` and `geometry`. A saved effect stores all of them, and apply-time values replace the saved ones. The manifest gains `passes`, `textures` (the declared names), `feedback` and `geometry`.
+`CREATE_SHADER_EFFECT` and `APPLY_SHADER_EFFECT` both accept `textures`, `feedback`, `data` / `data_url` and `geometry`. A saved effect stores all of them, and apply-time values replace the saved ones: feedback, geometry and data replace outright, and a texture entry with a source replaces the declared texture of the same name. The manifest gains `passes`, `textures` (the declared names), `feedback`, `geometry` and optionally `data` / `data_url`. Inline `data` wins over `data_url`.
 
 ### Named textures (bindings 6-9)
 
-Up to 4 named pictures besides `src` / `backdrop` / clips. Names match `[a-z][a-z0-9_]{0,23}`, and their order is the slot order.
+Up to 4 named pictures besides `src` / `backdrop` / clips. Names match `[a-z][a-z0-9_]{0,23}`, and their order is the slot order. Each entry gives `layer_id` OR `asset_url`, not both.
 
-- `{ "name": "logo", "layer_id": "logo_1" }`: that layer rendered alone (its transform, crop and grade; transparent elsewhere), the same way v2 renders clip pictures. Text, image / logo, motion-graphics and video layers all work. Default `space: "canvas"`: a canvas-space picture, so `tex_logo(c.uv)` is the pixel under the fragment.
+- `{ "name": "logo", "layer_id": "logo_1" }`: that layer rendered alone (its transform, crop and grade; transparent elsewhere), the same way v2 renders clip pictures. Text, image / logo, motion-graphics and video layers all work. Hidden layers work too: hide the source layer (`visible: false`) when only the shader's version should show. Default `space: "canvas"`: a canvas-space picture, so `tex_logo(c.uv)` is the pixel under the fragment.
 - `{ "name": "sheet", "asset_url": "https://…/walk.png" }`: a png / jpg / webp image (≤ 4096 × 4096, public URL only) decoded once. Default `space: "image"`: sampled in the image's own 0..1 UV, for sprite sheets, logos, LUT strips and noise textures.
 - Helpers (generated per name): `tex_<name>(uv: vec2<f32>) -> vec4<f32>` (straight rgba, linear, clamp-to-edge) and `tex_size_<name>() -> vec2<f32>` (pixels).
-- A declared name with nothing bound reads transparent.
+- A declared texture still needs a source by apply time: apply fails with `SHADER_FX_INVALID_INPUT` ("texture … has no source") if neither the saved effect nor the request gives one. A `layer_id` that is not on the timeline fails with `SHADER_FX_TARGET_NOT_FOUND`, and a non-public `asset_url` with `SHADER_FX_PRIVATE_URL`.
 
 ### Feedback (binding 10)
 
-`feedback: { "enabled": true, "warmup_sec": 1.0, "clear": [0, 0, 0, 0] }` gives the shader `prev(uv) -> vec4<f32>`: THIS layer's own output from the previous frame (straight rgba, render-target size), cleared to `clear` (default transparent) on the layer's first frame. Use it for trails, echoes, smears, accumulation and reaction-diffusion-style looks.
+`feedback: { "enabled": true, "warmup_sec": 1.0, "clear": [0, 0, 0, 0] }` gives the shader `prev(uv) -> vec4<f32>`: THIS layer's own output from the previous frame (straight rgba, render-target size), cleared to `clear` (default transparent) on the layer's first frame. `feedback: true` is shorthand for `{ enabled: true }`, and `{ enabled: false }` turns a saved effect's feedback off. Use it for trails, echoes, smears, accumulation and reaction-diffusion-style looks.
 
 - Export renders sequentially, so feedback is exact.
-- `render_preview` and seeking re-render the layer alone from `max(start_time, t − warmup_sec)` up to `t` at the scene fps, then show frame `t`. Same `t`, same pixels. Choose `warmup_sec` (default 1.0, at most 4) at least as long as your trail takes to fade, or previews will show a shorter trail than the export.
+- `render_preview` and seeking re-render the layer alone from `max(start_time, t − warmup_sec)` up to `t` at the scene fps, then show frame `t`. Same `t`, same pixels. Choose `warmup_sec` (default 1.0, 0..4) at least as long as your trail takes to fade, or previews will show a shorter trail than the export.
 - What you return is what `prev` gives back next frame, so a decay factor below 1 is what keeps trails from saturating.
 - Not available in geometry mode.
 
@@ -240,34 +242,42 @@ fn fx(c: FxCtx) -> vec4<f32> { ... }          // final pass, may read every buf_
 ```
 
 - Passes run in declaration order every frame, before the final `fx`. Each renders a full-target quad into its own rgba16float buffer (render target × scale), cleared each frame.
-- `buf_<name>(uv) -> vec4<f32>` reads a pass (straight rgba, linear filtering, so a lower-scale buffer upsamples smoothly). A pass reading itself or a later pass gets transparent.
+- A pass's return value is stored RAW: not clamped, not premultiplied or converted, in rgba16float. Values above 1 and negative values survive, so a pass can carry HDR light, vectors or masks. `buf_<name>(uv) -> vec4<f32>` reads it back raw, with linear filtering, so a lower-scale buffer upsamples smoothly. A pass reading itself or a later pass gets transparent. Only the final `fx` is clamped to 0..1 and goes through the output mode.
+- Inside `pass_<name>`, `c.res` and `c.px` are the pass buffer's size (render target × scale). `c.uv` is still 0..1 over the frame.
 - Every pass can use every input: `src`, `backdrop`, clips, textures, `prev`, `data`, params.
-- Keep sampling offsets in uv units (not `1.0 / c.res` texel steps), so a pass looks the same at any scale and on a supersampled export.
+- Offsets in uv units look the same at any scale and on a supersampled export. Use `1.0 / c.res` inside a pass only when you want exactly one texel of that pass's buffer.
 - Each pass adds a full-target render per frame. Use 0.5 / 0.25 scale for blurs and glows.
 
 ### Data buffer (binding 15)
 
-`data: [12, 30, 18, 44]` (≤ 16384 floats), or `data_url` pointing to a JSON array or CSV, which the server resolves to floats at apply time and stores. Helpers: `data(i: u32) -> f32` (0 when `i >= data_len()`), `data_len() -> u32`, `data_vec2(i: u32) -> vec2<f32>`, `data_vec4(i: u32) -> vec4<f32>` (2 / 4 consecutive floats from `i`). Use it for charts, per-particle state, lookup tables and keyed positions. Pack records with a fixed stride (e.g. 4 floats per point: x, y, size, hue) and read them with `data_vec4(i * 4u)`.
+`data: [12, 30, 18, 44]` (≤ 16384 floats), or `data_url`: a public http(s) / gs:// URL the server reads at apply time and stores as floats.
+
+- JSON: an array (or `{ "data": [...] }`). Nested arrays and row objects are flattened in order, and non-numbers are skipped.
+- CSV (`,` `;` or tab): a header row is detected when the first row has a non-numeric cell. Numbers are read row by row. With `data_columns: ["revenue", 3]` (header names or 0-based indexes) only those columns are read, in that order, per row. Without it, every numeric cell is read.
+- Fetch problems or no numbers: `SHADER_FX_DATA_UNAVAILABLE`.
+
+ Helpers: `data(i: u32) -> f32` (returns 0 past the end, never out of bounds), `data_len() -> u32`, `data_vec2(i: u32) -> vec2<f32>`, `data_vec4(i: u32) -> vec4<f32>` (2 / 4 consecutive floats from `i`). Use it for charts, per-particle state, lookup tables and keyed positions. Pack records with a fixed stride (e.g. 4 floats per point: x, y, size, hue) and read them with `data_vec4(i * 4u)`.
 
 ### Geometry mode (instanced quads / points)
 
-`geometry: { "mode": "quads", "count": 2000 }` (≤ 65536; `"points"` = small 4 px quads) draws `count` instances of a quad instead of one full-target quad. The source defines:
+`geometry: { "mode": "quads", "count": 2000 }` (`mode` default `quads`; `count` an integer 1..65536; in `"points"` mode an instance whose `size` is not positive is drawn 4 × 4 px) draws `count` instances of a quad instead of one full-target quad. The source defines (no `fx` is needed in geometry mode):
 
 ```wgsl
 fn instance(i: u32, c: FxCtx) -> FxInstance { ... }      // required, runs per vertex
 fn shade(p: FxPixel, c: FxCtx) -> vec4<f32> { ... }      // optional, per pixel
 ```
 
-- `FxInstance { pos: vec2<f32> /* canvas uv of the centre */, size: vec2<f32> /* pixels */, rotation: f32 /* radians */, color: vec4<f32> /* straight */, uv_rect: vec4<f32> /* x, y, w, h in a texture */, alive: f32 /* 0 hides it */ }`.
-- `FxPixel { local_uv: vec2<f32> /* 0..1 across the quad */, uv: vec2<f32> /* canvas uv */, color: vec4<f32>, uv_rect: vec4<f32>, instance: u32 }`.
-- Without `shade`: a soft round point × `color`, or, when a texture is bound, the first texture sampled through `uv_rect` × `color`.
+- `FxInstance { pos: vec2<f32> /* canvas uv of the centre */, size: vec2<f32> /* pixels */, rotation: f32 /* radians, about the centre */, color: vec4<f32> /* straight */, uv_rect: vec4<f32> /* x, y, w, h in a texture */, alive: f32 /* <= 0 culls */ }`.
+- `FxPixel { local_uv: vec2<f32> /* 0..1 across the quad, (0, 0) = its top-left corner before rotation */, uv: vec2<f32> /* canvas uv */, color: vec4<f32>, uv_rect: vec4<f32>, instance: u32 }`.
+- Without `shade`: with no texture, a soft round point, alpha `1 − smoothstep(0.42, 0.5, distance(local_uv, 0.5))` × `color`. With a texture, the FIRST texture sampled at `uv_rect.xy + local_uv × uv_rect.zw` × `color` (the whole texture when `uv_rect` has zero width or height).
+- In `instance()`, `c.uv` is (0.5, 0.5) and `c.res` the render-target size. In `shade()`, `c.uv` / `p.uv` is the pixel's canvas uv.
 - `instance()` runs in the vertex stage: compute motion in closed form from `i` and `c.local_time` (hash the index for randomness), or read per-instance state from `data`. Do not use `prev`: feedback is per-pixel and unavailable here. A closed-form system renders any frame on its own, so previews and seeks are exact.
-- `size` is in render-target pixels: scale by `c.res.y / 1080.0` to keep the same look on supersampled exports. Set `alive = 0.0` for particles not yet born.
+- `size` is in render-target pixels: scale by `c.res.y / 1080.0` to keep the same look on supersampled exports. Set `alive = 0.0` (anything <= 0) for particles not yet born or already dead.
 - `fx_output` still applies (`add` for glowing sparks, `normal` for solid sprites).
 
 ### Limits (v3)
 
-≤ 4 textures, ≤ 4 passes, ≤ 16384 data floats, ≤ 65536 instances, author source ≤ 48 KB in total, asset images ≤ 4096² and fetched from public addresses only. Every generated module is validated: each pass, the final pass, and the vertex + fragment stages in geometry mode. Errors map to your own lines. A layer whose shaders fail to build is skipped and reported (`custom_shader_errors`). Feedback warm-up and passes multiply per-frame cost, so keep counts and scales as low as the look allows.
+≤ 4 textures, ≤ 4 passes, ≤ 16384 data floats, ≤ 65536 instances, author source ≤ 48 KB in total, asset images ≤ 4096² and fetched from public addresses only. Every generated module is validated: each pass, the final pass, and the vertex + fragment stages in geometry mode. Errors map to your own lines and name the module that failed, e.g. `(pass blur)`, `(geometry vertex)`, `(final pass)`. Also reserved in v3 (module scope): `prev`, `data`, `data_len`, `data_vec2`, `data_vec4`, `FxData`, `FxInstance`, `FxPixel`, `FxGeoOut`, `fxd`, `FX_FPS`, `t_tex0`…`t_tex3`, `t_prev`, `t_pass0`…`t_pass3`, and the generated `tex_<name>`, `tex_size_<name>` and `buf_<name>`. A layer whose shaders fail to build is skipped and reported (`custom_shader_errors`). Feedback warm-up and passes multiply per-frame cost, so keep counts and scales as low as the look allows.
 
 ## Examples (ABI v2)
 
@@ -473,11 +483,11 @@ Apply it twice with different looks:
 
 ## ABI v3 examples
 
-All six were validated with naga inside a harness built to ADR 0002's bindings and helpers. Field names follow the ADR.
+All six pass the server's real `compileShaderFx` (v3 harness + naga validator), including every pass and the geometry vertex / fragment stages.
 
 ### 7. Logo reveal: texture from a layer, light sweep + dissolve
 
-Manifest: `{ "abi": 3, "kind": "generator", "output": "normal", "textures": [{ "name": "logo" }], "params": [{ "name": "glow", "type": "color", "default": "#ffd27a" }] }`
+Manifest: `{ "kind": "generator", "output": "normal", "textures": [{ "name": "logo" }], "params": [{ "name": "glow", "type": "color", "default": "#ffd27a" }] }`
 
 Apply over the logo's window, binding the logo layer:
 
@@ -486,7 +496,7 @@ Apply over the logo's window, binding the logo layer:
   "textures": [{ "name": "logo", "layer_id": "logo_1" }], "params": { "glow": "#9fd8ff" } }
 ```
 
-The effect draws its own copy of the logo, and the logo layer itself still draws underneath. Check in `render_preview` how the logo layer's own visibility interacts with `tex_logo` before you hide it.
+Hide the logo layer itself (`UPDATE_LAYER { layer_id: "logo_1", properties: { visible: false } }`): hidden layers still render into a texture, so only the shader's revealed copy shows.
 
 ```wgsl
 // Diagonal light sweep + noisy dissolve that reveals the logo.
@@ -520,7 +530,7 @@ fn fx(c: FxCtx) -> vec4<f32> {
 
 ### 8. Motion trails / echo with feedback
 
-Manifest: `{ "abi": 3, "kind": "filter", "output": "normal", "feedback": { "enabled": true, "warmup_sec": 1.5 }, "params": [{ "name": "decay", "type": "float", "min": 0, "max": 0.99, "default": 0.9 }, { "name": "tint", "type": "color", "default": "#ffffff" }, { "name": "drift", "type": "vec2", "default": [0, 0] }] }`
+Manifest: `{ "kind": "filter", "output": "normal", "feedback": { "enabled": true, "warmup_sec": 1.5 }, "params": [{ "name": "decay", "type": "float", "min": 0, "max": 0.99, "default": 0.9 }, { "name": "tint", "type": "color", "default": "#ffffff" }, { "name": "drift", "type": "vec2", "default": [0, 0] }] }`
 
 Apply with `target_layer_id` set to a moving subject (a cut-out, a title, a product shot) so only it leaves trails. `drift` is in pixels per frame, e.g. `[0, -2]` makes the trail rise. With `decay` 0.9 a trail fades to about 4 % in 30 frames (1 s at 30 fps), so `warmup_sec` 1.5 covers it.
 
@@ -546,9 +556,9 @@ fn fx(c: FxCtx) -> vec4<f32> {
 
 ### 9. Bloom: bright-pass (0.5) → blur (0.25) → composite
 
-Manifest: `{ "abi": 3, "kind": "filter", "output": "normal", "passes": [{ "name": "bright", "scale": 0.5 }, { "name": "blur", "scale": 0.25 }], "params": [{ "name": "threshold", "type": "float", "min": 0, "max": 1, "default": 0.7 }, { "name": "radius", "type": "float", "min": 0, "max": 0.05, "default": 0.012 }, { "name": "strength", "type": "float", "min": 0, "max": 2, "default": 0.8 }] }`
+Manifest: `{ "kind": "filter", "output": "normal", "passes": [{ "name": "bright", "scale": 0.5 }, { "name": "blur", "scale": 0.25 }], "params": [{ "name": "threshold", "type": "float", "min": 0, "max": 1, "default": 0.7 }, { "name": "radius", "type": "float", "min": 0, "max": 0.05, "default": 0.012 }, { "name": "strength", "type": "float", "min": 0, "max": 2, "default": 0.8 }] }`
 
-Three full-target renders per frame, two of them at reduced size: about 1.3× the cost of a single full-size pass.
+Three renders per frame, two of them at reduced size: about 1.3× the cost of a single full-size pass. The passes store raw values, so the bright pass keeps its exact intensity and the final pass does the only clamp.
 
 ```wgsl
 // Pass "bright" (0.5 scale): keep only what is brighter than the threshold.
@@ -588,14 +598,14 @@ fn fx(c: FxCtx) -> vec4<f32> {
 
 ### 10. Data-driven bar chart from `data`
 
-Manifest: `{ "abi": 3, "kind": "generator", "output": "normal", "params": [{ "name": "max_value", "type": "float", "default": 100 }, { "name": "color", "type": "color", "default": "#4cc9f0" }] }`
+Manifest: `{ "kind": "generator", "output": "normal", "params": [{ "name": "max_value", "type": "float", "default": 100 }, { "name": "color", "type": "color", "default": "#4cc9f0" }] }`
 
 ```json
 { "effect_id": "fx_bars", "kind": "generator", "start_time": 3, "end_time": 8,
   "data": [42, 67, 88, 51, 95, 73], "params": { "max_value": 100, "color": "#f72585" } }
 ```
 
-Or `"data_url": "https://…/q3.csv"` to resolve a CSV column at apply time. The bar count is `data_len()`. Each pixel works out the one bar it can belong to, so there is no per-bar loop. Bars grow with `local_time`, each starting 0.08 s after the previous one. Add labels and values as `TITLE_CARD` / text layers above it.
+Or `"data_url": "https://…/q3.csv", "data_columns": ["revenue"]` to read one CSV column at apply time. The bar count is `data_len()`. Each pixel works out the one bar it can belong to, so there is no per-bar loop. Bars grow with `local_time`, each starting 0.08 s after the previous one. Add labels and values as `TITLE_CARD` / text layers above it.
 
 ```wgsl
 // Signed distance to a rounded box (centre p, half-size b, corner radius r).
@@ -644,7 +654,7 @@ fn fx(c: FxCtx) -> vec4<f32> {
 
 ### 11. Particle fountain: geometry quads, closed-form motion
 
-Manifest: `{ "abi": 3, "kind": "generator", "output": "add", "geometry": { "mode": "quads", "count": 1500 } }`. No `shade`: the default soft round point × `color` is used. Every particle is a pure function of its index and time (seek-safe, no feedback). Size and colour change over each particle's life, and particles stay hidden (`alive = 0`) until their first birth.
+Manifest: `{ "kind": "generator", "output": "add", "geometry": { "mode": "quads", "count": 1500 } }`. No `shade`: the default soft round point × `color` is used. Every particle is a pure function of its index and time (seek-safe, no feedback). Size and colour change over each particle's life, and particles stay hidden (`alive = 0`) until their first birth.
 
 ```wgsl
 // Closed-form particle fountain: every particle's state is a pure function of
@@ -686,7 +696,7 @@ fn instance(i: u32, c: FxCtx) -> FxInstance {
 
 ### 12. Sprite-sheet animation: geometry quads + `asset_url` texture
 
-Manifest: `{ "abi": 3, "kind": "generator", "output": "normal", "geometry": { "mode": "quads", "count": 6 }, "textures": [{ "name": "sheet" }], "params": [{ "name": "fps", "type": "float", "min": 1, "max": 60, "default": 12 }] }`
+Manifest: `{ "kind": "generator", "output": "normal", "geometry": { "mode": "quads", "count": 6 }, "textures": [{ "name": "sheet" }], "params": [{ "name": "fps", "type": "float", "min": 1, "max": 60, "default": 12 }] }`
 
 ```json
 { "effect_id": "fx_walkers", "kind": "generator", "start_time": 0, "end_time": 6,
