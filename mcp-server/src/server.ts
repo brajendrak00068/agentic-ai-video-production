@@ -451,7 +451,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_action',
     description:
-      'Execute any single canonical editor action (all 189+ actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project.',
+      'Execute any single canonical editor action (all 189+ actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1035,11 +1035,13 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   'Levea is a cloud video editor. Two ways to use it:',
   'A) Broad creative goal ("make 3 vertical clips with captions and music"): send the user\'s brief verbatim to autonomous_edit (or queue_edit + check_task_status for long edits). Never re-call it to check progress; on status "running" poll get_active_task.',
   'B) You drive the edit yourself (surgical changes, your own plan): use the direct tools. Fastest pattern, 3-4 calls total:',
-  '  1. execute_batch of read tools (list_layers, query_transcript, list_sources, shot_timeline) — pass video_url or assets on this first call to seed a new project; keep the returned project_id and pass it on every later call. Do not send the scene back; the server keeps it.',
+  '  1. execute_batch of read tools (timeline_view = the whole edit as one short text block; query_transcript, list_sources, shot_timeline) — pass video_url or assets on this first call to seed a new project; keep the returned project_id and pass it on every later call. Do not send the scene back; the server keeps it.',
   '  2. ONE execute_batch with every edit in NLE order: structure & cuts (SET_SOURCE_RANGE, TRIM_LAYER, SPLIT_LAYER, REMOVE_SILENCES, CONFIGURE_CANVAS, VERTICAL_REFRAME) before visuals (COLOR_GRADE, APPLY_VFX, TITLE_CARD, GENERATE_CAPTIONS, STYLE_CAPTIONS) before audio (CLEAN_AUDIO, GENERATE_MUSIC, ADD_SFX, AUTO_DUCK, MASTER_AUDIO).',
   '  3. render_preview at 2-4 timestamps and look at the frames; fix what you see with one more batch.',
   '  4. execute_action EXPORT_VIDEO → videoUrl, or a jobId to poll with check_job_status.',
   'Unsure of an action\'s params? search_tools with a query returns matching actions with param specs; get_action_schema takes actions: [..] for several at once. A batch (max 25 steps) is checked before anything runs and is atomic (allow_partial: true to keep successful steps); destructive actions need confirm_destructive: true. The server adds no creative content of its own on this path, and masters loudness at export if you skipped MASTER_AUDIO.',
+  'No id lookups between steps: params accept references — @last (layer the latest step created; also across calls), @last:<kind>, @step<N>, @primary (main video), @first:<kind>, @all:<kind> (bulk, in layer_ids) and times @end-3, @mid, @last.end+0.5. Kinds: video, audio, text, caption, title, broll, music, sfx or any role. Receipts list createdLayerIds.',
+  'Bulk in one step: TRIM_LAYER { layer_id: "@primary", keep_ranges: [{start,end}] } keeps only those spans and stitches; UPDATE_LAYER { layer_ids: "@all:title", ... }; STYLE_CAPTIONS restyles every caption.',
   'Craft playbooks: search_skills / load_skill. Brand kits and caption templates: list_brand_kits, list_caption_templates.',
 ].join('\n');
 
