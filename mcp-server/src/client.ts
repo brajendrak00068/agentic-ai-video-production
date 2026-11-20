@@ -308,6 +308,26 @@ export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal): 
  * the full scene with `get_project`) so multi-step edits do not flood the
  * calling model's context window.
  */
+/** Longest server-requested wait the client sits through before retrying a rate-limited call once. */
+const RATE_LIMIT_MAX_WAIT_SEC = 65;
+
+/** Seconds to wait before retrying a 429 (retryAfter in the body, else the Retry-After header); null = do not retry. */
+function rateLimitWaitSec(res: { status: number; data?: unknown; headers?: Record<string, unknown> }): number | null {
+  if (res.status !== 429) return null;
+  const bodyWait = Number((res.data as { retryAfter?: unknown } | undefined)?.retryAfter);
+  const headerWait = Number(res.headers?.['retry-after']);
+  const wait = Number.isFinite(bodyWait) && bodyWait >= 0 ? bodyWait : (Number.isFinite(headerWait) && headerWait >= 0 ? headerWait : NaN);
+  if (!Number.isFinite(wait) || wait > RATE_LIMIT_MAX_WAIT_SEC) return null;
+  return Math.max(1, Math.ceil(wait)) + Math.random();
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+  });
+}
+
 export async function executeDeterministicTool(
   tool: string,
   projectId: string | undefined,
@@ -317,16 +337,21 @@ export async function executeDeterministicTool(
   const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
   const resolvedProjectId = projectId || (typeof params?.project_id === 'string' && params.project_id.trim() ? params.project_id.trim() : undefined);
   try {
-    const res = await http2().post(
-      v1('/execute'),
-      {
-        tool,
-        params,
-        ...(resolvedProjectId ? { projectId: resolvedProjectId, project_id: resolvedProjectId } : {}),
-        ...(params?.scene !== undefined ? { scene: params.scene } : {}),
-      },
-      { signal: call.signal },
-    );
+    const body = {
+      tool,
+      params,
+      ...(resolvedProjectId ? { projectId: resolvedProjectId, project_id: resolvedProjectId } : {}),
+      ...(params?.scene !== undefined ? { scene: params.scene } : {}),
+    };
+    let res = await http2().post(v1('/execute'), body, { signal: call.signal });
+    // Rate limited: the server refunded the request and ran nothing, so one
+    // retry after its retryAfter (short waits only) is safe and spares the
+    // agent a failed step it would otherwise resend at once.
+    const waitSec = rateLimitWaitSec(res);
+    if (waitSec !== null && !call.signal.aborted) {
+      await sleep(waitSec * 1000, call.signal);
+      res = await http2().post(v1('/execute'), body, { signal: call.signal });
+    }
     const d = (res.data || {}) as Record<string, unknown>;
     const { scene, ...rest } = d;
     const layers = (scene as { layers?: unknown } | undefined)?.layers;
