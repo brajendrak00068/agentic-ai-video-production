@@ -6,7 +6,7 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 `levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
-## Tools (37 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
+## Tools (41 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
 
 The surface supports **two complementary execution modes** plus typed management & polling:
 - **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
@@ -36,6 +36,17 @@ The surface supports **two complementary execution modes** plus typed management
 | `delete_layer` | Shortcut: delete one or more layers; `close_gap: true` ripples the timeline closed |
 | `trim_layer` | Shortcut: shorten a layer (`edge` + `seconds`, or `start_time` + `end_time`) |
 | `apply_transition` | Shortcut: put a named transition (~170 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
+
+### ShaderFX — your own GPU effects (4)
+
+Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that read the footage (`src()`), transitions that read clip A / clip B (`clip_a()` / `clip_b()`), and generators. The server wraps and validates it (errors come back as `{ line, column, message }` in your source); preview and export run the same shader. Contract, output modes, params manifest and six worked examples: `load_skill({ skill_id: "shaderfx-effects" })` or [`skills/shaderfx-effects`](./skills/shaderfx-effects/SKILL.md).
+
+| Tool | What it does |
+|---|---|
+| `create_shader_effect` | Validate + save `{ name, source, manifest }` to your effect library; returns the effect id (`CREATE_SHADER_EFFECT`) |
+| `list_shader_effects` | List saved effects (`LIST_SHADER_EFFECTS`; `GET_SHADER_EFFECT` via `execute_action`) |
+| `apply_shader_effect` | Put an effect (`effect_id`, or inline `source` + `manifest`) on a project as a `filter` (`target_layer_id`), `transition` (`from_layer_id` + `to_layer_id`) or `generator`, with `params`, `start_time` / `end_time`, `output` (`APPLY_SHADER_EFFECT`) |
+| `delete_shader_effect` | Delete a saved effect (`DELETE_SHADER_EFFECT`) |
 
 ### Job / task polling (3)
 
