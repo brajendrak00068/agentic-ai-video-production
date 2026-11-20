@@ -173,7 +173,7 @@ The harness clamps what `fx` returns to 0..1, multiplies by the layer opacity, a
               { "name": "direction", "type": "vec2", "default": [1, 0] } ] }
 ```
 
-- `abi` must be 2 if given. `kind`: `filter` (default) | `transition` | `generator`. `output`: `normal` (default) | `add` | `replace`.
+- `abi`, if given, is 2 or 3 (the features used decide; see ABI v3 below). `kind`: `filter` (default) | `transition` | `generator`. `output`: `normal` (default) | `add` | `replace`.
 - Param names start with a letter and use letters, digits and `_`, at most 40 characters, unique. They become accessors: `P_strength()`, `P_tint()`, `P_direction()`. Optional `min`, `max`, `description`.
 - Slot sizes: `float` 1, `bool` 1, `vec2` 2, `vec3` 4 (xyz plus padding), `color` 4 (rgba). Slots are assigned in declaration order, and `vec3` / `color` start on the next multiple of 4. Above: `strength` → 0, slots 1-3 unused, `tint` → 4-7, `direction` → 8-9. Declare 4-slot params first to avoid gaps. Total ≤ 32 slots.
 - Value formats: `float` a number; `bool` `true` / `false`; `vec2` `[x, y]` or `{x, y}`; `vec3` `[x, y, z]`; `color` `"#rgb"`, `"#rgba"`, `"#rrggbb"`, `"#rrggbbaa"`, `[r, g, b(, a)]` or `{ r, g, b, a? }` in 0..1.
