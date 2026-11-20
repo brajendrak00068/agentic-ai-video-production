@@ -45,7 +45,7 @@ Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that re
 |---|---|
 | `create_shader_effect` | Validate + save `{ name, source, manifest }` to your effect library; returns the effect id (`CREATE_SHADER_EFFECT`) |
 | `list_shader_effects` | List saved effects (`LIST_SHADER_EFFECTS`; `GET_SHADER_EFFECT` via `execute_action`) |
-| `apply_shader_effect` | Put an effect (`effect_id`, or inline `source` + `manifest`) on a project as a `filter` (`target_layer_id`), `transition` (`from_layer_id` + `to_layer_id`) or `generator`, with `params`, `start_time` / `end_time`, `output` (`APPLY_SHADER_EFFECT`) |
+| `apply_shader_effect` | Put an effect (`effect_id`, or inline `source` + `manifest`) on a project as a `filter` (`target_layer_id`), `transition` (`from_layer_id` + `to_layer_id`) or `generator`, with `params`, `param_keyframes` (per-param animation), `start_time` / `end_time`, `output` (`APPLY_SHADER_EFFECT`). Transitions draw across the A/B overlap; clips meeting at a cut get one laid on media handles (`duration_sec`, default 0.8 s), else `SHADER_FX_NO_HANDLES` |
 | `delete_shader_effect` | Delete a saved effect (`DELETE_SHADER_EFFECT`) |
 
 ### Job / task polling (3)

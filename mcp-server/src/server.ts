@@ -180,7 +180,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'create_shader_effect',
     description:
-      'Save a reusable ShaderFX (ABI v2) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv, px, res, time, local_time, progress, intensity }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns the effect id for apply_shader_effect. Source ≤ 24 KB; keep loops bounded. Full contract + worked examples: load_skill shaderfx-effects.',
+      'Save a reusable ShaderFX (ABI v2) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv (0..1 canvas, top-left), px, res (render-target px), time = local_time (seconds since the effect layer started), progress (transition: 0→1 across the overlap; else time / layer length), intensity }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …; float → f32, vec2/vec3 → vec2/vec3<f32>, color → vec4<f32>, bool → f32 0/1). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns effect_id and the param table (name, type, slot, accessor). overwrite: true replaces your effect of the same name. Source ≤ 24 KB; keep loops bounded. Full contract + worked examples: load_skill shaderfx-effects.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -188,9 +188,11 @@ const TOOL_DEFS: Tool[] = [
         source: { type: 'string', description: 'Author WGSL defining fn fx(c: FxCtx) -> vec4<f32> (plus any helper fns of your own). No bindings, no @fragment.' },
         manifest: {
           type: 'object',
-          description: 'Effect manifest: { abi: 2, kind: "filter" | "transition" | "generator", output: "add" | "normal" | "replace", params: [{ name, type: "float" | "vec2" | "vec3" | "color" | "bool", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (color aligned to a 4-slot boundary); total ≤ 32.',
+          description: 'Effect manifest: { abi: 2, kind: "filter" | "transition" | "generator", output: "add" | "normal" | "replace", params: [{ name, type: "float" | "vec2" | "vec3" | "color" | "bool", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (vec3/color start on a 4-slot boundary); total ≤ 32. kind defaults to filter, output to normal.',
         },
         description: { type: 'string', description: 'Optional one-line description.' },
+        is_public: { type: 'boolean', description: 'Share the effect publicly (default false).' },
+        overwrite: { type: 'boolean', description: 'Replace your existing effect with the same name.' },
         project_id: { type: 'string', description: 'Optional project context.' },
       },
       required: ['name', 'source', 'manifest'],
@@ -202,6 +204,9 @@ const TOOL_DEFS: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        query: { type: 'string', description: 'Optional name / description filter.' },
+        include_public: { type: 'boolean', description: 'Also list public effects.' },
+        limit: { type: 'number', description: 'Max effects to return.' },
         project_id: { type: 'string', description: 'Optional project context.' },
       },
       required: [],
@@ -210,7 +215,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'apply_shader_effect',
     description:
-      'Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind "filter": target_layer_id = the layer whose picture src() reads (omit = everything composited below). kind "transition": from_layer_id (clip A, clip_a()) + to_layer_id (clip B, clip_b()), progress runs 0→1. kind "generator": paints on its own (src() is transparent). params = values by manifest param name (missing = default). Then check it with render_preview before export.',
+      'Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind (optional: request, else manifest, else inferred from the layer ids) "filter": target_layer_id = the layer whose picture src() reads (omit = everything composited below); window = start_time/end_time, else the target\'s, else the whole timeline. "transition": from_layer_id (clip A) + to_layer_id (clip B); progress runs 0→1 across their overlap. Clips meeting at a cut get a duration_sec overlap (default 0.8 s) laid on media handles, program length unchanged; SHADER_FX_NO_HANDLES if neither clip has media beyond the cut (overlap them first or shorten duration_sec). "generator": paints on its own. params = values by manifest name; param_keyframes animates them. Then check with render_preview before export.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -222,12 +227,20 @@ const TOOL_DEFS: Tool[] = [
         target_layer_id: { type: 'string', description: '[filter] Layer whose picture is src(); omit for the composited backdrop.' },
         from_layer_id: { type: 'string', description: '[transition] Outgoing clip A.' },
         to_layer_id: { type: 'string', description: '[transition] Incoming clip B.' },
-        params: { type: 'object', description: 'Param values by manifest name, e.g. { "strength": 0.8, "tint": "#ffcc66", "direction": [1, 0] }.' },
-        start_time: { type: 'number', description: 'Timeline seconds the effect starts.' },
-        end_time: { type: 'number', description: 'Timeline seconds the effect ends.' },
+        params: { type: 'object', description: 'Param values by manifest name, e.g. { "strength": 0.8, "tint": "#ffcc66", "direction": [1, 0] }. Unknown names are errors; floats clamp to min/max.' },
+        param_keyframes: {
+          type: 'object',
+          description: 'Animate params: { "<param name>": [{ "time": <timeline seconds>, "value": <param type>, "easing"?: "ease_out" }, ...] } with at least 2 keyframes each. vec/color keyframe per component; bool steps.',
+        },
+        start_time: { type: 'number', description: '[filter/generator] Timeline seconds the effect starts (ignored for transitions).' },
+        end_time: { type: 'number', description: '[filter/generator] Timeline seconds the effect ends (ignored for transitions).' },
+        duration_sec: { type: 'number', description: '[transition] Overlap length in seconds (default 0.8, at most half the shorter clip).' },
+        easing: { type: 'string', description: '[transition] Easing of progress (default linear), e.g. ease_in_out.' },
         output: { type: 'string', enum: ['add', 'normal', 'replace'], description: 'Override the manifest output mode.' },
+        intensity: { type: 'number', description: 'c.intensity for the layer (default 1).' },
+        opacity: { type: 'number', description: 'Layer opacity 0..1 (default 1).' },
       },
-      required: ['project_id', 'kind'],
+      required: ['project_id'],
     },
   },
   {

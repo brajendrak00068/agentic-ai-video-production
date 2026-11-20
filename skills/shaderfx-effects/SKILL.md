@@ -26,11 +26,28 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 | MCP tool | Canonical action (also callable via `execute_action` / `execute_batch`) | What it does |
 |---|---|---|
-| `create_shader_effect` | `CREATE_SHADER_EFFECT { name, source, manifest }` | Validates and saves an effect to your library; returns its id, or `errors: [{ line, column, message }]` and saves nothing |
-| `list_shader_effects` | `LIST_SHADER_EFFECTS` | Your saved effects |
-| (via `execute_action`) | `GET_SHADER_EFFECT { effect_id }` | One effect with its source and manifest |
-| `apply_shader_effect` | `APPLY_SHADER_EFFECT { effect_id \| source+manifest, kind, target_layer_id \| from_layer_id+to_layer_id, params, start_time, end_time, output }` | Puts the effect on a project |
-| `delete_shader_effect` | `DELETE_SHADER_EFFECT { effect_id }` | Removes it from the library (layers already using it keep their copy) |
+| `create_shader_effect` | `CREATE_SHADER_EFFECT { name, source, manifest, description?, is_public?, overwrite? }` | Validates and saves an effect to your library; returns `effect_id` and the parameter table (name, type, slot, accessor), or `errors: [{ line, column, message }]` and saves nothing. `overwrite: true` replaces your effect of the same name |
+| `list_shader_effects` | `LIST_SHADER_EFFECTS { include_public?, query?, limit? }` | Your saved effects (id, name, kind, output, params) |
+| (via `execute_action`) | `GET_SHADER_EFFECT { effect_id }` | One effect with its source, manifest and parameter table |
+| `apply_shader_effect` | `APPLY_SHADER_EFFECT` (fields below) | Adds a ShaderFX layer to the project |
+| `delete_shader_effect` | `DELETE_SHADER_EFFECT { effect_id }` | Removes it from the library; layers it was applied to keep their compiled shader |
+
+`APPLY_SHADER_EFFECT` fields:
+
+| field | meaning |
+|---|---|
+| `effect_id` or `source` + `manifest` | a saved effect, or inline code (validated the same way) |
+| `kind` | `filter` \| `transition` \| `generator`. Optional: the request's, else the manifest's, else `transition` when `from_layer_id` + `to_layer_id` are given, `filter` when `target_layer_id` is |
+| `target_layer_id` | filter: the layer whose picture is `src()`; the effect layer goes just above it and spans its window. Omit to filter everything composited below (the effect goes above the top picture layer) |
+| `from_layer_id` + `to_layer_id` | transition: outgoing clip A and incoming clip B (see Transitions below) |
+| `params` | values by manifest name: `{ "strength": 0.8, "tint": "#ff8800", "direction": [0, 1] }`. Unknown names or wrong shapes are errors; floats are clamped to the param's min/max |
+| `param_keyframes` | animate params over time (see Parameter keyframes below) |
+| `start_time`, `end_time` | filter / generator window in timeline seconds (default: the target's window, else the whole timeline). Ignored for transitions |
+| `duration_sec`, `easing` | transition length (default 0.8 s) and the easing of its progress (default `linear`) |
+| `output` | overrides the manifest's output mode |
+| `intensity`, `opacity`, `z_index` | the layer's `c.intensity` (default 1), opacity (default 1) and stacking override |
+
+The result names the new layer (`layer_id`, `createdLayerIds`), its window and the parameter table. Failure codes: `SHADER_FX_INVALID` (shader or manifest errors, with `errors`), `SHADER_FX_INVALID_PARAMS`, `SHADER_FX_TARGET_NOT_FOUND`, `SHADER_FX_CLIPS_NOT_ADJACENT`, `SHADER_FX_NO_HANDLES`, `SHADER_FX_NOT_FOUND`.
 
 The old path still works: `APPLY_VFX` / `TRANSITION` with `custom_shader_frag` is ABI v1 (`evaluate_pixel(uv, time, res, progress, intensity)`, no picture input, light-only output). Use ABI v2 for anything new.
 
@@ -38,11 +55,11 @@ The old path still works: `APPLY_VFX` / `TRANSITION` with `custom_shader_frag` i
 
 1. Write `source` + `manifest`. Call `create_shader_effect`.
 2. If it returns `errors`, fix those lines (they are numbered in YOUR source, not the wrapped shader) and call again.
-3. `apply_shader_effect` with the returned `effect_id`, the `kind`, the layers, the time window and `params`.
-4. `render_preview` at 2-4 timestamps inside the window (for a transition: start, middle, end) and look at the frames. Adjust `params` or the source and re-apply.
+3. `apply_shader_effect` with the returned `effect_id`, the layers, the window and `params`.
+4. `render_preview` at 2-4 timestamps inside the window (for a transition: start, middle, end) and look at the frames. A shader the GPU could not build is reported there (`customShaderErrors`). Adjust `params` or the source and re-apply.
 5. Export with `execute_action` `EXPORT_VIDEO`.
 
-You can skip the library and pass `source` + `manifest` straight to `apply_shader_effect` (validated the same way) for one-off effects.
+You can skip the library and pass `source` + `manifest` straight to `apply_shader_effect` for one-off effects.
 
 ```json
 {
@@ -51,9 +68,38 @@ You can skip the library and pass `source` + `manifest` straight to `apply_shade
   "kind": "transition",
   "from_layer_id": "clip_1",
   "to_layer_id": "clip_2",
-  "start_time": 4.5,
-  "end_time": 5.3,
+  "duration_sec": 0.6,
+  "easing": "ease_in_out",
   "params": { "strength": 0.7 }
+}
+```
+
+### Transitions: the overlap
+
+A transition layer draws across the time where clip A and clip B overlap. `c.progress` runs 0 → 1 across that overlap (keyed on the layer, with `easing`).
+
+- Clips that already overlap: the existing overlap is used (with `duration_sec`, only its last `duration_sec`).
+- Clips that meet at a cut: an overlap of `duration_sec` (default 0.8 s, at most half the shorter clip) is created from media handles, without changing the program length. If clip A has media after its out point, A plays on under B (tail handle, the transition starts at the cut). Otherwise, if B has media before its in point, B starts earlier on that earlier media (head handle, the transition ends at the cut).
+- Neither clip has enough media beyond the cut: `SHADER_FX_NO_HANDLES`. Overlap the clips first (`TRIM_LAYER` / `SET_SOURCE_RANGE`) or pass a shorter `duration_sec`.
+- Clips with a gap between them: `SHADER_FX_CLIPS_NOT_ADJACENT`. `from_layer_id` is the outgoing clip, `to_layer_id` the incoming one.
+
+The effect layer sits above both clips, and `replace` output (the usual choice) covers them for the overlap.
+
+### Parameter keyframes
+
+`param_keyframes` animates manifest params: `{ "<param name>": [ { "time": <timeline seconds>, "value": <the param's own type>, "easing": "<optional>" }, ... ] }`, at least 2 keyframes per param. Each param becomes `fx_param_<slot>` tracks. A `vec2` / `vec3` / `color` gets one track per component. A `bool` steps. Values are encoded like `params` (hex or `[r, g, b(, a)]` for colors, clamped to min/max). Keyed params override the static `params` value while the keyframes apply.
+
+```json
+{
+  "project_id": "proj_123",
+  "effect_id": "fx_streak",
+  "target_layer_id": "@primary",
+  "start_time": 2, "end_time": 6,
+  "params": { "tint": "#66ccff" },
+  "param_keyframes": {
+    "strength": [ { "time": 2, "value": 0 }, { "time": 3, "value": 1, "easing": "ease_out" }, { "time": 6, "value": 0.2 } ],
+    "direction": [ { "time": 2, "value": [1, 0] }, { "time": 6, "value": [0, 1] } ]
+  }
 }
 ```
 
@@ -67,19 +113,22 @@ fn fx(c: FxCtx) -> vec4<f32> {
 }
 ```
 
-You may add your own helper functions and `const`s above `fx`. Do not declare bindings, `@fragment`, `fs_main`, or anything named like the harness symbols below; the server builds those.
+You may add your own helper functions, structs and `const`s above `fx`. The server adds the bindings and the entry point. Rejected before compiling:
+
+- any `@fragment`, `@vertex`, `@compute`, `@group` or `@binding`;
+- a module-scope `fn` / `struct` / `var` / `const` / `alias` named like a harness symbol: `fs_main`, `vs_main`, `FxCtx`, `FxParams`, `LayerUniforms`, `VertexOutput`, `VertexInput`, `u`, `fxp`, `t_src`, `s_linear`, `t_backdrop`, `t_b`, `src`, `backdrop`, `clip_a`, `clip_b`, `param`, `param_color`, `hash2`, `noise2`, `fbm`, `luma`, `rotate2`, your `P_<name>` accessors, or anything starting with `_fx_` / `_harness_`. A local `let` / `var` inside a function may reuse these names.
 
 ### FxCtx
 
 | field | type | meaning |
 |---|---|---|
-| `uv` | `vec2<f32>` | 0..1 across the whole canvas, top-left origin (y grows downward) |
-| `px` | `vec2<f32>` | pixel position, `uv * res` |
-| `res` | `vec2<f32>` | canvas size in pixels |
-| `time` | `f32` | timeline seconds |
-| `local_time` | `f32` | seconds since this layer started |
-| `progress` | `f32` | 0..1: transition progress for a transition, layer progress otherwise |
-| `intensity` | `f32` | the layer's effect intensity; multiply your strength by it |
+| `uv` | `vec2<f32>` | the effect layer's texture coordinate. The layer is a full-canvas quad, so this is 0..1 across the canvas, top-left origin (y grows downward), and `src(c.uv)` is the pixel under the fragment |
+| `px` | `vec2<f32>` | `uv * res` |
+| `res` | `vec2<f32>` | render-target size in pixels: the bound backdrop's size (on export, canvas × supersample), else the layer size. It is not the scene canvas size, so build resolution-independent detail from `uv` and use `res` for aspect (`res.x / res.y`) |
+| `time` | `f32` | the layer clock: seconds since the effect layer started |
+| `local_time` | `f32` | the same layer clock (equal to `time`) |
+| `progress` | `f32` | transition: the keyed transition progress, 0 → 1 across the overlap. Filter / generator: `time / layer length`, clamped to 0..1 |
+| `intensity` | `f32` | the layer's `fx_intensity` (default 1); multiply your strength by it |
 
 Aspect-correct anything round: `var p = c.uv - vec2<f32>(0.5, 0.5); p.x = p.x * (c.res.x / c.res.y);`
 
@@ -89,33 +138,31 @@ Aspect-correct anything round: `var p = c.uv - vec2<f32>(0.5, 0.5); p.x = p.x * 
 |---|---|---|---|
 | `src(uv)` | the target layer (`target_layer_id`) rendered alone, transparent elsewhere; without a target, everything composited below this layer | clip A | transparent |
 | `backdrop(uv)` | everything composited below this layer this frame | same | same |
-| `clip_a(uv)` | — | outgoing clip (`from_layer_id`) | — |
+| `clip_a(uv)` | same as `src` | outgoing clip (`from_layer_id`) | transparent |
 | `clip_b(uv)` | transparent | incoming clip (`to_layer_id`) | transparent |
 
-Pictures are full-canvas and the same resolution as the output, so `src(c.uv)` is exactly the pixel under the fragment; offset the uv to displace, blur or split. Sampling is linear with clamp-to-edge, so uvs outside 0..1 repeat the edge pixel; mask them yourself if you need transparency there.
+Pictures are full-canvas and the same resolution as the render target. Offset the uv to displace, blur or split. Sampling is linear with clamp-to-edge, so uvs outside 0..1 repeat the edge pixel; mask them yourself if you need transparency there. The helpers sample at mip level 0 (`textureSampleLevel`), so they can be called anywhere, including inside branches and loops.
 
 ### Other helpers
 
 | helper | signature | notes |
 |---|---|---|
-| `param` | `param(i: u32) -> f32` | raw parameter slot i (0..31) |
+| `P_<name>` | `P_strength()` … | one per manifest param: `float` → `f32`, `vec2` → `vec2<f32>`, `vec3` → `vec3<f32>`, `color` → `vec4<f32>` (straight rgba, 0..1), `bool` → `f32` 0.0 or 1.0 (test `P_flag() > 0.5`). Prefer these over indices |
+| `param` | `param(i: u32) -> f32` | raw slot i (0..31, clamped) |
 | `param_color` | `param_color(i: u32) -> vec4<f32>` | 4 consecutive slots from i |
-| `P_<name>` | `P_strength()` … | generated per manifest param: `float` → `f32`, `vec2` → `vec2<f32>`, `vec3` → `vec3<f32>`, `color` → `vec4<f32>` (rgba). Prefer these over indices |
 | `hash2` | `hash2(p: vec2<f32>) -> f32` | white noise in 0..1 |
 | `noise2` | `noise2(p: vec2<f32>) -> f32` | smooth gradient noise, signed (about -0.5..0.5); add 0.5 for 0..1 |
 | `fbm` | `fbm(p: vec2<f32>) -> f32` | 4 octaves of `noise2`, also signed |
-| `luma` | `luma(rgb: vec3<f32>) -> f32` | perceived brightness |
+| `luma` | `luma(rgb: vec3<f32>) -> f32` | Rec. 709 luma (0.2126, 0.7152, 0.0722) |
 | `rotate2` | `rotate2(v: vec2<f32>, angle: f32) -> vec2<f32>` | rotate by radians |
-
-A `bool` param is one slot holding 0 or 1; test it as `param(i) > 0.5`.
 
 ### Output modes (`manifest.output`, or `output` on apply)
 
-The harness turns your straight rgba into premultiplied "over" compositing:
+The harness clamps what `fx` returns to 0..1, multiplies by the layer opacity, and composites premultiplied "over":
 
-- `normal` (default): your rgba is composited over what is below, with real alpha. Alpha 1 black is black: vignettes, shadows, letterboxes, darkening and full re-renders of a layer all work. For filters that rewrite a picture, return the picture's own alpha (`src(uv).a`) so the area outside the layer stays untouched.
-- `add`: your rgb is added onto what is below and alpha is ignored (light only). Glows, leaks, sparks, flares. Fade it by scaling rgb, not alpha.
-- `replace`: your rgb replaces what is below with alpha forced to 1, over the whole canvas. Use it for transitions between full-frame clips and for generators that paint every pixel. Do not use it for a filter on a layer that does not cover the frame: the transparent area outside the layer would turn black.
+- `normal` (default): your rgba over what is below, with real alpha. Alpha 1 black is black, so vignettes, shadows, letterboxes, darkening and full re-renders of a layer all work. For filters that rewrite a picture, return the picture's own alpha (`src(uv).a`) so the area outside the layer stays untouched.
+- `add`: `rgb × a` is added onto what is below (light only; nothing is covered). Glows, leaks, sparks, flares. Alpha works as a light mask.
+- `replace`: your rgb replaces what is below, with alpha set to the layer opacity (1 by default), over the whole canvas. Use it for transitions between full-frame clips and for generators that paint every pixel. Do not use it for a filter on a layer that does not cover the frame: the transparent area outside the layer would turn black.
 
 ### Manifest and parameter slots
 
@@ -126,19 +173,18 @@ The harness turns your straight rgba into premultiplied "over" compositing:
               { "name": "direction", "type": "vec2", "default": [1, 0] } ] }
 ```
 
-- `kind`: `filter` | `transition` | `generator`. `output`: `add` | `normal` | `replace`.
-- Slot sizes: `float` 1, `bool` 1, `vec2` 2, `vec3` 4, `color` 4 (rgba).
-- Slots are assigned in declaration order. A `color` starts on the next multiple of 4, leaving a gap. Above: `strength` → 0, slots 1-3 unused, `tint` → 4-7, `direction` → 8-9. Declaring 4-slot params first avoids gaps.
-- Total ≤ 32 slots.
-- Names become accessors (`P_strength()`, `P_tint()`, `P_direction()`): use letters, digits and underscores only.
-- Values are static per layer, or keyframed per slot (`fx_param_0` … `fx_param_31`); `apply_shader_effect` `params` takes values by name.
+- `abi` must be 2 if given. `kind`: `filter` (default) | `transition` | `generator`. `output`: `normal` (default) | `add` | `replace`.
+- Param names start with a letter and use letters, digits and `_`, at most 40 characters, unique. They become accessors: `P_strength()`, `P_tint()`, `P_direction()`. Optional `min`, `max`, `description`.
+- Slot sizes: `float` 1, `bool` 1, `vec2` 2, `vec3` 4 (xyz plus padding), `color` 4 (rgba). Slots are assigned in declaration order, and `vec3` / `color` start on the next multiple of 4. Above: `strength` → 0, slots 1-3 unused, `tint` → 4-7, `direction` → 8-9. Declare 4-slot params first to avoid gaps. Total ≤ 32 slots.
+- Value formats: `float` a number; `bool` `true` / `false`; `vec2` `[x, y]` or `{x, y}`; `vec3` `[x, y, z]`; `color` `"#rgb"`, `"#rgba"`, `"#rrggbb"`, `"#rrggbbaa"`, `[r, g, b(, a)]` or `{ r, g, b, a? }` in 0..1.
+- Without a `default`: `float` 0 (clamped to min/max), `bool` false, vectors 0, `color` opaque white.
 
 ### Validation and limits
 
-- The wrapped shader is compiled with naga before saving or rendering. Errors come back as `{ line, column, message }` in your own source lines.
+- The wrapped shader is compiled with the renderer's own naga (wasm build on the server) before anything is saved or rendered. Errors come back as `{ line, column, message }` on your own lines. An error inside the generated harness has line 0 and usually means `fx` has the wrong signature or a name collides.
 - Author source ≤ 24 KB.
 - Keep every loop bounded by a constant (`for (var i = 0; i < 8; i = i + 1)`). A layer whose pipeline fails to build or that stalls the GPU is skipped (picture unchanged) and reported.
-- The same WGSL runs in preview and export: no renderer-specific code.
+- The same WGSL runs in preview (WebGPU) and export (Vulkan): no renderer-specific code.
 
 ### WGSL pitfalls that fail validation
 
@@ -147,7 +193,6 @@ The harness turns your straight rgba into premultiplied "over" compositing:
 - `let` is immutable; use `var` for anything you assign to (including swizzle writes like `p.x = ...`).
 - There is no `?:`; use `select(if_false, if_true, cond)` or `mix`/`step`.
 - No recursion, no implicit conversions between `i32`, `u32` and `f32`; `param(2u)` takes a `u32`.
-- Call `src` / `backdrop` / `clip_a` / `clip_b` unconditionally (not inside an `if` or a loop whose condition depends on pixel values); branch on the result instead. Texture sampling in non-uniform control flow fails validation.
 - `smoothstep(e0, e1, x)` needs `e0 < e1`.
 
 ## Examples
@@ -201,8 +246,10 @@ fn fx(c: FxCtx) -> vec4<f32> {
     let d = length(p) / length(vec2<f32>(0.5 * aspect, 0.5));
     let falloff = smoothstep(0.35, 1.05, d);
 
-    // A touch of animated grain in the dark area breaks up banding.
-    let grain = (hash2(floor(c.px) + vec2<f32>(c.time * 61.0, c.time * 17.0)) - 0.5) * 0.06;
+    // A touch of animated grain in the dark area breaks up banding. Built from uv
+    // (not px), so the grain size is the same in preview and supersampled export.
+    let grain_cell = floor(c.uv * vec2<f32>(720.0 * aspect, 720.0));
+    let grain = (hash2(grain_cell + vec2<f32>(c.time * 61.0, c.time * 17.0)) - 0.5) * 0.06;
     let alpha = clamp((falloff * 0.9 + grain * falloff) * c.intensity, 0.0, 1.0);
 
     // Slightly cool shadow colour reads as a lens, not a black overlay.
@@ -268,7 +315,7 @@ fn fx(c: FxCtx) -> vec4<f32> {
 
 ### 5. Generator: animated light leaks
 
-Manifest: `{ "abi": 2, "kind": "generator", "output": "add", "params": [] }`. Apply with `start_time` / `end_time` over the section; it fades itself in and out with layer progress.
+Manifest: `{ "abi": 2, "kind": "generator", "output": "add", "params": [] }`. Apply with `start_time` / `end_time` over the section; it fades itself in and out with `c.progress` (time through the layer).
 
 ```wgsl
 fn blob(p: vec2<f32>, centre: vec2<f32>, radius: vec2<f32>) -> f32 {
@@ -357,4 +404,6 @@ Apply it twice with different looks:
 - Round things are aspect-corrected; the effect looks the same in 9:16 and 16:9.
 - Filters that rewrite a layer return `src(uv).a`; only full-frame work uses `replace`.
 - Light-only looks use `add`; anything that darkens uses `normal` with alpha.
-- Time-based motion uses `local_time` (starts at 0 with the layer) unless it must stay in sync with the timeline.
+- Motion uses the layer clock (`c.time` = `c.local_time`, 0 when the effect layer starts) or `c.progress`; to stay in sync with something on the timeline, place the layer so its start lines up.
+- Detail sizes (grain, noise scale) come from `uv`, not `px`: `res` is the render-target size and is larger on a supersampled export.
+- To animate a param over time, use `param_keyframes` rather than hard-coding time curves in the shader, so the same effect stays reusable.
