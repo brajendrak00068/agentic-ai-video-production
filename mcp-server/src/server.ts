@@ -180,7 +180,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'create_shader_effect',
     description:
-      'Save a reusable ShaderFX (ABI v2) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv (0..1 canvas, top-left), px, res (render-target px), time = local_time (seconds since the effect layer started), progress (transition: 0→1 across the overlap; else time / layer length), intensity }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …; float → f32, vec2/vec3 → vec2/vec3<f32>, color → vec4<f32>, bool → f32 0/1). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns effect_id and the param table (name, type, slot, accessor). overwrite: true replaces your effect of the same name. Source ≤ 24 KB; keep loops bounded. Full contract + worked examples: load_skill shaderfx-effects.',
+      'Save a reusable ShaderFX (ABI v2 / v3) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv (0..1 canvas, top-left), px, res (render-target px), time = local_time (seconds since the effect layer started), progress (transition: 0→1 across the overlap; else time / layer length), intensity, frame (v3) }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …; float → f32, vec2/vec3 → vec2/vec3<f32>, color → vec4<f32>, bool → f32 0/1). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns effect_id and the param table (name, type, slot, accessor). overwrite: true replaces your effect of the same name. Source ≤ 24 KB (v3: 48 KB); keep loops bounded. v3 (auto when used): textures, feedback, multi-pass, data, geometry (instanced particles / sprites). Full contract + worked examples: load_skill shaderfx-effects.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -188,9 +188,27 @@ const TOOL_DEFS: Tool[] = [
         source: { type: 'string', description: 'Author WGSL defining fn fx(c: FxCtx) -> vec4<f32> (plus any helper fns of your own). No bindings, no @fragment.' },
         manifest: {
           type: 'object',
-          description: 'Effect manifest: { abi: 2, kind: "filter" | "transition" | "generator", output: "add" | "normal" | "replace", params: [{ name, type: "float" | "vec2" | "vec3" | "color" | "bool", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (vec3/color start on a 4-slot boundary); total ≤ 32. kind defaults to filter, output to normal.',
+          description: 'Effect manifest: { abi: 2, kind: "filter" | "transition" | "generator", output: "add" | "normal" | "replace", params: [{ name, type: "float" | "vec2" | "vec3" | "color" | "bool", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (vec3/color start on a 4-slot boundary); total ≤ 32. kind defaults to filter, output to normal. Leave abi out: the server picks v3 automatically when a v3 field is present (an explicit abi: 3 is rejected). ABI v3 adds passes: [{ name, scale?: 1 | 0.5 | 0.25 }] (≤ 4; source defines fn pass_<name>(c), read with buf_<name>(uv)), textures: [{ name }] (≤ 4; tex_<name>(uv)), feedback: { enabled, warmup_sec?, clear? } (prev(uv)), geometry: { mode: "quads" | "points", count } (source defines fn instance(i, c) -> FxInstance and optional fn shade(p, c)).',
         },
         description: { type: 'string', description: 'Optional one-line description.' },
+        textures: {
+          type: 'array',
+          description: '[ABI v3] Up to 4 named textures: [{ name, layer_id | asset_url, space?: "canvas" | "image" }]. layer_id = that layer rendered alone (canvas space by default); asset_url = a public png/jpg/webp ≤ 4096² (image space by default, e.g. sprite sheets). Read with tex_<name>(uv), tex_size_<name>().',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Texture name, [a-z][a-z0-9_]{0,23}.' },
+              layer_id: { type: 'string', description: 'Layer whose picture is the texture.' },
+              asset_url: { type: 'string', description: 'Public image URL.' },
+              space: { type: 'string', enum: ['canvas', 'image'], description: 'Sampling space (default canvas for layer_id, image for asset_url).' },
+            },
+            required: ['name'],
+          },
+        },
+        feedback: { type: 'object', description: '[ABI v3] { enabled: true, warmup_sec?: 0..4 (default 1), clear?: [r, g, b, a] }: prev(uv) reads this layer\'s previous output frame (trails, echoes). Previews re-render warmup_sec before the frame. { enabled: false } turns a saved effect\'s feedback off.' },
+        data: { type: 'array', items: { type: 'number' }, description: '[ABI v3] Up to 16384 floats for data(i), data_len(), data_vec2(i), data_vec4(i) (charts, per-instance state, lookup tables).' },
+        data_url: { type: 'string', description: '[ABI v3] Public http(s) / gs:// URL of a JSON array (or { data: [...] }) or CSV, resolved to floats at apply time (inline data wins).' },
+        geometry: { type: 'object', description: '[ABI v3] { mode: "quads" (default) | "points", count: integer 1..65536 }: draw count instanced quads; the source defines fn instance(i: u32, c: FxCtx) -> FxInstance (pos canvas uv, size px, rotation rad, color, uv_rect, alive <= 0 culls) and optionally fn shade(p: FxPixel, c: FxCtx); no fx needed. Default shade: soft round point x color, or the first texture through uv_rect x color.' },
         is_public: { type: 'boolean', description: 'Share the effect publicly (default false).' },
         overwrite: { type: 'boolean', description: 'Replace your existing effect with the same name.' },
         project_id: { type: 'string', description: 'Optional project context.' },
@@ -215,19 +233,38 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'apply_shader_effect',
     description:
-      'Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind (optional: request, else manifest, else inferred from the layer ids) "filter": target_layer_id = the layer whose picture src() reads (omit = everything composited below); window = start_time/end_time, else the target\'s, else the whole timeline. "transition": from_layer_id (clip A) + to_layer_id (clip B); progress runs 0→1 across their overlap. Clips meeting at a cut get a duration_sec overlap (default 0.8 s) laid on media handles, program length unchanged; SHADER_FX_NO_HANDLES if neither clip has media beyond the cut (overlap them first or shorten duration_sec). "generator": paints on its own. params = values by manifest name; param_keyframes animates them. Then check with render_preview before export.',
+      'Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind (optional: request, else manifest, else inferred from the layer ids) "filter": target_layer_id = the layer whose picture src() reads (omit = everything composited below); window = start_time/end_time, else the target\'s, else the whole timeline. "transition": from_layer_id (clip A) + to_layer_id (clip B); progress runs 0→1 across their overlap. Clips meeting at a cut get a duration_sec overlap (default 0.8 s) laid on media handles, program length unchanged; SHADER_FX_NO_HANDLES if neither clip has media beyond the cut (overlap them first or shorten duration_sec). "generator": paints on its own. params = values by manifest name; param_keyframes animates them. v3 inputs: textures, feedback, data / data_url, geometry. Then check with render_preview before export.',
     inputSchema: {
       type: 'object',
       properties: {
         project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
         effect_id: { type: 'string', description: 'Saved effect id (from create_shader_effect / list_shader_effects).' },
         source: { type: 'string', description: 'Inline author WGSL (alternative to effect_id; needs manifest).' },
-        manifest: { type: 'object', description: 'Inline manifest (with source).' },
+        manifest: { type: 'object', description: 'Inline manifest (with source); may declare v3 passes / textures / feedback / geometry.' },
         kind: { type: 'string', enum: ['filter', 'transition', 'generator'], description: 'Effect kind; match the manifest kind.' },
         target_layer_id: { type: 'string', description: '[filter] Layer whose picture is src(); omit for the composited backdrop.' },
         from_layer_id: { type: 'string', description: '[transition] Outgoing clip A.' },
         to_layer_id: { type: 'string', description: '[transition] Incoming clip B.' },
         params: { type: 'object', description: 'Param values by manifest name, e.g. { "strength": 0.8, "tint": "#ffcc66", "direction": [1, 0] }. Unknown names are errors; floats clamp to min/max.' },
+        textures: {
+          type: 'array',
+          description: '[ABI v3] Up to 4 named textures: [{ name, layer_id | asset_url, space?: "canvas" | "image" }]. layer_id = that layer rendered alone (canvas space by default); asset_url = a public png/jpg/webp ≤ 4096² (image space by default, e.g. sprite sheets). Read with tex_<name>(uv), tex_size_<name>().',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Texture name, [a-z][a-z0-9_]{0,23}.' },
+              layer_id: { type: 'string', description: 'Layer whose picture is the texture.' },
+              asset_url: { type: 'string', description: 'Public image URL.' },
+              space: { type: 'string', enum: ['canvas', 'image'], description: 'Sampling space (default canvas for layer_id, image for asset_url).' },
+            },
+            required: ['name'],
+          },
+        },
+        feedback: { type: 'object', description: '[ABI v3] { enabled: true, warmup_sec?: 0..4 (default 1), clear?: [r, g, b, a] }: prev(uv) reads this layer\'s previous output frame (trails, echoes). Previews re-render warmup_sec before the frame. { enabled: false } turns a saved effect\'s feedback off.' },
+        data: { type: 'array', items: { type: 'number' }, description: '[ABI v3] Up to 16384 floats for data(i), data_len(), data_vec2(i), data_vec4(i) (charts, per-instance state, lookup tables).' },
+        data_url: { type: 'string', description: '[ABI v3] Public http(s) / gs:// URL of a JSON array (or { data: [...] }) or CSV, resolved to floats at apply time (inline data wins).' },
+        geometry: { type: 'object', description: '[ABI v3] { mode: "quads" (default) | "points", count: integer 1..65536 }: draw count instanced quads; the source defines fn instance(i: u32, c: FxCtx) -> FxInstance (pos canvas uv, size px, rotation rad, color, uv_rect, alive <= 0 culls) and optionally fn shade(p: FxPixel, c: FxCtx); no fx needed. Default shade: soft round point x color, or the first texture through uv_rect x color.' },
+        data_columns: { type: 'array', items: { type: 'string' }, description: '[ABI v3] CSV data_url only: columns to read, as header names or 0-based indexes ("3"), row by row in this order.' },
         param_keyframes: {
           type: 'object',
           description: 'Animate params: { "<param name>": [{ "time": <timeline seconds>, "value": <param type>, "easing"?: "ease_out" }, ...] } with at least 2 keyframes each. vec/color keyframe per component; bool steps.',
@@ -1161,7 +1198,7 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   'Unsure of an action\'s params? search_tools with a query returns matching actions with param specs; get_action_schema takes actions: [..] for several at once. A batch (max 25 steps) is checked before anything runs and is atomic (allow_partial: true to keep successful steps); destructive actions need confirm_destructive: true. The server adds no creative content of its own on this path, and masters loudness at export if you skipped MASTER_AUDIO.',
   'No id lookups between steps: params accept references — @last (layer the latest step created; also across calls), @last:<kind>, @step<N>, @primary (main video), @first:<kind>, @all:<kind> (bulk, in layer_ids) and times @end-3, @mid, @last.end+0.5. Kinds: video, audio, text, caption, title, broll, music, sfx or any role. Receipts list createdLayerIds.',
   'Bulk in one step: TRIM_LAYER { layer_id: "@primary", keep_ranges: [{start,end}] } keeps only those spans and stitches; UPDATE_LAYER { layer_ids: "@all:title", ... }; STYLE_CAPTIONS restyles every caption.',
-  'Custom GPU shaders (WGSL fn fx(c: FxCtx)): create_shader_effect then apply_shader_effect; contract + examples: load_skill shaderfx-effects.',
+  'Custom GPU shaders (WGSL fn fx(c: FxCtx); v3: textures, feedback, passes, data, particles): create_shader_effect then apply_shader_effect; contract + examples: load_skill shaderfx-effects.',
   'Craft playbooks: search_skills / load_skill. Brand kits and caption templates: list_brand_kits, list_caption_templates.',
 ].join('\n');
 

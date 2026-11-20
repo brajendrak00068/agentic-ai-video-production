@@ -1,7 +1,7 @@
 ---
 name: shaderfx-effects
-description: "Write your own GPU effects for Levea in WGSL (ShaderFX ABI v2): filters that read and rewrite the footage, transitions that read clip A and clip B, and generators like light leaks, with real alpha, typed reusable parameters, server-side validation with line/column errors, and an effect library. The same shader runs in the WebGPU preview and the Vulkan export."
-version: 1.0.0
+description: "Write your own GPU effects for Levea in WGSL (ShaderFX ABI v2 + v3): filters that read and rewrite the footage, transitions that read clip A and clip B, and generators like light leaks, plus (ABI v3) named textures, feedback trails, multi-pass bloom, data-driven charts and instanced particles / sprites, with real alpha, typed reusable parameters, server-side validation with line/column errors, and an effect library. The same shader runs in the WebGPU preview and the Vulkan export."
+version: 1.1.0
 author: brajendrak00068
 license: MIT
 ---
@@ -173,7 +173,7 @@ The harness clamps what `fx` returns to 0..1, multiplies by the layer opacity, a
               { "name": "direction", "type": "vec2", "default": [1, 0] } ] }
 ```
 
-- `abi` must be 2 if given. `kind`: `filter` (default) | `transition` | `generator`. `output`: `normal` (default) | `add` | `replace`.
+- `abi`, if given, is 2 or 3 (the features used decide; see ABI v3 below). `kind`: `filter` (default) | `transition` | `generator`. `output`: `normal` (default) | `add` | `replace`.
 - Param names start with a letter and use letters, digits and `_`, at most 40 characters, unique. They become accessors: `P_strength()`, `P_tint()`, `P_direction()`. Optional `min`, `max`, `description`.
 - Slot sizes: `float` 1, `bool` 1, `vec2` 2, `vec3` 4 (xyz plus padding), `color` 4 (rgba). Slots are assigned in declaration order, and `vec3` / `color` start on the next multiple of 4. Above: `strength` → 0, slots 1-3 unused, `tint` → 4-7, `direction` → 8-9. Declare 4-slot params first to avoid gaps. Total ≤ 32 slots.
 - Value formats: `float` a number; `bool` `true` / `false`; `vec2` `[x, y]` or `{x, y}`; `vec3` `[x, y, z]`; `color` `"#rgb"`, `"#rgba"`, `"#rrggbb"`, `"#rrggbbaa"`, `[r, g, b(, a)]` or `{ r, g, b, a? }` in 0..1.
@@ -195,7 +195,91 @@ The harness clamps what `fx` returns to 0..1, multiplies by the layer opacity, a
 - No recursion, no implicit conversions between `i32`, `u32` and `f32`; `param(2u)` takes a `u32`.
 - `smoothstep(e0, e1, x)` needs `e0 < e1`.
 
-## Examples
+## ABI v3: textures, feedback, multi-pass, data, geometry
+
+ABI v3 (ADR 0002) adds five optional features to the v2 contract above. Every v2 effect keeps working unchanged. The server picks the ABI automatically: v3 when an effect uses any feature below, else v2. A v3 effect that uses none of them renders exactly like v2. Everything above (FxCtx, helpers, output modes, params, `param_keyframes`, transitions) still applies.
+
+`FxCtx` gains one field in v3: `frame: u32` = `floor(local_time × scene fps)`, the frame index since the layer started (the scene fps is baked in at apply time; 30 when the scene names none).
+
+You can leave `abi` out of a v3 manifest: the server switches to v3 by itself when a feature below is present. `"abi": 2` and `"abi": 3` are both accepted (saved v3 effects come back from `GET_SHADER_EFFECT` with `abi: 3`), but the features you use decide the ABI, not this field.
+
+| feature | manifest declares | apply / create supplies | author uses |
+|---|---|---|---|
+| Named textures (≤ 4) | `textures: [{ name }]` | `textures: [{ name, layer_id \| asset_url, space? }]` | `tex_<name>(uv)`, `tex_size_<name>()` |
+| Feedback | `feedback: { enabled: true, warmup_sec?, clear? }` (or `true`) | `feedback` (same shape) | `prev(uv)`, `c.frame` |
+| Multi-pass (≤ 4) | `passes: [{ name, scale? }]` | (source defines the passes) | `fn pass_<name>(c: FxCtx)`, `buf_<name>(uv)` |
+| Data buffer | optional `data` / `data_url` | `data: number[]`, or `data_url` (+ `data_columns` for CSV) | `data(i)`, `data_len()`, `data_vec2(i)`, `data_vec4(i)` |
+| Geometry | `geometry: { mode, count }` | `geometry` (same shape) | `fn instance(i, c)`, optional `fn shade(p, c)` |
+
+`CREATE_SHADER_EFFECT` and `APPLY_SHADER_EFFECT` both accept `textures`, `feedback`, `data` / `data_url` and `geometry`. A saved effect stores all of them, and apply-time values replace the saved ones: feedback, geometry and data replace outright, and a texture entry with a source replaces the declared texture of the same name. The manifest gains `passes`, `textures` (the declared names), `feedback`, `geometry` and optionally `data` / `data_url`. Inline `data` wins over `data_url`.
+
+### Named textures (bindings 6-9)
+
+Up to 4 named pictures besides `src` / `backdrop` / clips. Names match `[a-z][a-z0-9_]{0,23}`, and their order is the slot order. Each entry gives `layer_id` OR `asset_url`, not both.
+
+- `{ "name": "logo", "layer_id": "logo_1" }`: that layer rendered alone (its transform, crop and grade; transparent elsewhere), the same way v2 renders clip pictures. Text, image / logo, motion-graphics and video layers all work. Hidden layers work too: hide the source layer (`visible: false`) when only the shader's version should show. Default `space: "canvas"`: a canvas-space picture, so `tex_logo(c.uv)` is the pixel under the fragment.
+- `{ "name": "sheet", "asset_url": "https://…/walk.png" }`: a png / jpg / webp image (≤ 4096 × 4096, public URL only) decoded once. Default `space: "image"`: sampled in the image's own 0..1 UV, for sprite sheets, logos, LUT strips and noise textures.
+- Helpers (generated per name): `tex_<name>(uv: vec2<f32>) -> vec4<f32>` (straight rgba, linear, clamp-to-edge) and `tex_size_<name>() -> vec2<f32>` (pixels).
+- A declared texture still needs a source by apply time: apply fails with `SHADER_FX_INVALID_INPUT` ("texture … has no source") if neither the saved effect nor the request gives one. A `layer_id` that is not on the timeline fails with `SHADER_FX_TARGET_NOT_FOUND`, and a non-public `asset_url` with `SHADER_FX_PRIVATE_URL`.
+
+### Feedback (binding 10)
+
+`feedback: { "enabled": true, "warmup_sec": 1.0, "clear": [0, 0, 0, 0] }` gives the shader `prev(uv) -> vec4<f32>`: THIS layer's own output from the previous frame (straight rgba, render-target size), cleared to `clear` (default transparent) on the layer's first frame. `feedback: true` is shorthand for `{ enabled: true }`, and `{ enabled: false }` turns a saved effect's feedback off. Use it for trails, echoes, smears, accumulation and reaction-diffusion-style looks.
+
+- Export renders sequentially, so feedback is exact.
+- `render_preview` and seeking re-render the layer alone from `max(start_time, t − warmup_sec)` up to `t` at the scene fps, then show frame `t`. Same `t`, same pixels. Choose `warmup_sec` (default 1.0, 0..4) at least as long as your trail takes to fade, or previews will show a shorter trail than the export.
+- What you return is what `prev` gives back next frame, so a decay factor below 1 is what keeps trails from saturating.
+- Not available in geometry mode.
+
+### Multi-pass (bindings 11-14)
+
+Declare `passes: [{ "name": "bright", "scale": 0.5 }, { "name": "blur", "scale": 0.25 }]` (≤ 4; `scale` 1, 0.5 or 0.25, default 1) and define one function per pass in the source:
+
+```wgsl
+fn pass_bright(c: FxCtx) -> vec4<f32> { ... }
+fn pass_blur(c: FxCtx) -> vec4<f32> { ... }   // may read buf_bright(uv)
+fn fx(c: FxCtx) -> vec4<f32> { ... }          // final pass, may read every buf_
+```
+
+- Passes run in declaration order every frame, before the final `fx`. Each renders a full-target quad into its own rgba16float buffer (render target × scale), cleared each frame.
+- A pass's return value is stored RAW: not clamped, not premultiplied or converted, in rgba16float. Values above 1 and negative values survive, so a pass can carry HDR light, vectors or masks. `buf_<name>(uv) -> vec4<f32>` reads it back raw, with linear filtering, so a lower-scale buffer upsamples smoothly. A pass reading itself or a later pass gets transparent. Only the final `fx` is clamped to 0..1 and goes through the output mode.
+- Inside `pass_<name>`, `c.res` and `c.px` are the pass buffer's size (render target × scale). `c.uv` is still 0..1 over the frame.
+- Every pass can use every input: `src`, `backdrop`, clips, textures, `prev`, `data`, params.
+- Offsets in uv units look the same at any scale and on a supersampled export. Use `1.0 / c.res` inside a pass only when you want exactly one texel of that pass's buffer.
+- Each pass adds a full-target render per frame. Use 0.5 / 0.25 scale for blurs and glows.
+
+### Data buffer (binding 15)
+
+`data: [12, 30, 18, 44]` (≤ 16384 floats), or `data_url`: a public http(s) / gs:// URL the server reads at apply time and stores as floats.
+
+- JSON: an array (or `{ "data": [...] }`). Nested arrays and row objects are flattened in order, and non-numbers are skipped.
+- CSV (`,` `;` or tab): a header row is detected when the first row has a non-numeric cell. Numbers are read row by row. With `data_columns: ["revenue", 3]` (header names or 0-based indexes) only those columns are read, in that order, per row. Without it, every numeric cell is read.
+- Fetch problems or no numbers: `SHADER_FX_DATA_UNAVAILABLE`.
+
+ Helpers: `data(i: u32) -> f32` (returns 0 past the end, never out of bounds), `data_len() -> u32`, `data_vec2(i: u32) -> vec2<f32>`, `data_vec4(i: u32) -> vec4<f32>` (2 / 4 consecutive floats from `i`). Use it for charts, per-particle state, lookup tables and keyed positions. Pack records with a fixed stride (e.g. 4 floats per point: x, y, size, hue) and read them with `data_vec4(i * 4u)`.
+
+### Geometry mode (instanced quads / points)
+
+`geometry: { "mode": "quads", "count": 2000 }` (`mode` default `quads`; `count` an integer 1..65536; in `"points"` mode an instance whose `size` is not positive is drawn 4 × 4 px) draws `count` instances of a quad instead of one full-target quad. The source defines (no `fx` is needed in geometry mode):
+
+```wgsl
+fn instance(i: u32, c: FxCtx) -> FxInstance { ... }      // required, runs per vertex
+fn shade(p: FxPixel, c: FxCtx) -> vec4<f32> { ... }      // optional, per pixel
+```
+
+- `FxInstance { pos: vec2<f32> /* canvas uv of the centre */, size: vec2<f32> /* pixels */, rotation: f32 /* radians, about the centre */, color: vec4<f32> /* straight */, uv_rect: vec4<f32> /* x, y, w, h in a texture */, alive: f32 /* <= 0 culls */ }`.
+- `FxPixel { local_uv: vec2<f32> /* 0..1 across the quad, (0, 0) = its top-left corner before rotation */, uv: vec2<f32> /* canvas uv */, color: vec4<f32>, uv_rect: vec4<f32>, instance: u32 }`.
+- Without `shade`: with no texture, a soft round point, alpha `1 − smoothstep(0.42, 0.5, distance(local_uv, 0.5))` × `color`. With a texture, the FIRST texture sampled at `uv_rect.xy + local_uv × uv_rect.zw` × `color` (the whole texture when `uv_rect` has zero width or height).
+- In `instance()`, `c.uv` is (0.5, 0.5) and `c.res` the render-target size. In `shade()`, `c.uv` / `p.uv` is the pixel's canvas uv.
+- `instance()` runs in the vertex stage: compute motion in closed form from `i` and `c.local_time` (hash the index for randomness), or read per-instance state from `data`. Do not use `prev`: feedback is per-pixel and unavailable here. A closed-form system renders any frame on its own, so previews and seeks are exact.
+- `size` is in render-target pixels: scale by `c.res.y / 1080.0` to keep the same look on supersampled exports. Set `alive = 0.0` (anything <= 0) for particles not yet born or already dead.
+- `fx_output` still applies (`add` for glowing sparks, `normal` for solid sprites).
+
+### Limits (v3)
+
+≤ 4 textures, ≤ 4 passes, ≤ 16384 data floats, ≤ 65536 instances, author source ≤ 48 KB in total, asset images ≤ 4096² and fetched from public addresses only. Every generated module is validated: each pass, the final pass, and the vertex + fragment stages in geometry mode. Errors map to your own lines and name the module that failed, e.g. `(pass blur)`, `(geometry vertex)`, `(final pass)`. Also reserved in v3 (module scope): `prev`, `data`, `data_len`, `data_vec2`, `data_vec4`, `FxData`, `FxInstance`, `FxPixel`, `FxGeoOut`, `fxd`, `FX_FPS`, `t_tex0`…`t_tex3`, `t_prev`, `t_pass0`…`t_pass3`, and the generated `tex_<name>`, `tex_size_<name>` and `buf_<name>`. A layer whose shaders fail to build is skipped and reported (`custom_shader_errors`). Feedback warm-up and passes multiply per-frame cost, so keep counts and scales as low as the look allows.
+
+## Examples (ABI v2)
 
 Each example is complete: `source` is what you pass to `create_shader_effect` / `apply_shader_effect`, together with its manifest.
 
@@ -397,6 +481,268 @@ Apply it twice with different looks:
   "start_time": 0, "end_time": 3, "params": { "strength": 0.8, "tint": "#66ccff", "direction": [0, 1] } }
 ```
 
+## ABI v3 examples
+
+All six pass the server's real `compileShaderFx` (v3 harness + naga validator), including every pass and the geometry vertex / fragment stages.
+
+### 7. Logo reveal: texture from a layer, light sweep + dissolve
+
+Manifest: `{ "kind": "generator", "output": "normal", "textures": [{ "name": "logo" }], "params": [{ "name": "glow", "type": "color", "default": "#ffd27a" }] }`
+
+Apply over the logo's window, binding the logo layer:
+
+```json
+{ "effect_id": "fx_logo_reveal", "kind": "generator", "start_time": 0, "end_time": 2.5,
+  "textures": [{ "name": "logo", "layer_id": "logo_1" }], "params": { "glow": "#9fd8ff" } }
+```
+
+Hide the logo layer itself (`UPDATE_LAYER { layer_id: "logo_1", properties: { visible: false } }`): hidden layers still render into a texture, so only the shader's revealed copy shows.
+
+```wgsl
+// Diagonal light sweep + noisy dissolve that reveals the logo.
+fn fx(c: FxCtx) -> vec4<f32> {
+    let logo = tex_logo(c.uv);
+    let t = c.progress;
+    let reveal = smoothstep(0.0, 0.6, t);
+
+    // Dissolve: fbm threshold sweeps from fully hidden to fully shown.
+    let n = fbm(c.uv * 9.0) + 0.5;
+    let soft = 0.06;
+    let shown = smoothstep(n - soft, n + soft, reveal * (1.0 + 2.0 * soft) - soft);
+
+    // Hot edge where the dissolve is happening.
+    let edge = (1.0 - abs(shown * 2.0 - 1.0)) * step(0.001, logo.a);
+    let edge_col = P_glow().rgb * edge * 1.5;
+
+    // Light sweep: a soft diagonal band crossing the logo after the reveal.
+    let aspect = c.res.x / c.res.y;
+    let diag = (c.uv.x * aspect + c.uv.y) / (aspect + 1.0);
+    let sweep_pos = mix(-0.2, 1.2, smoothstep(0.45, 1.0, t));
+    let k = (diag - sweep_pos) / 0.05;
+    let band = exp(-k * k);
+    let sweep_col = P_glow().rgb * band * 0.9 * logo.a;
+
+    let a = clamp(logo.a * shown + edge * logo.a, 0.0, 1.0);
+    let rgb = logo.rgb + edge_col + sweep_col;
+    return vec4<f32>(clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0)), a * c.intensity);
+}
+```
+
+### 8. Motion trails / echo with feedback
+
+Manifest: `{ "kind": "filter", "output": "normal", "feedback": { "enabled": true, "warmup_sec": 1.5 }, "params": [{ "name": "decay", "type": "float", "min": 0, "max": 0.99, "default": 0.9 }, { "name": "tint", "type": "color", "default": "#ffffff" }, { "name": "drift", "type": "vec2", "default": [0, 0] }] }`
+
+Apply with `target_layer_id` set to a moving subject (a cut-out, a title, a product shot) so only it leaves trails. `drift` is in pixels per frame, e.g. `[0, -2]` makes the trail rise. With `decay` 0.9 a trail fades to about 4 % in 30 frames (1 s at 30 fps), so `warmup_sec` 1.5 covers it.
+
+```wgsl
+// Echo trails: the current picture over a decaying, drifting copy of the
+// last output frame.
+fn fx(c: FxCtx) -> vec4<f32> {
+    let cur = src(c.uv);
+
+    // Sample last frame slightly displaced so the trail drifts.
+    let drift = P_drift() / c.res;
+    let echo_raw = prev(c.uv - drift);
+    let decay = clamp(P_decay(), 0.0, 0.99);
+    let echo = vec4<f32>(echo_raw.rgb * P_tint().rgb, echo_raw.a * decay);
+
+    // Straight-alpha "over": cur over echo.
+    let a = cur.a + echo.a * (1.0 - cur.a);
+    let rgb_p = cur.rgb * cur.a + echo.rgb * echo.a * (1.0 - cur.a);
+    let rgb = select(vec3<f32>(0.0), rgb_p / max(a, 0.0001), a > 0.0001);
+    return vec4<f32>(rgb, a);
+}
+```
+
+### 9. Bloom: bright-pass (0.5) → blur (0.25) → composite
+
+Manifest: `{ "kind": "filter", "output": "normal", "passes": [{ "name": "bright", "scale": 0.5 }, { "name": "blur", "scale": 0.25 }], "params": [{ "name": "threshold", "type": "float", "min": 0, "max": 1, "default": 0.7 }, { "name": "radius", "type": "float", "min": 0, "max": 0.05, "default": 0.012 }, { "name": "strength", "type": "float", "min": 0, "max": 2, "default": 0.8 }] }`
+
+Three renders per frame, two of them at reduced size: about 1.3× the cost of a single full-size pass. The passes store raw values, so the bright pass keeps its exact intensity and the final pass does the only clamp.
+
+```wgsl
+// Pass "bright" (0.5 scale): keep only what is brighter than the threshold.
+fn pass_bright(c: FxCtx) -> vec4<f32> {
+    let s = src(c.uv);
+    let l = luma(s.rgb);
+    let k = smoothstep(P_threshold(), P_threshold() + 0.2, l);
+    return vec4<f32>(s.rgb * k, k * s.a);
+}
+
+// Pass "blur" (0.25 scale): 5x5 Gaussian of the bright pass. Offsets are in
+// uv, so the blur radius is the same whatever the buffer size.
+fn pass_blur(c: FxCtx) -> vec4<f32> {
+    let aspect = c.res.x / c.res.y;
+    let r = vec2<f32>(P_radius() / aspect, P_radius());
+    var acc = vec4<f32>(0.0);
+    var wsum = 0.0;
+    for (var y = -2; y <= 2; y = y + 1) {
+        for (var x = -2; x <= 2; x = x + 1) {
+            let o = vec2<f32>(f32(x), f32(y));
+            let w = exp(-dot(o, o) / 4.5);
+            acc = acc + buf_bright(c.uv + o * r * 0.5) * w;
+            wsum = wsum + w;
+        }
+    }
+    return acc / wsum;
+}
+
+// Final: the picture plus the blurred highlights (screen-style add).
+fn fx(c: FxCtx) -> vec4<f32> {
+    let base = src(c.uv);
+    let bloom = buf_blur(c.uv).rgb * P_strength() * c.intensity;
+    let rgb = 1.0 - (1.0 - base.rgb) * (1.0 - clamp(bloom, vec3<f32>(0.0), vec3<f32>(1.0)));
+    return vec4<f32>(rgb, base.a);
+}
+```
+
+### 10. Data-driven bar chart from `data`
+
+Manifest: `{ "kind": "generator", "output": "normal", "params": [{ "name": "max_value", "type": "float", "default": 100 }, { "name": "color", "type": "color", "default": "#4cc9f0" }] }`
+
+```json
+{ "effect_id": "fx_bars", "kind": "generator", "start_time": 3, "end_time": 8,
+  "data": [42, 67, 88, 51, 95, 73], "params": { "max_value": 100, "color": "#f72585" } }
+```
+
+Or `"data_url": "https://…/q3.csv", "data_columns": ["revenue"]` to read one CSV column at apply time. The bar count is `data_len()`. Each pixel works out the one bar it can belong to, so there is no per-bar loop. Bars grow with `local_time`, each starting 0.08 s after the previous one. Add labels and values as `TITLE_CARD` / text layers above it.
+
+```wgsl
+// Signed distance to a rounded box (centre p, half-size b, corner radius r).
+fn sd_round_box(p: vec2<f32>, b: vec2<f32>, r: f32) -> f32 {
+    let q = abs(p) - b + vec2<f32>(r, r);
+    return length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0) - r;
+}
+
+fn fx(c: FxCtx) -> vec4<f32> {
+    let n = data_len();
+    if (n == 0u) {
+        return vec4<f32>(0.0);
+    }
+    let aspect = c.res.x / c.res.y;
+    // Chart area in uv: x 0.1..0.9, baseline at y 0.85, max height 0.6.
+    let x0 = 0.1;
+    let width = 0.8;
+    let base_y = 0.85;
+    let max_h = 0.6;
+    let slot = width / f32(n);
+
+    // The one bar this pixel can belong to.
+    let fi = clamp(floor((c.uv.x - x0) / slot), 0.0, f32(n - 1u));
+    let i = u32(fi);
+    let value = clamp(data(i) / max(P_max_value(), 0.0001), 0.0, 1.0);
+
+    // Staggered growth: bar i starts 0.08 s after bar i-1, grows over 0.7 s.
+    let t = clamp((c.local_time - fi * 0.08) / 0.7, 0.0, 1.0);
+    let grow = 1.0 - pow(1.0 - t, 3.0);
+    let h = max(value * max_h * grow, 0.002);
+
+    // Work in aspect-corrected space so the corner radius stays round.
+    let centre = vec2<f32>(x0 + (fi + 0.5) * slot, base_y - h * 0.5);
+    let half = vec2<f32>(slot * 0.35, h * 0.5);
+    let p = vec2<f32>((c.uv.x - centre.x) * aspect, c.uv.y - centre.y);
+    let d = sd_round_box(p, vec2<f32>(half.x * aspect, half.y), min(0.012, half.x * aspect));
+
+    let aa = 1.5 / c.res.y;
+    let fill = 1.0 - smoothstep(-aa, aa, d);
+    // Lighter top edge for depth.
+    let top = smoothstep(centre.y - half.y + 0.02, centre.y - half.y, c.uv.y);
+    let col = mix(P_color().rgb, min(P_color().rgb * 1.35, vec3<f32>(1.0)), top);
+    return vec4<f32>(col, fill * P_color().a * c.intensity);
+}
+```
+
+### 11. Particle fountain: geometry quads, closed-form motion
+
+Manifest: `{ "kind": "generator", "output": "add", "geometry": { "mode": "quads", "count": 1500 } }`. No `shade`: the default soft round point × `color` is used. Every particle is a pure function of its index and time (seek-safe, no feedback). Size and colour change over each particle's life, and particles stay hidden (`alive = 0`) until their first birth.
+
+```wgsl
+// Closed-form particle fountain: every particle's state is a pure function of
+// its index and time, so any frame renders correctly on its own (seek-safe).
+fn instance(i: u32, c: FxCtx) -> FxInstance {
+    var o: FxInstance;
+    let fi = f32(i);
+    let seed = hash2(vec2<f32>(fi, 3.7));
+    let seed2 = hash2(vec2<f32>(fi, 11.3));
+    let seed3 = hash2(vec2<f32>(fi, 29.1));
+
+    let lifetime = mix(1.4, 2.6, seed2);
+    let born = seed * lifetime;                 // spread first births over one lifetime
+    let since = c.local_time - born;
+    let age_sec = since - floor(since / lifetime) * lifetime;   // repeats every lifetime
+    let age = age_sec / lifetime;               // 0..1 over the particle's life
+
+    // Launch from the bottom centre with an upward cone, then gravity.
+    let aspect = c.res.x / c.res.y;
+    let angle = (seed3 - 0.5) * 0.9;
+    let speed = mix(0.55, 0.95, seed2);
+    let vel = vec2<f32>(sin(angle) * speed / aspect, -cos(angle) * speed);
+    let gravity = vec2<f32>(0.0, 0.7);
+    let origin = vec2<f32>(0.5, 0.92);
+
+    o.pos = origin + vel * age_sec + 0.5 * gravity * age_sec * age_sec;
+    let scale = c.res.y / 1080.0;
+    o.size = vec2<f32>(mix(22.0, 3.0, age) * scale);
+    o.rotation = 0.0;
+    // Colour over life: hot yellow -> orange -> deep red, fading out.
+    let warm = mix(vec3<f32>(1.0, 0.9, 0.5), vec3<f32>(1.0, 0.45, 0.1), smoothstep(0.0, 0.5, age));
+    let col = mix(warm, vec3<f32>(0.6, 0.05, 0.02), smoothstep(0.5, 1.0, age));
+    o.color = vec4<f32>(col, (1.0 - age) * c.intensity);
+    o.uv_rect = vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    o.alive = select(0.0, 1.0, since >= 0.0);
+    return o;
+}
+```
+
+### 12. Sprite-sheet animation: geometry quads + `asset_url` texture
+
+Manifest: `{ "kind": "generator", "output": "normal", "geometry": { "mode": "quads", "count": 6 }, "textures": [{ "name": "sheet" }], "params": [{ "name": "fps", "type": "float", "min": 1, "max": 60, "default": 12 }] }`
+
+```json
+{ "effect_id": "fx_walkers", "kind": "generator", "start_time": 0, "end_time": 6,
+  "textures": [{ "name": "sheet", "asset_url": "https://example.com/walk_4x2.png" }] }
+```
+
+The sheet is 4 columns × 2 rows, read top-left first. An `asset_url` texture is in image space, so `uv_rect` selects a cell in 0..1 of the sheet. The explicit `shade` below matches the default for a bound texture; replace it to add outlines, flashes or palette swaps.
+
+```wgsl
+// A row of characters walking across the frame, each playing an 8-frame
+// walk cycle from a 4 x 2 sprite sheet, offset so they are out of step.
+const COLS: u32 = 4u;
+const ROWS: u32 = 2u;
+const FRAMES: u32 = 8u;
+
+fn instance(i: u32, c: FxCtx) -> FxInstance {
+    var o: FxInstance;
+    let fi = f32(i);
+    let count = 6.0;
+
+    // Walk left to right, wrapping, spaced evenly.
+    let speed = 0.12;
+    let x = fract(fi / count + c.local_time * speed) * 1.2 - 0.1;
+    o.pos = vec2<f32>(x, 0.78 + 0.01 * sin(fi * 2.3));
+    let px = 220.0 * (c.res.y / 1080.0);
+    o.size = vec2<f32>(px, px);
+    o.rotation = 0.0;
+    o.color = vec4<f32>(1.0, 1.0, 1.0, c.intensity);
+
+    // Sprite frame: steps at P_fps(), each instance offset by its index.
+    let frame = (u32(max(c.local_time, 0.0) * P_fps()) + i * 3u) % FRAMES;
+    let col = f32(frame % COLS);
+    let row = f32(frame / COLS);
+    o.uv_rect = vec4<f32>(col / f32(COLS), row / f32(ROWS), 1.0 / f32(COLS), 1.0 / f32(ROWS));
+    o.alive = 1.0;
+    return o;
+}
+
+// What the default shade does when a texture is bound, written out:
+// sample the sheet through uv_rect and tint by the instance colour.
+fn shade(p: FxPixel, c: FxCtx) -> vec4<f32> {
+    let s = tex_sheet(p.uv_rect.xy + p.local_uv * p.uv_rect.zw);
+    return vec4<f32>(s.rgb * p.color.rgb, s.a * p.color.a);
+}
+```
+
 ## Quality checklist
 
 - Every frame of the window looks right in `render_preview`, not just the middle one. For transitions check progress 0, 0.5 and 1: the ends must match clip A and clip B exactly.
@@ -407,3 +753,4 @@ Apply it twice with different looks:
 - Motion uses the layer clock (`c.time` = `c.local_time`, 0 when the effect layer starts) or `c.progress`; to stay in sync with something on the timeline, place the layer so its start lines up.
 - Detail sizes (grain, noise scale) come from `uv`, not `px`: `res` is the render-target size and is larger on a supersampled export.
 - To animate a param over time, use `param_keyframes` rather than hard-coding time curves in the shader, so the same effect stays reusable.
+- v3: feedback trails look the same in `render_preview` and export only if `warmup_sec` covers the trail length; particle and sprite sizes scale with `c.res.y / 1080.0`; pass offsets are in uv.

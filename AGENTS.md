@@ -39,7 +39,7 @@ The surface supports **two complementary execution modes** plus typed management
 
 ### ShaderFX — your own GPU effects (4)
 
-Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that read the footage (`src()`), transitions that read clip A / clip B (`clip_a()` / `clip_b()`), and generators. The server wraps and validates it (errors come back as `{ line, column, message }` in your source); preview and export run the same shader. Contract, output modes, params manifest and six worked examples: `load_skill({ skill_id: "shaderfx-effects" })` or [`skills/shaderfx-effects`](./skills/shaderfx-effects/SKILL.md).
+Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that read the footage (`src()`), transitions that read clip A / clip B (`clip_a()` / `clip_b()`), and generators. The server wraps and validates it (errors come back as `{ line, column, message }` in your source); preview and export run the same shader. ABI v3 adds named textures (a layer or an image URL: `tex_<name>()`), feedback (`prev()` for trails), multi-pass (`pass_<name>` / `buf_<name>`, e.g. bloom), a data buffer (`data` / `data_url`: charts, lookup tables) and geometry mode (instanced quads for particles and sprite sheets); `create_shader_effect` / `apply_shader_effect` take `textures`, `feedback`, `data` / `data_url`, `geometry`. Contract, output modes, params manifest and twelve worked examples (six v2, six v3): `load_skill({ skill_id: "shaderfx-effects" })` or [`skills/shaderfx-effects`](./skills/shaderfx-effects/SKILL.md).
 
 | Tool | What it does |
 |---|---|
