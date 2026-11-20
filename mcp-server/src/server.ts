@@ -18,6 +18,9 @@
  *     typed single actions on a project's committed scene (backend /v1/execute
  *     deterministic branch, same power the planner path runs): the
  *     observe → nudge → observe loop of a calling agent, without a planner run.
+ *   - `create_shader_effect`, `list_shader_effects`, `apply_shader_effect`,
+ *     `delete_shader_effect` run the ShaderFX (ABI v2) canonical actions through
+ *     execute_action: user-written WGSL filters, transitions and generators.
  *   - All OTHER tools are read-only diagnostics or state-management CRUD
  *     (brand kits, projects, assets, caption templates).
  *
@@ -167,6 +170,76 @@ const TOOL_DEFS: Tool[] = [
         easing: { type: 'string', description: 'Optional easing name.' },
       },
       required: ['project_id', 'type', 'to_layer_id'],
+    },
+  },
+
+  // ── ShaderFX (ABI v2) — your own GPU effects, transitions and generators ──
+  // Thin wrappers over execute_action with the matching canonical action
+  // (CREATE/LIST/APPLY/DELETE_SHADER_EFFECT). The author contract (fx(c: FxCtx),
+  // helpers, output modes, params manifest) is in the shaderfx-effects skill.
+  {
+    name: 'create_shader_effect',
+    description:
+      'Save a reusable ShaderFX (ABI v2) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv, px, res, time, local_time, progress, intensity }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns the effect id for apply_shader_effect. Source ≤ 24 KB; keep loops bounded. Full contract + worked examples: load_skill shaderfx-effects.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Effect name (shown in list_shader_effects).' },
+        source: { type: 'string', description: 'Author WGSL defining fn fx(c: FxCtx) -> vec4<f32> (plus any helper fns of your own). No bindings, no @fragment.' },
+        manifest: {
+          type: 'object',
+          description: 'Effect manifest: { abi: 2, kind: "filter" | "transition" | "generator", output: "add" | "normal" | "replace", params: [{ name, type: "float" | "vec2" | "vec3" | "color" | "bool", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (color aligned to a 4-slot boundary); total ≤ 32.',
+        },
+        description: { type: 'string', description: 'Optional one-line description.' },
+        project_id: { type: 'string', description: 'Optional project context.' },
+      },
+      required: ['name', 'source', 'manifest'],
+    },
+  },
+  {
+    name: 'list_shader_effects',
+    description: 'List the ShaderFX effects in your library (id, name, description, kind, output, params). Pass an id to apply_shader_effect.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Optional project context.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'apply_shader_effect',
+    description:
+      'Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind "filter": target_layer_id = the layer whose picture src() reads (omit = everything composited below). kind "transition": from_layer_id (clip A, clip_a()) + to_layer_id (clip B, clip_b()), progress runs 0→1. kind "generator": paints on its own (src() is transparent). params = values by manifest param name (missing = default). Then check it with render_preview before export.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
+        effect_id: { type: 'string', description: 'Saved effect id (from create_shader_effect / list_shader_effects).' },
+        source: { type: 'string', description: 'Inline author WGSL (alternative to effect_id; needs manifest).' },
+        manifest: { type: 'object', description: 'Inline manifest (with source).' },
+        kind: { type: 'string', enum: ['filter', 'transition', 'generator'], description: 'Effect kind; match the manifest kind.' },
+        target_layer_id: { type: 'string', description: '[filter] Layer whose picture is src(); omit for the composited backdrop.' },
+        from_layer_id: { type: 'string', description: '[transition] Outgoing clip A.' },
+        to_layer_id: { type: 'string', description: '[transition] Incoming clip B.' },
+        params: { type: 'object', description: 'Param values by manifest name, e.g. { "strength": 0.8, "tint": "#ffcc66", "direction": [1, 0] }.' },
+        start_time: { type: 'number', description: 'Timeline seconds the effect starts.' },
+        end_time: { type: 'number', description: 'Timeline seconds the effect ends.' },
+        output: { type: 'string', enum: ['add', 'normal', 'replace'], description: 'Override the manifest output mode.' },
+      },
+      required: ['project_id', 'kind'],
+    },
+  },
+  {
+    name: 'delete_shader_effect',
+    description: 'Delete a saved ShaderFX effect from your library. Layers that already use it keep their own copy of the shader.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        effect_id: { type: 'string', description: 'Effect id to delete.' },
+        project_id: { type: 'string', description: 'Optional project context.' },
+      },
+      required: ['effect_id'],
     },
   },
 
@@ -569,6 +642,7 @@ const TOOL_DEFS: Tool[] = [
 type ToolName =
   | 'autonomous_edit' | 'autonomous_edit_streaming' | 'queue_edit'
   | 'update_layer' | 'delete_layer' | 'trim_layer' | 'apply_transition'
+  | 'create_shader_effect' | 'list_shader_effects' | 'apply_shader_effect' | 'delete_shader_effect'
   | 'check_job_status' | 'check_task_status' | 'get_active_task'
   | 'list_caption_templates' | 'apply_caption_template' | 'save_caption_template'
   | 'save_current_caption_template' | 'delete_caption_template'
@@ -595,6 +669,10 @@ const TOOL_ANNOTATIONS = {
   delete_layer: destructive('Delete layer'),
   trim_layer: destructive('Trim layer'),
   apply_transition: write('Apply transition'),
+  create_shader_effect: write('Create shader effect'),
+  list_shader_effects: read('List shader effects'),
+  apply_shader_effect: write('Apply shader effect'),
+  delete_shader_effect: destructive('Delete shader effect'),
   check_job_status: read('Check job status'),
   check_task_status: read('Check task status'),
   get_active_task: read('Get active task'),
@@ -762,6 +840,14 @@ interface DispatchCtx {
   signal?: AbortSignal;
 }
 
+/** ShaderFX MCP tools → the canonical action each one runs through execute_action. */
+const SHADER_FX_ACTIONS = {
+  create_shader_effect: 'CREATE_SHADER_EFFECT',
+  list_shader_effects: 'LIST_SHADER_EFFECTS',
+  apply_shader_effect: 'APPLY_SHADER_EFFECT',
+  delete_shader_effect: 'DELETE_SHADER_EFFECT',
+} as const;
+
 /** Events kept on a streaming result (the last ones, heartbeats excluded). */
 const MAX_STREAM_EVENTS = 50;
 
@@ -816,6 +902,26 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       const head = r.success === false
         ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
         : `✅ ${name}: ${r.observation || 'applied'}`;
+      return ok(head, r);
+    }
+
+    case 'create_shader_effect':
+    case 'list_shader_effects':
+    case 'apply_shader_effect':
+    case 'delete_shader_effect': {
+      const action = SHADER_FX_ACTIONS[name];
+      const pid = str(a.project_id) || str(a.projectId);
+      if (name === 'apply_shader_effect' && !pid) return fail('❌ `project_id` is required for apply_shader_effect (it edits a project\'s committed scene).');
+      const { project_id: _p, projectId: _q, ...actionParams } = a;
+      const r = (await executeDeterministicTool(
+        'execute_action',
+        pid,
+        { action, action_params: actionParams, ...(pid ? { project_id: pid } : {}) },
+        ctx.signal,
+      )) as Record<string, unknown>;
+      const head = r.success === false
+        ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
+        : `✅ ${name}: ${r.observation || r.message || 'completed'}`;
       return ok(head, r);
     }
 
@@ -1042,6 +1148,7 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   'Unsure of an action\'s params? search_tools with a query returns matching actions with param specs; get_action_schema takes actions: [..] for several at once. A batch (max 25 steps) is checked before anything runs and is atomic (allow_partial: true to keep successful steps); destructive actions need confirm_destructive: true. The server adds no creative content of its own on this path, and masters loudness at export if you skipped MASTER_AUDIO.',
   'No id lookups between steps: params accept references — @last (layer the latest step created; also across calls), @last:<kind>, @step<N>, @primary (main video), @first:<kind>, @all:<kind> (bulk, in layer_ids) and times @end-3, @mid, @last.end+0.5. Kinds: video, audio, text, caption, title, broll, music, sfx or any role. Receipts list createdLayerIds.',
   'Bulk in one step: TRIM_LAYER { layer_id: "@primary", keep_ranges: [{start,end}] } keeps only those spans and stitches; UPDATE_LAYER { layer_ids: "@all:title", ... }; STYLE_CAPTIONS restyles every caption.',
+  'Custom GPU shaders (WGSL fn fx(c: FxCtx)): create_shader_effect then apply_shader_effect; contract + examples: load_skill shaderfx-effects.',
   'Craft playbooks: search_skills / load_skill. Brand kits and caption templates: list_brand_kits, list_caption_templates.',
 ].join('\n');
 

@@ -111,7 +111,7 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 
 > Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`.
 
-### Tools the AI sees (37 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
+### Tools the AI sees (41 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
 
 **Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's autonomous editing agent (**Mode A: `autonomous_edit`**) or drive any of the **189+ canonical actions**, **13 read/inspection tools**, and **100+ editing craft skills** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
 
@@ -120,6 +120,7 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 | **Mode A: Goal Delegation** (1 entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
 | **Mode B: Universal Direct Canonical Suite** (189+ actions, 13 read tools & 100+ skills) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) · `search_skills` · `load_skill` · `read_skill_resource` |
 | **Deterministic Layer Shortcuts** | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — fast typed shortcuts for single-layer updates, deletes, trims, and ~170 named transitions |
+| **ShaderFX (custom GPU shaders)** | `create_shader_effect` · `list_shader_effects` · `apply_shader_effect` · `delete_shader_effect` — write WGSL `fn fx(c: FxCtx) -> vec4<f32>` filters (read the footage via `src()`), transitions (`clip_a()` / `clip_b()`) and generators; validated server-side with line/column errors, saved to a reusable library with typed params. Contract + examples: [`skills/shaderfx-effects`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills/shaderfx-effects/SKILL.md) or `load_skill shaderfx-effects` |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
 | Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (280+ built-in + your saved) |
 | Brand kits | `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit` (palette · fonts · logo · voice · gradeBias · enforcement) |
@@ -135,7 +136,7 @@ Every direct tool call (`execute_action` / `execute_batch`) includes automatic p
    - In **Mode A (`autonomous_edit`)**, Levea automatically loads the right craft skills for your prompt.
    - In **Mode B**, your agent can call `search_skills` (e.g. `query: "captions"`, `"color"`, `"podcast"`), call `load_skill` to pull the full `SKILL.md` craft playbook into its context, and call `read_skill_resource` to inspect reference guides or templates before running `execute_action` / `execute_batch`.
 2. **12 Installable Client Skills (`npx skills add brajendrak00068/agentic-ai-video-production`):**
-   - Ready-made `SKILL.md` packages in [`skills/`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills) (`levea-ai-video-editor`, `viral-clips-generator`, `tiktok-reels-shorts-editor`, `auto-captions-subtitles`, `multicam-podcast-video-editor`, `silence-removal-audio-cleanup`, `ai-b-roll-motion-graphics`, `after-effects-motion-graphics`, `vfx-compositing-keying`, `motion-tracking-stabilization`).
+   - Ready-made `SKILL.md` packages in [`skills/`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills) (`levea-ai-video-editor`, `viral-clips-generator`, `tiktok-reels-shorts-editor`, `auto-captions-subtitles`, `multicam-podcast-video-editor`, `silence-removal-audio-cleanup`, `ai-b-roll-motion-graphics`, `after-effects-motion-graphics`, `vfx-compositing-keying`, `motion-tracking-stabilization`, `shaderfx-effects`).
 3. **Bring Your Own Custom `SKILL.md`:**
    - Drop a custom `SKILL.md` into `.claude/skills/<name>/SKILL.md` (Claude Code), `.cursor/skills/<name>/SKILL.md` (Cursor), `~/.openclaw/skills/<name>/SKILL.md` (OpenClaw), or `~/.hermes/skills/<name>/SKILL.md` (Hermes).
    - Encode your channel's `brandId`, `captionTemplatePreset` (e.g. `hormozi`), `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Mode A) or an exact `execute_batch` + `render_preview` action sequence (Mode B). Your agent can even call `load_skill` inside your custom skill to combine Levea's built-in craft rules with your own house rules.

@@ -216,6 +216,7 @@ This repository includes 12 ready-to-install agent skills under [`skills/`](./sk
 | [`ai-b-roll-motion-graphics`](./skills/ai-b-roll-motion-graphics/SKILL.md) | Contextual B-roll cutaways, charts, lower thirds & callouts |
 | [`after-effects-motion-graphics`](./skills/after-effects-motion-graphics/SKILL.md) | Shape layers (Trim Paths, Repeaters), Bezier paths & 3D titles |
 | [`vfx-compositing-keying`](./skills/vfx-compositing-keying/SKILL.md) | Keylight green-screen keying, AI mattes, depth bokeh, LUTs & 328 VFX |
+| [`shaderfx-effects`](./skills/shaderfx-effects/SKILL.md) | Write your own WGSL GPU filters, transitions & generators (ShaderFX ABI v2) |
 | [`motion-tracking-stabilization`](./skills/motion-tracking-stabilization/SKILL.md) | 2D region tracking, hand palm attachment, 3D camera solve & warp stabilizer |
 
 **Install all 12 skills in one command:**
