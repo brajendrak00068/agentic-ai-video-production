@@ -308,10 +308,10 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'check_task_status',
-    description: 'Poll a queued edit task by taskId (returned by queue_edit). Separate from job_id (exports).',
+    description: 'Poll a queued edit task by taskId (returned by queue_edit), or a direct tool call that answered status "running" (taskId "dc_…" from execute_action / execute_batch / render_preview: its result is that call\'s full response once status is completed / failed). Separate from job_id (exports).',
     inputSchema: {
       type: 'object',
-      properties: { task_id: { type: 'string', description: 'Task id from queue_edit.' } },
+      properties: { task_id: { type: 'string', description: 'Task id from queue_edit, or a "dc_…" id from a direct call still running.' } },
       required: ['task_id'],
     },
   },
@@ -554,6 +554,8 @@ const TOOL_DEFS: Tool[] = [
         category: { type: 'string', description: 'Optional domain/category filter.' },
         limit: { type: 'number', description: 'Max actions to return (default: all matches; preset catalogs default to 50).' },
         include_schemas: { type: 'boolean', description: 'Force parameter specs on (true) or off (false). Default: on when 25 or fewer actions match.' },
+        offset: { type: 'number', description: 'Page through a long result: pass the nextOffset a previous answer returned (answers stay under ~15k tokens).' },
+        detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): one-line descriptions. "full": full action descriptions (pages sooner).' },
       },
       required: [],
     },
@@ -567,6 +569,8 @@ const TOOL_DEFS: Tool[] = [
       properties: {
         action: { type: 'string', description: 'Canonical action name or read tool name.' },
         actions: { type: 'array', items: { type: 'string' }, description: 'Several action names at once (up to 40) — one round trip instead of many.' },
+        params: { type: 'array', items: { type: 'string' }, description: 'Only these parameters, in full (nested schemas, every enum value). Use it for the parameters a summarised schema lists in schemaDetail.paramsOmitted.' },
+        detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): a very large schema is compacted to stay under ~15k tokens. "full": the whole schema as stored (CREATE_LAYER / UPDATE_LAYER are 200-380 KB).' },
       },
       required: [],
     },
@@ -585,6 +589,8 @@ const TOOL_DEFS: Tool[] = [
         assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
         scene: { type: 'object', description: 'Optional inline scene.' },
         include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
+        idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
+        rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
       },
       required: ['action'],
     },
@@ -613,6 +619,8 @@ const TOOL_DEFS: Tool[] = [
         assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
         scene: { type: 'object', description: 'Optional inline scene.' },
         include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
+        idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
+        rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
       },
       required: ['actions'],
     },
@@ -1146,31 +1154,43 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     case 'execute_batch': {
       const pid = str(a.project_id) || str(a.projectId);
       const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
-      const head = r.success === false
-        ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
-        : `✅ ${name}: ${r.observation || r.message || 'completed'}`;
-      return ok(head, r);
+      return ok(directHead(name, r, 'completed'), r);
     }
 
     case 'render_preview': {
       const pid = str(a.project_id) || str(a.projectId);
       const r = (await executeDeterministicTool('RENDER_PREVIEW', pid, a, ctx.signal)) as Record<string, unknown>;
-      const head = r.success === false
-        ? `❌ render_preview failed: ${r.error || r.message || 'unknown'}`
-        : `✅ render_preview: ${r.observation || r.message || 'rendered preview frames'}`;
-      return ok(head, r);
+      return ok(directHead('render_preview', r, 'rendered preview frames'), r);
     }
 
     default: {
       // Allow calling any of the 189+ canonical actions or 13 read tools directly by name.
       const pid = str(a.project_id) || str(a.projectId);
       const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
-      const head = r.success === false
-        ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
-        : `✅ ${name}: ${r.observation || r.message || 'completed'}`;
-      return ok(head, r);
+      return ok(directHead(name, r, 'completed'), r);
     }
   }
+}
+
+/**
+ * The one-line summary of a direct tool result: a call the backend is still
+ * running (HTTP 202, status "running") is not a failure — it names the task to
+ * poll; params the action did not take (ignored_params) are called out.
+ */
+function directHead(name: string, r: Record<string, unknown>, fallback: string): string {
+  const taskId = typeof r.taskId === 'string' ? r.taskId : (typeof r.task_id === 'string' ? r.task_id : undefined);
+  if (r.status === 'running' && taskId) {
+    return `⏳ ${name} is still running on Levea (nothing lost, never run twice). Poll check_task_status { task_id: "${taskId}" } — its result is this call's full response — or resend the identical call.`;
+  }
+  const head = r.success === false
+    ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
+    : `✅ ${name}: ${r.observation || r.message || fallback}`;
+  const ignored = Array.isArray(r.ignored_params) ? r.ignored_params : [];
+  if (ignored.length === 0) return head;
+  const names = ignored.flatMap((g: any) => Array.isArray(g?.ignored_params) ? g.ignored_params : [g])
+    .map((i: any) => (i?.didYouMean ? `${i.param} (did you mean ${i.didYouMean}?)` : String(i?.param ?? '')))
+    .filter(Boolean);
+  return `${head}\n⚠ IGNORED params (no effect): ${names.join(', ')}`;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
