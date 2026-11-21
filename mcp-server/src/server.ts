@@ -105,13 +105,13 @@ const TOOL_DEFS: Tool[] = [
 
   // ── Deterministic edits — one typed action, no planner ───────────────────
   // For surgical nudges in an observe → nudge → observe loop on an existing
-  // project. Read layer ids from get_project (project.scene.layers[].id).
+  // project. Read layer ids from timeline_view or a receipt's createdLayerIds.
   // Anything that needs judgment (what to cut, which look, where) stays with
   // autonomous_edit.
   {
     name: 'update_layer',
     description:
-      'Deterministic edit: set registry properties on one existing layer of a project, committed immediately (no planner, no export). E.g. {"x": 540, "y": 960}, {"scale": 1.2}, {"opacity": 0.5}, {"volume": 0.3}, {"visible": false}, {"z_index": 4}, or its timeline window {"start_time": 2, "end_time": 8}. Unknown keys are ignored, and an update that changes nothing is an error (NO_CHANGE). Not for keyframed animation (use autonomous_edit), and not "text" on a caption group (refused: it would overwrite every caption). Get layer ids from get_project (project.scene.layers[].id).',
+      'Deterministic edit: set registry properties on one existing layer of a project, committed immediately (no planner, no export). E.g. {"x": 540, "y": 960}, {"scale": 1.2}, {"opacity": 0.5}, {"volume": 0.3}, {"visible": false}, {"z_index": 4}, or its timeline window {"start_time": 2, "end_time": 8}. Unknown keys are ignored, and an update that changes nothing is an error (NO_CHANGE). Not for keyframed animation (use autonomous_edit), and not "text" on a caption group (refused: it would overwrite every caption). Layer ids: execute_action timeline_view, or the createdLayerIds in an earlier receipt.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -308,7 +308,7 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'check_task_status',
-    description: 'Poll a queued edit task by taskId (returned by queue_edit), or a direct tool call that answered status "running" (taskId "dc_…" from execute_action / execute_batch / render_preview: its result is that call\'s full response once status is completed / failed). Separate from job_id (exports).',
+    description: 'Poll a queued edit task by taskId (returned by queue_edit), or a direct tool call that answered status "running" (taskId "dc_…" from execute_action / execute_batch / render_preview: waits up to ~25 s for it, and its result is that call\'s full response once status is completed / failed). Direct calls already wait for their own result, so you rarely need this. Separate from job_id (exports).',
     inputSchema: {
       type: 'object',
       properties: { task_id: { type: 'string', description: 'Task id from queue_edit, or a "dc_…" id from a direct call still running.' } },
@@ -451,10 +451,13 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'get_project',
-    description: 'Fetch one project by id.',
+    description: 'Fetch one project\'s record by id (name, revision, dates) with a short layer index (id, type, role, name, start_time, end_time). The full scene JSON is several MB: pass include_scene: true only if you really need it. To read the edit, execute_action timeline_view is the compact whole-timeline view.',
     inputSchema: {
       type: 'object',
-      properties: { project_id: { type: 'string' } },
+      properties: {
+        project_id: { type: 'string' },
+        include_scene: { type: 'boolean', description: 'true returns the full scene JSON (several MB) instead of the layer index.' },
+      },
       required: ['project_id'],
     },
   },
@@ -856,12 +859,64 @@ function resultContent(text: string, structured: unknown): McpContentBlock[] {
 
 function ok(text: string, structured: unknown) {
   const failed = isFailure(structured);
+  const content = resultContent(text, structured);
   return {
-    content: resultContent(text, structured),
-    structuredContent: structured as Record<string, unknown>,
+    content,
+    structuredContent: withoutAttachedImages(structured, content) as Record<string, unknown>,
     ...(failed ? { isError: true } : {}),
   };
 }
+/**
+ * Frames attached as MCP image blocks are not repeated as base64 in
+ * structuredContent: clients such as Claude Code hand the model the structured
+ * result, and 8 frames of base64 (~400 KB) overflow its output limit, cutting
+ * off everything after them. Each frame keeps its metadata and says which image
+ * block holds it.
+ */
+const IMAGE_DATA_KEYS: ReadonlySet<string> = new Set(['base64', 'dataUrl', 'frameImages', 'mcpContent']);
+function withoutAttachedImages(structured: unknown, content: McpContentBlock[]): unknown {
+  if (!structured || typeof structured !== 'object') return structured;
+  if (!content.some((b) => b.type === 'image')) return structured;
+  const strip = (v: unknown, depth: number): unknown => {
+    if (depth > 4 || !v || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map((x) => strip(x, depth + 1));
+    const o: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if (IMAGE_DATA_KEYS.has(k)) { if (k === 'base64') o.image = 'attached as an MCP image block'; continue; }
+      o[k] = strip(x, depth + 1);
+    }
+    return o;
+  };
+  return strip(structured, 0);
+}
+
+/** A project record with its multi-MB scene replaced by a layer index (get_project without include_scene). */
+function slimProject(r: unknown): unknown {
+  const project = (r as { project?: Record<string, unknown> } | null)?.project;
+  const scene = project?.scene as { layers?: unknown[]; duration?: unknown; canvas?: unknown; width?: unknown; height?: unknown } | undefined;
+  if (!project || !scene || typeof scene !== 'object') return r;
+  const layers = Array.isArray(scene.layers) ? scene.layers : [];
+  const index = layers.slice(0, 200).map((l: any) => ({
+    id: l?.id, type: l?.type, ...(l?.role ? { role: l.role } : {}), ...(l?.name ? { name: l.name } : {}),
+    start_time: l?.start_time ?? l?.startTime, end_time: l?.end_time ?? l?.endTime,
+  }));
+  const { scene: _scene, ...rest } = project;
+  return {
+    ...(r as Record<string, unknown>),
+    project: {
+      ...rest,
+      sceneSummary: {
+        layerCount: layers.length,
+        ...(scene.duration !== undefined ? { duration: scene.duration } : {}),
+        ...(scene.canvas !== undefined ? { canvas: scene.canvas } : {}),
+        layers: index,
+        ...(layers.length > index.length ? { layersOmitted: layers.length - index.length } : {}),
+        note: 'Full scene omitted (pass include_scene: true). execute_action timeline_view gives the whole edit as compact text.',
+      },
+    },
+  };
+}
+
 function fail(text: string, structured?: unknown) {
   const data = (structured as Record<string, unknown>) ?? { error: text };
   return {
@@ -996,7 +1051,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     case 'check_task_status': {
       const id = str(a.task_id);
       if (!id) return fail('❌ `task_id` is required.');
-      const r = await getTaskStatus(id);
+      const r = await getTaskStatus(id, id.startsWith('dc_'));
       return ok(summarizeAny(`task ${id}`, r), r);
     }
 
@@ -1096,7 +1151,8 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       const id = str(a.project_id);
       if (!id) return fail('❌ `project_id` is required.');
       const r = await getProject(id);
-      return ok(summarizeAny(`project ${id}`, r), r);
+      const slim = a.include_scene === true ? r : slimProject(r);
+      return ok(summarizeAny(`project ${id}`, slim), slim);
     }
     case 'create_project': {
       const nm = str(a.name);
@@ -1180,7 +1236,10 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
 function directHead(name: string, r: Record<string, unknown>, fallback: string): string {
   const taskId = typeof r.taskId === 'string' ? r.taskId : (typeof r.task_id === 'string' ? r.task_id : undefined);
   if (r.status === 'running' && taskId) {
-    return `⏳ ${name} is still running on Levea (nothing lost, never run twice). Poll check_task_status { task_id: "${taskId}" } — its result is this call's full response — or resend the identical call.`;
+    const waited = typeof r.waitedSec === 'number' ? ` (waited ${r.waitedSec} s for it)` : '';
+    const pd = r.progressDetail as { stepsDone?: number; stepsTotal?: number; currentAction?: string } | undefined;
+    const where = pd && pd.stepsTotal ? ` Step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}.` : '';
+    return `⏳ ${name} is still running on Levea${waited}; nothing lost, never run twice.${where} To keep waiting, resend the identical call (it waits again and returns the full result when done) or call check_task_status { task_id: "${taskId}" }. Do not change the params while it runs.`;
   }
   const head = r.success === false
     ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
@@ -1216,6 +1275,8 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   '  3. render_preview at 2-4 timestamps and look at the frames; fix what you see with one more batch.',
   '  4. execute_action EXPORT_VIDEO → videoUrl, or a jobId to poll with check_job_status.',
   'Unsure of an action\'s params? search_tools with a query returns matching actions with param specs; get_action_schema takes actions: [..] for several at once. A batch (max 25 steps) is checked before anything runs and is atomic (allow_partial: true to keep successful steps); destructive actions need confirm_destructive: true. The server adds no creative content of its own on this path, and masters loudness at export if you skipped MASTER_AUDIO.',
+  'Long direct calls (FACE_RETOUCH, LIPSYNC_VIDEO, generation, DETECT_* on a long source, export) wait for their own result, up to this server\'s request timeout. If one still answers ⏳ running, resend the identical call to keep waiting (it is never run twice; changed params start a new call) — do not loop on other tools meanwhile.',
+  'Verify before export: render_preview frames for picture (titles, captions, faces, framing); inspect_layer for keyframes / effects / audio routing that timeline_view only lists; measure_audio for loudness and ducking.',
   'No id lookups between steps: params accept references — @last (layer the latest step created; also across calls), @last:<kind>, @step<N>, @primary (main video), @first:<kind>, @all:<kind> (bulk, in layer_ids) and times @end-3, @mid, @last.end+0.5. Kinds: video, audio, text, caption, title, broll, music, sfx or any role. Receipts list createdLayerIds.',
   'Bulk in one step: TRIM_LAYER { layer_id: "@primary", keep_ranges: [{start,end}] } keeps only those spans and stitches; UPDATE_LAYER { layer_ids: "@all:title", ... }; STYLE_CAPTIONS restyles every caption.',
   'Custom GPU shaders (WGSL fn fx(c: FxCtx); v3: textures, feedback, passes, data, particles): create_shader_effect then apply_shader_effect; contract + examples: load_skill shaderfx-effects.',

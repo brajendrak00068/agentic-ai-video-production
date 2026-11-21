@@ -328,6 +328,80 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/** The task id of a direct call the backend answered "still running" (HTTP 202), else undefined. */
+function runningTaskId(d: Record<string, unknown>): string | undefined {
+  if (d?.status !== 'running') return undefined;
+  const id = d.taskId ?? d.task_id;
+  return typeof id === 'string' && id.trim() ? id.trim() : undefined;
+}
+
+/**
+ * Long-poll a running direct call (GET /task-status/:id?wait=true blocks up to
+ * 25 s server-side) until it finishes or this request's own deadline. Returns
+ * the call's own full response once finished; on the deadline, the 202 body
+ * with the latest live progress (resending the identical call resumes the
+ * wait — it is never run twice). null when the call was not running.
+ */
+async function waitForDirectCall(
+  first: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<{ data: Record<string, unknown>; httpStatus?: number; waitedSec: number } | null> {
+  const taskId = runningTaskId(first);
+  if (!taskId) return null;
+  const t0 = Date.now();
+  let data = first;
+  const done = (d: Record<string, unknown>, httpStatus?: number) => ({ data: d, httpStatus, waitedSec: Math.round((Date.now() - t0) / 1000) });
+  while (!signal.aborted) {
+    const pollStart = Date.now();
+    let st: { status: number; data: unknown };
+    try {
+      st = await http2().get(v1(`/task-status/${encodeURIComponent(taskId)}`), { params: { wait: 'true' }, signal });
+    } catch {
+      if (signal.aborted) break;
+      await sleep(5_000, signal);
+      continue;
+    }
+    const s = (st.data || {}) as Record<string, any>;
+    if (st.status >= 400) break; // unknown to this key / refused: hand back the 202 as it was
+    if (st.status < 400 && s.status && s.status !== 'running') {
+      if (s.result && typeof s.result === 'object') {
+        const result = s.result as Record<string, unknown>;
+        return done({ ...result, ...(s.failureCode && !result.failureCode ? { failureCode: s.failureCode } : {}) });
+      }
+      return done({
+        success: s.status === 'completed',
+        status: s.status,
+        taskId,
+        ...(s.failureCode ? { failureCode: s.failureCode } : {}),
+        ...(s.error ? { error: s.error } : {}),
+        message: s.message,
+      });
+    }
+    if (st.status < 400) {
+      // Still running: keep the live progress so a deadline answer says where it is.
+      const { result: _r, frames: _f, mcpContent: _m, ...live } = s;
+      data = { ...data, ...live, status: 'running', success: false, taskId };
+    }
+    // The server long-polls ~25 s; if it answered at once (older server), back off.
+    if (Date.now() - pollStart < 3_000) await sleep(Math.min(15, Math.max(3, Number(data.retryAfterSec) || 5)) * 1000, signal);
+  }
+  return done(data);
+}
+
+/**
+ * Drop what a direct result repeats: `actionsExecuted` is the same array as
+ * `stepReceipts`, and `message` often repeats `observation` verbatim. Clients
+ * such as Claude Code hand the model the structured result, so every repeated
+ * kilobyte is paid for on every call.
+ */
+function slimDirectResult(r: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...r };
+  if (Array.isArray(out.stepReceipts) && Array.isArray(out.actionsExecuted)) delete out.actionsExecuted;
+  if (typeof out.message === 'string' && out.message === out.observation) delete out.message;
+  if (out.task_id === out.taskId) delete out.task_id;
+  return out;
+}
+
 export async function executeDeterministicTool(
   tool: string,
   projectId: string | undefined,
@@ -352,17 +426,25 @@ export async function executeDeterministicTool(
       await sleep(waitSec * 1000, call.signal);
       res = await http2().post(v1('/execute'), body, { signal: call.signal });
     }
-    const d = (res.data || {}) as Record<string, unknown>;
+    let d = (res.data || {}) as Record<string, unknown>;
+    let httpStatus = res.status;
+    // A long call answers 202 { status: "running", taskId: "dc_…" } and keeps
+    // running on Levea. Wait for it here instead of handing the agent a
+    // "still running" it would resend in a loop: one tool call returns the
+    // call's own full response.
+    const waited = await waitForDirectCall(d, call.signal);
+    if (waited) { d = waited.data; httpStatus = waited.httpStatus ?? httpStatus; }
     const { scene, ...rest } = d;
     const layers = (scene as { layers?: unknown } | undefined)?.layers;
-    const out: Record<string, unknown> = {
+    const out: Record<string, unknown> = slimDirectResult({
       ...rest,
       ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}),
       ...(params?.include_scene === true && scene !== undefined ? { scene } : {}),
-    };
+    });
+    if (waited) out.waitedSec = waited.waitedSec;
     if (Array.isArray(layers)) out.layerCount = layers.length;
-    if (res.status >= 400 && out.success === undefined) out.success = false;
-    if (res.status >= 400) out.httpStatus = res.status;
+    if (httpStatus >= 400 && out.success === undefined) out.success = false;
+    if (httpStatus >= 400) out.httpStatus = httpStatus;
     return out;
   } catch (err) {
     if (hostSignal?.aborted) return { success: false, status: 'cancelled', error: `Cancelled by the client; ${tool} may still have been applied.`, ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}) };
@@ -636,9 +718,9 @@ export async function queueEdit(edit: EditRequestBody): Promise<unknown> {
   }
 }
 
-export async function getTaskStatus(taskId: string): Promise<unknown> {
+export async function getTaskStatus(taskId: string, wait = false): Promise<unknown> {
   try {
-    const res = await http2().get(v1(`/task-status/${encodeURIComponent(taskId)}`));
+    const res = await http2().get(v1(`/task-status/${encodeURIComponent(taskId)}`), wait ? { params: { wait: 'true' } } : undefined);
     return res.data;
   } catch (err) {
     return describeError(err, `getTaskStatus(${taskId})`);
