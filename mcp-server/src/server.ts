@@ -560,7 +560,7 @@ const TOOL_DEFS: Tool[] = [
         category: { type: 'string', description: 'Optional domain/category filter.' },
         limit: { type: 'number', description: 'Max actions to return (default: all matches; preset catalogs default to 50).' },
         include_schemas: { type: 'boolean', description: 'Force parameter specs on (true) or off (false). Default: on when 25 or fewer actions match.' },
-        offset: { type: 'number', description: 'Page through a long result: pass the nextOffset a previous answer returned (answers stay under ~15k tokens).' },
+        offset: { type: 'number', description: 'Page through a long result: pass the nextOffset a previous answer returned (answers stay under ~10k tokens).' },
         detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): one-line descriptions. "full": full action descriptions (pages sooner).' },
       },
       required: [],
@@ -574,9 +574,15 @@ const TOOL_DEFS: Tool[] = [
       type: 'object',
       properties: {
         action: { type: 'string', description: 'Canonical action name or read tool name.' },
-        actions: { type: 'array', items: { type: 'string' }, description: 'Several action names at once (up to 40) — one round trip instead of many.' },
-        params: { type: 'array', items: { type: 'string' }, description: 'Only these parameters, in full (nested schemas, every enum value). Use it for the parameters a summarised schema lists in schemaDetail.paramsOmitted.' },
-        detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): a very large schema is compacted to stay under ~15k tokens. "full": the whole schema as stored (CREATE_LAYER / UPDATE_LAYER are 200-380 KB).' },
+        actions: { type: 'array', items: { type: 'string' }, description: 'Several action names at once (up to 40) — one round trip instead of many. They share one answer budget (~10k tokens): small schemas come whole, larger ones summarised (listed in `compacted`; schemaDetail.paramsOmitted names the rest).' },
+        params: {
+          oneOf: [
+            { type: 'array', items: { type: 'string' } },
+            { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } },
+          ],
+          description: 'Only these parameters, in full (nested schemas, every enum value): ["name", ...], or { "ACTION": ["name", ...] } per action with actions: [...]. Use it for the parameters a summarised schema lists in schemaDetail.paramsOmitted.',
+        },
+        detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): a very large schema is compacted to stay under ~10k tokens. "full": the whole schema as stored (CREATE_LAYER / UPDATE_LAYER are 200-380 KB).' },
       },
       required: [],
     },
@@ -606,7 +612,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_batch',
     description:
-      'Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. Fast path: seed (video_url + timeline_view + query_transcript) → this batch with dry_run: true → the same batch without it (end with EXPORT_VIDEO, or check render_preview first). The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true), and any parameter an action does not take or a value outside its enum / type / range (INVALID_PARAMS), rejects it before anything runs, listing every problem with did-you-mean suggestions; declared aliases are corrected and reported in corrected_params. Exact names: get_action_schema (several actions in one call). Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called.',
+      'Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. Fast path: seed (video_url + timeline_view + query_transcript) → this batch with dry_run: true → the same batch without it (end with EXPORT_VIDEO, or check render_preview first). The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true), and any parameter an action does not take or a value outside its enum / type / range (INVALID_PARAMS), rejects it before anything runs, listing every problem with did-you-mean suggestions; declared aliases are corrected and reported in corrected_params. Exact names: get_action_schema (several actions in one call). Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called. Answers stay under ~10k tokens: a long read output in a batch is paged (its receipt names the start / offset that continues) and replyBudget lists anything shortened. query_transcript returns timed sentence lines (detail: "words" for per-word times); timeline_view is compact on a busy timeline (detail: "full" for every field).',
     inputSchema: {
       type: 'object',
       properties: {
