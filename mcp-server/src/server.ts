@@ -1058,7 +1058,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       if (!id) return fail('❌ `job_id` is required.');
       const job = a.wait === true ? await waitForJob(id) : await getJobStatus(id);
       return ok(
-        `${job.success ? '🔎' : '❌'} job ${job.jobId}: ${job.status} (${job.progress}%) ${job.message}`,
+        `${job.success ? '🔎' : '❌'} job ${job.jobId}: ${job.status} (${job.progress}%) ${job.message}${polishLine(job as unknown as Record<string, unknown>)}`,
         job
       );
     }
@@ -1250,21 +1250,37 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
 }
 
 /**
+ * The export polish gate's outcome as one summary line (its fixes and what it
+ * left, each with the call that fixes it, are in structuredContent.polish),
+ * so a client that shows only the text still sees that the gate ran.
+ */
+function polishLine(r: Record<string, unknown>): string {
+  const p = r.polish as { status?: unknown; grade?: unknown; fixed?: unknown; remaining?: unknown; summary?: unknown } | undefined;
+  if (!p || typeof p !== 'object') return '';
+  const fixed = Array.isArray(p.fixed) ? p.fixed.length : 0;
+  const remaining = Array.isArray(p.remaining) ? p.remaining.length : 0;
+  const grade = typeof p.grade === 'string' ? `, grade ${p.grade}` : '';
+  return `\n🧹 polish ${String(p.status ?? 'ran')}${grade}: ${fixed} fixed, ${remaining} left (see polish.fixed / polish.remaining)`;
+}
+
+/**
  * The one-line summary of a direct tool result: a call the backend is still
  * running (HTTP 202, status "running") is not a failure — it names the task to
  * poll; params the action did not take (ignored_params) are called out.
  */
 function directHead(name: string, r: Record<string, unknown>, fallback: string): string {
   const taskId = typeof r.taskId === 'string' ? r.taskId : (typeof r.task_id === 'string' ? r.task_id : undefined);
+  // An export job still rendering after the wait: poll the job, not the call.
+  if (typeof r.exportHint === 'string') return `⏳ ${name}: ${r.exportHint}${polishLine(r)}`;
   if (r.status === 'running' && taskId) {
     const waited = typeof r.waitedSec === 'number' ? ` (waited ${r.waitedSec} s for it)` : '';
     const pd = r.progressDetail as { stepsDone?: number; stepsTotal?: number; currentAction?: string } | undefined;
     const where = pd && pd.stepsTotal ? ` Step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}.` : '';
     return `⏳ ${name} is still running on Levea${waited}; nothing lost, never run twice.${where} To keep waiting, resend the identical call (it waits again and returns the full result when done) or call check_task_status { task_id: "${taskId}" }. Do not change the params while it runs.`;
   }
-  const head = r.success === false
+  const head = (r.success === false
     ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
-    : `✅ ${name}: ${r.observation || r.message || fallback}`;
+    : `✅ ${name}: ${r.observation || r.message || fallback}`) + polishLine(r);
   const ignored = Array.isArray(r.ignored_params) ? r.ignored_params : [];
   if (ignored.length === 0) return head;
   const names = ignored.flatMap((g: any) => Array.isArray(g?.ignored_params) ? g.ignored_params : [g])

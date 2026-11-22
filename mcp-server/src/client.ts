@@ -38,6 +38,21 @@ export interface JobStatus {
   error?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  /** A direct EXPORT_VIDEO's own report, kept on its export job (polish gate, deliverable warnings, its steps, verification report). */
+  polish?: unknown;
+  deliverableWarnings?: unknown[];
+  exportCallSteps?: unknown[];
+  verificationReport?: unknown;
+  deliverySampledDecode?: unknown;
+}
+
+/** The report fields a job poll carries for a direct export (backend: TaskResultResolver.directExportReplyFields). */
+const JOB_REPORT_FIELDS = ['polish', 'deliverableWarnings', 'exportCallSteps', 'verificationReport', 'deliverySampledDecode'] as const;
+
+function jobReportFields(d: Record<string, unknown>): Partial<JobStatus> {
+  const out: Record<string, unknown> = {};
+  for (const k of JOB_REPORT_FIELDS) if (d[k] !== undefined && d[k] !== null) out[k] = d[k];
+  return out as Partial<JobStatus>;
 }
 
 export interface SSEEvent {
@@ -328,11 +343,27 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-/** The task id of a direct call the backend answered "still running" (HTTP 202), else undefined. */
+/**
+ * The task id of a direct call the backend answered "still running" (HTTP 202),
+ * else undefined. Only the direct call's own 202 names one: it carries the call
+ * id (`callId`, the same id as taskId). An export still rendering also answers
+ * status "running" with its job id, and older backends put that id in taskId
+ * too: following it replaced the whole reply (polish, deliverableWarnings,
+ * receipts) with the export row's clips, {"0": {url, ...}}.
+ */
 function runningTaskId(d: Record<string, unknown>): string | undefined {
   if (d?.status !== 'running') return undefined;
   const id = d.taskId ?? d.task_id;
-  return typeof id === 'string' && id.trim() ? id.trim() : undefined;
+  if (typeof id !== 'string' || !id.trim()) return undefined;
+  const callId = typeof d.callId === 'string' ? d.callId.trim() : '';
+  const pollWith = isPlainObject(d.pollWith) ? d.pollWith : null;
+  const pollId = typeof pollWith?.task_id === 'string' ? pollWith.task_id.trim() : '';
+  return (callId && callId === id.trim()) || (pollId && pollId === id.trim()) ? id.trim() : undefined;
+}
+
+/** A plain JSON object (not an array, not null). */
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
 /**
@@ -364,14 +395,17 @@ async function waitForDirectCall(
     const s = (st.data || {}) as Record<string, any>;
     if (st.status >= 400) break; // unknown to this key / refused: hand back the 202 as it was
     if (st.status < 400 && s.status && s.status !== 'running') {
-      if (s.result && typeof s.result === 'object') {
-        const result = s.result as Record<string, unknown>;
+      // The call's own full response once finished. Anything else (a job's
+      // clip list) is never spread over the reply: it stays under `result`.
+      if (isPlainObject(s.result)) {
+        const result = s.result;
         return done({ ...result, ...(s.failureCode && !result.failureCode ? { failureCode: s.failureCode } : {}) });
       }
       return done({
         success: s.status === 'completed',
         status: s.status,
         taskId,
+        ...(s.result !== undefined && s.result !== null ? { result: s.result } : {}),
         ...(s.failureCode ? { failureCode: s.failureCode } : {}),
         ...(s.error ? { error: s.error } : {}),
         message: s.message,
@@ -402,6 +436,46 @@ function slimDirectResult(r: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+/** Time left unspent at the end of a call's deadline when it waits for an export job (to answer before the host gives up). */
+const EXPORT_WAIT_MARGIN_MS = 10_000;
+
+const EXPORT_JOB_PENDING: ReadonlySet<string> = new Set(['running', 'queued', 'processing', 'pending', 'rendering']);
+
+/** A direct reply whose EXPORT_VIDEO step queued a job still rendering (jobId, a pending status, no video yet). */
+function exportStillRendering(r: Record<string, unknown>): boolean {
+  if (r.jobId === undefined || r.jobId === null || String(r.jobId).trim() === '') return false;
+  if (typeof r.videoUrl === 'string' && r.videoUrl) return false;
+  if (!EXPORT_JOB_PENDING.has(String(r.status ?? '').toLowerCase())) return false;
+  const receipts = Array.isArray(r.stepReceipts) ? r.stepReceipts as Array<{ action?: unknown }> : [];
+  return r.action === 'EXPORT_VIDEO' || receipts.some((s) => s?.action === 'EXPORT_VIDEO');
+}
+
+/**
+ * The fields a finished (or still running) export job adds to the direct
+ * reply that queued it: the job's status and video, under `exportJob` the job
+ * record itself, and the report fields the job carries only where the reply
+ * has none of its own (the reply's polish / deliverableWarnings /
+ * verificationReport are the call's, and win).
+ */
+function withExportJob(reply: Record<string, unknown>, job: JobStatus): Record<string, unknown> {
+  const { polish, deliverableWarnings, exportCallSteps, verificationReport, deliverySampledDecode, ...record } = job;
+  const finished = job.status === 'completed' || job.status === 'complete' || job.status === 'succeeded' || job.status === 'success';
+  return {
+    status: job.status,
+    ...(job.videoUrl ? { videoUrl: job.videoUrl } : {}),
+    ...(job.success === false || job.status === 'failed' || job.status === 'error' ? { exportError: job.error || job.message } : {}),
+    exportJob: record,
+    ...(reply.polish === undefined && polish !== undefined ? { polish } : {}),
+    ...(reply.deliverableWarnings === undefined && deliverableWarnings !== undefined ? { deliverableWarnings } : {}),
+    ...(reply.verificationReport === undefined && verificationReport !== undefined ? { verificationReport } : {}),
+    ...(reply.stepReceipts === undefined && exportCallSteps !== undefined ? { exportCallSteps } : {}),
+    ...(deliverySampledDecode !== undefined ? { deliverySampledDecode } : {}),
+    ...(!finished && EXPORT_JOB_PENDING.has(String(job.status).toLowerCase())
+      ? { exportHint: `The export is still rendering; check_job_status { job_id: "${String(reply.jobId)}", wait: true } returns the video with this call's polish report.` }
+      : {}),
+  };
+}
+
 export async function executeDeterministicTool(
   tool: string,
   projectId: string | undefined,
@@ -409,6 +483,7 @@ export async function executeDeterministicTool(
   hostSignal?: AbortSignal,
 ): Promise<unknown> {
   const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
+  const callStart = Date.now();
   const resolvedProjectId = projectId || (typeof params?.project_id === 'string' && params.project_id.trim() ? params.project_id.trim() : undefined);
   try {
     const body = {
@@ -443,6 +518,17 @@ export async function executeDeterministicTool(
     });
     if (waited) out.waitedSec = waited.waitedSec;
     if (Array.isArray(layers)) out.layerCount = layers.length;
+    // An export still rendering when the call answered: wait for its job
+    // here (within this call's own deadline) and add the job's outcome to the
+    // reply. The reply's own fields (polish, deliverableWarnings,
+    // verificationReport, stepReceipts) are kept; the job never replaces them.
+    if (httpStatus < 400 && exportStillRendering(out)) {
+      const left = callStart + DEFAULT_TIMEOUT_MS - Date.now() - EXPORT_WAIT_MARGIN_MS;
+      if (left > 0 && !call.signal.aborted) {
+        const job = await waitForJob(String(out.jobId), { timeoutMs: left });
+        Object.assign(out, withExportJob(out, job));
+      }
+    }
     if (httpStatus >= 400 && out.success === undefined) out.success = false;
     if (httpStatus >= 400) out.httpStatus = httpStatus;
     return out;
@@ -615,6 +701,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
       error: (d.error as string | null) ?? null,
       createdAt: d.createdAt as string | undefined,
       updatedAt: d.updatedAt as string | undefined,
+      ...jobReportFields(d),
     };
   } catch (err) {
     return describeError(err, `getJobStatus(${jobId})`);
