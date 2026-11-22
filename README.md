@@ -262,13 +262,16 @@ When the user asks to edit a clip in our house style:
    - `prompt`: "Cut silences >0.4s and filler words, reframe to 9:16 keeping the active speaker centered, add Hormozi captions in the lower safe zone, add a lower-third title card at 0:02, duck upbeat background music to -18 LUFS under speech, and export 1080p MP4."
 
 3. **Option B — Deterministic Step-by-Step Recipe (`execute_batch` → `render_preview` → `EXPORT_VIDEO`):**
-   - Call `execute_batch` on `project_id` with our exact sequence:
-     1. `REMOVE_SILENCES` (`min_silence_duration: 0.4`, `padding_ms: 80`)
+   - Call `execute_batch` on `project_id` with our exact sequence (steps run in order on one scene and commit once; if a step fails nothing is committed):
+     1. `REMOVE_SILENCES` (`min_silence_duration: 0.4`, `padding: 80`) — `padding` is in milliseconds
      2. `CONFIGURE_CANVAS` (`aspect_ratio: "9:16"`)
-     3. `VERTICAL_REFRAME` (`mode: "active_speaker"`)
-     4. `COLOR_GRADE` (`preset: "cinematic_warm"`, `contrast: 1.08`, `saturation: 1.05`)
-     5. `GENERATE_CAPTIONS` (`template: "hormozi"`)
-     6. `AUTO_DUCK` (`target_lufs: -18`)
+     3. `VERTICAL_REFRAME` (`mode: "track_face"`)
+     4. `COLOR_GRADE` (`color_preset: "warm"`, `contrast: 1.08`, `saturation: 1.05`)
+     5. `GENERATE_CAPTIONS` (`style: "reel-hormozi-punch"`)
+     6. `GENERATE_MUSIC` (`mood: "upbeat"`, `mix_role: "under_dialogue"`)
+     7. `AUTO_DUCK` (`mode: "music_under_speech"`, `target_loudness_lufs: -18`)
+   - Send the batch with `dry_run: true` first: every step's parameters are checked against its schema in under a second and nothing runs. An unknown parameter, a value outside its list or a wrong type refuses the whole batch with `INVALID_PARAMS` and every problem listed (with "did you mean" suggestions); declared aliases are corrected and reported in `corrected_params`. Exact names and values: `get_action_schema` (it accepts a list of actions) and the `search_tools` catalogs (`color_presets`, `captions`).
+   - Send calls one after another and wait for each answer: two edits on the same `project_id` at once fail with `PROJECT_REVISION_CONFLICT`.
    - Call `render_preview` at `timestamps: [1.5, 5.0, 10.0]` to visually inspect the GPU-rendered JPEG frames and verify captions do not overlap faces.
    - Call `execute_action` with `action: "EXPORT_VIDEO"` to deliver the final MP4.
 ```
