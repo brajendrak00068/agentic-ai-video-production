@@ -522,12 +522,15 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'transcribe_asset',
-    description: 'Force transcription of an existing asset. Returns transcript words + timing.',
+    description: 'Transcribe an existing asset (cached after the first call). By default returns a compact answer: language, duration_sec, word_count, speakers, transcript_id and one page of sentence lines "[start s–end s] [speaker] text" in source seconds. detail "words" returns words with only text / start / end / speaker, paged with offset / limit; detail "full" returns the raw transcription record (very large).',
     inputSchema: {
       type: 'object',
       properties: {
         fileName: { type: 'string', description: 'Asset path.' },
         language: { type: 'string', description: 'Optional ASR language hint.' },
+        detail: { type: 'string', enum: ['lines', 'words', 'full'], description: 'lines (default): sentence lines with start / end times. words: word-level text / start / end / speaker, paged. full: the raw transcription record (very large; avoid).' },
+        offset: { type: 'integer', minimum: 0, description: 'First line (detail lines) or word (detail words) to return: next_offset from the previous page.' },
+        limit: { type: 'integer', minimum: 1, description: 'Max lines / words in this page (words: default 500, max 1000). A page is also capped at about 12k tokens.' },
       },
       required: ['fileName'],
     },
@@ -1201,7 +1204,13 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     case 'transcribe_asset': {
       const fn = str(a.fileName);
       if (!fn) return fail('❌ `fileName` is required.');
-      const r = await transcribeAsset({ fileName: fn, language: str(a.language) });
+      const r = await transcribeAsset({
+        fileName: fn,
+        language: str(a.language),
+        detail: str(a.detail),
+        offset: typeof a.offset === 'number' ? a.offset : undefined,
+        limit: typeof a.limit === 'number' ? a.limit : undefined,
+      });
       return ok(summarizeAny(`transcribe ${fn}`, r), r);
     }
 
