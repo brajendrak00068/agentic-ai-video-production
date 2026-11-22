@@ -581,7 +581,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_action',
     description:
-      'Execute any single canonical editor action (all 189+ actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed.',
+      'Execute any single canonical editor action (all 189+ actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed. Parameters are checked before anything runs (INVALID_PARAMS lists every problem with suggestions); dry_run: true checks without running. For several edits use execute_batch.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -594,6 +594,8 @@ const TOOL_DEFS: Tool[] = [
         include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
         idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
         rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
+        dry_run: { type: 'boolean', description: 'true: check every step\'s parameters against its schema (unknown names, enum values, types, ranges) in under a second and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it.' },
+        allow_unknown_params: { type: 'boolean', description: 'true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs.' },
       },
       required: ['action'],
     },
@@ -601,7 +603,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_batch',
     description:
-      'Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true) rejects it before anything runs, listing every bad step with suggestions. Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called.',
+      'Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. Fast path: seed (video_url + timeline_view + query_transcript) → this batch with dry_run: true → the same batch without it (end with EXPORT_VIDEO, or check render_preview first). The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true), and any parameter an action does not take or a value outside its enum / type / range (INVALID_PARAMS), rejects it before anything runs, listing every problem with did-you-mean suggestions; declared aliases are corrected and reported in corrected_params. Exact names: get_action_schema (several actions in one call). Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -624,6 +626,10 @@ const TOOL_DEFS: Tool[] = [
         include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
         idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
         rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
+        dry_run: { type: 'boolean', description: 'true: check every step\'s parameters against its schema (unknown names, enum values, types, ranges) in under a second and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it.' },
+        allow_unknown_params: { type: 'boolean', description: 'true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs.' },
+        allow_partial: { description: 'false (default): atomic. true: commit every step that succeeded. "until_failure": commit the steps before the first failure.' },
+        confirm_destructive: { type: 'boolean', description: 'Required true for destructive actions (CLEAR, DELETE_LAYER on many layers, …).' },
       },
       required: ['actions'],
     },
