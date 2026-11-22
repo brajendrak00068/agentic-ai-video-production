@@ -218,6 +218,21 @@
       }
     },
     {
+      "name": "skills",
+      "placement": "top",
+      "surfaces": [
+        "all"
+      ],
+      "doc": "Your own saved skills (save_skill) to apply to this edit, as \"user/<slug>\" ids. Skills saved with apply: always are applied to every edit without being named.",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional list of your own skill ids (\"user/<slug>\", from save_skill / search_skills { mine: true }) to apply to this edit: each playbook guides the editing agent, and the style it sets (brand_id, caption_template, style_reference_url) is used where this request sets none. Skills saved with apply: always are applied automatically."
+      }
+    },
+    {
       "name": "flaggedIssues",
       "placement": "top",
       "surfaces": [
