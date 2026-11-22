@@ -141,6 +141,11 @@ Every direct tool call (`execute_action` / `execute_batch`) includes automatic p
    - Drop a custom `SKILL.md` into `.claude/skills/<name>/SKILL.md` (Claude Code), `.cursor/skills/<name>/SKILL.md` (Cursor), `~/.openclaw/skills/<name>/SKILL.md` (OpenClaw), or `~/.hermes/skills/<name>/SKILL.md` (Hermes).
    - Encode your channel's `brandId`, `captionTemplatePreset` (e.g. `hormozi`), `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Mode A) or an exact `execute_batch` + `render_preview` action sequence (Mode B). Your agent can even call `load_skill` inside your custom skill to combine Levea's built-in craft rules with your own house rules.
 
+4. **Upload Your Skill to Your Levea Account (`save_skill`) — the editor edits in your style:**
+   - `save_skill({ path: "~/.claude/skills/my-style" })` (local `npx levea-mcp-server`: reads `SKILL.md` and its text files such as `references/*.md`) or `save_skill({ skill_md: "---\nname: my-style\n…" })` (any client) saves it as `user/my-style`.
+   - Frontmatter: `name`, `description`, `tags`, `actions` (canonical names), `apply: always` (applied to **every** `autonomous_edit` / `queue_edit` you run), and the style those edits default to where the request sets none: `brand_id`, `caption_template`, `style_reference_url`.
+   - Use it: `autonomous_edit({ prompt, skills: ["user/my-style"] })` (or nothing at all with `apply: always`) — the editing agent gets your playbook in full on every step; in your own loop, `load_skill({ skill_id: "user/my-style" })`. `search_skills` lists your skills first (`mine: true`: only yours); `delete_skill` removes one. Limits: 50 skills, 48k-character playbook, 12 text resources.
+
 → For agent-integration details (Mode A vs. Mode B, custom skills, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
 
 ---
@@ -348,6 +353,7 @@ curl -sS -X POST "$LEVEA_API_URL/api/v1/misc/openclaw/v1/execute" \
 | `planDecision` | Set to `"approve"` to approve the plan from an approval pause; resend it with that response's `workingMemory`. |
 | `attachedImages` | Reference image URLs for planning (style, branding). |
 | `style_reference_url` | A reference video whose editing style the result should match (pacing, captions, framing, zooms, transitions, grade). |
+| `skills` | Your own saved skills (save_skill) to apply to this edit, as "user/<slug>" ids. Skills saved with apply: always are applied to every edit without being named. |
 | `flaggedIssues` | Specific problems the user flagged that this run must fix. |
 | `brandId` | Brand kit to apply to this call. |
 | `projectBrandId` | Default brand kit for the project; persists across calls. |

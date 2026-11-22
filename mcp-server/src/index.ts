@@ -8,7 +8,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createLeveaMcpServer, PKG_VERSION, TOOLS } from './server';
 
 async function main() {
-  const server = createLeveaMcpServer();
+  // The stdio binary runs on the user's machine: save_skill { path } may read their local SKILL.md.
+  const server = createLeveaMcpServer({ localFiles: true });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stderr.write(

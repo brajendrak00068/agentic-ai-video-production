@@ -674,11 +674,12 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'search_skills',
     description:
-      'Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category.',
+      'Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category. Your own saved skills (save_skill) are listed first with source "user"; mine: true lists only yours.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search keyword (e.g. "color", "caption", "podcast", "montage", "motion").' },
+        mine: { type: 'boolean', description: 'Only your own saved skills (save_skill).' },
         category: { type: 'string', description: 'Optional category filter.' },
         limit: { type: 'number', description: 'Max skills to return (default 20).' },
       },
@@ -711,6 +712,33 @@ const TOOL_DEFS: Tool[] = [
       required: ['resource'],
     },
   },
+  {
+    name: 'save_skill',
+    description:
+      'Save (or update) one of your own SKILL.md playbooks on your Levea account, so the editor edits the way you do: your house style, a client\'s rules, how you pace and caption. It is kept as "user/<slug>" and works like a built-in skill: search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` — or on every edit when its frontmatter says apply: always. Frontmatter: name, description, tags, categories, actions (canonical action names), apply: always, and the style edits default to where the request sets none: brand_id, caption_template, style_reference_url. Pass skill_md (the text) or, with the local npx server, path (a SKILL.md file or the folder holding it; its text files such as references/*.md are uploaded as resources). Limits: 50 skills, 48k-character playbook, 12 resources / 128k characters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skill_md: { type: 'string', description: 'The whole SKILL.md: YAML frontmatter (name, description, …) then the playbook in markdown.' },
+        path: { type: 'string', description: 'Local npx server only: path to a SKILL.md file, or to the folder that holds SKILL.md (its other text files are uploaded as resources).' },
+        resources: { type: 'object', description: 'Bundled text files, { "references/look.md": "…" }.', additionalProperties: { type: 'string' } },
+        skill_id: { type: 'string', description: 'Slug to save under (default: the frontmatter name).' },
+        apply_by_default: { type: 'boolean', description: 'Apply this skill to every autonomous_edit you run (overrides frontmatter apply).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'delete_skill',
+    description: 'Delete one of your own saved skills ("user/<slug>").',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skill_id: { type: 'string', description: 'The skill to delete ("user/<slug>").' },
+      },
+      required: ['skill_id'],
+    },
+  },
 ];
 
 // Human-readable titles + safety hints for every tool (MCP tool annotations).
@@ -727,7 +755,8 @@ type ToolName =
   | 'asset_upload_url' | 'list_assets' | 'delete_asset' | 'transcribe_asset'
   | 'editor_health'
   | 'search_tools' | 'get_action_schema' | 'execute_action' | 'execute_batch' | 'render_preview'
-  | 'search_skills' | 'load_skill' | 'read_skill_resource';
+  | 'search_skills' | 'load_skill' | 'read_skill_resource'
+  | 'save_skill' | 'delete_skill';
 
 const read = (title: string): ToolAnnotations => ({ title, readOnlyHint: true, openWorldHint: false });
 const write = (title: string): ToolAnnotations => ({ title, readOnlyHint: false, destructiveHint: false, openWorldHint: false });
@@ -779,6 +808,8 @@ const TOOL_ANNOTATIONS = {
   search_skills: read('Search production craft skills'),
   load_skill: read('Load production craft skill'),
   read_skill_resource: read('Read skill reference resource'),
+  save_skill: write('Save your own skill'),
+  delete_skill: destructive('Delete your own skill'),
 } satisfies Record<ToolName, ToolAnnotations>;
 
 export const TOOLS: Tool[] = TOOL_DEFS.map((tool) => {
@@ -966,6 +997,47 @@ interface DispatchCtx {
   notifyProgress?: (progress: number, total?: number, message?: string) => Promise<void>;
   /** The host's cancel signal: aborts the upstream request when the client goes away. */
   signal?: AbortSignal;
+  /** The local stdio binary only: save_skill may read a SKILL.md from the user's disk (never on the hosted endpoint). */
+  localFiles?: boolean;
+}
+
+const SKILL_TEXT_EXTENSIONS = new Set(['md', 'markdown', 'txt', 'json', 'yaml', 'yml', 'csv', 'tsv', 'html', 'css', 'js', 'ts', 'svg', 'xml']);
+const SKILL_UPLOAD_MAX_FILES = 12;
+const SKILL_UPLOAD_MAX_FILE_BYTES = 64_000;
+
+/**
+ * A local SKILL.md (a file, or the folder holding SKILL.md) as save_skill's upload: the SKILL.md text and its folder's
+ * other text files (recursively, skipping dot-folders and node_modules) as resources keyed by relative path.
+ */
+async function readLocalSkill(rawPath: string): Promise<{ skill_md: string; resources: Record<string, string> }> {
+  const fs = await import('node:fs/promises');
+  const pathMod = await import('node:path');
+  const os = await import('node:os');
+  const expanded = rawPath.startsWith('~/') ? pathMod.join(os.homedir(), rawPath.slice(2)) : rawPath;
+  const target = pathMod.resolve(expanded);
+  const stat = await fs.stat(target);
+  const dir = stat.isDirectory() ? target : pathMod.dirname(target);
+  const skillFile = stat.isDirectory() ? pathMod.join(target, 'SKILL.md') : target;
+  const skill_md = await fs.readFile(skillFile, 'utf8');
+  const resources: Record<string, string> = {};
+  if (stat.isDirectory() || pathMod.basename(skillFile).toLowerCase() === 'skill.md') {
+    const walk = async (d: string): Promise<void> => {
+      for (const entry of await fs.readdir(d, { withFileTypes: true })) {
+        if (Object.keys(resources).length >= SKILL_UPLOAD_MAX_FILES) return;
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        const full = pathMod.join(d, entry.name);
+        if (entry.isDirectory()) { await walk(full); continue; }
+        if (full === skillFile) continue;
+        const ext = entry.name.includes('.') ? entry.name.slice(entry.name.lastIndexOf('.') + 1).toLowerCase() : '';
+        if (!SKILL_TEXT_EXTENSIONS.has(ext)) continue;
+        const info = await fs.stat(full);
+        if (info.size > SKILL_UPLOAD_MAX_FILE_BYTES) continue;
+        resources[pathMod.relative(dir, full).split(pathMod.sep).join('/')] = await fs.readFile(full, 'utf8');
+      }
+    };
+    await walk(dir);
+  }
+  return { skill_md, resources };
 }
 
 /** ShaderFX MCP tools → the canonical action each one runs through execute_action. */
@@ -1225,6 +1297,27 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
       return ok(`${h.ok ? '✅ backend reachable' : '❌ backend unreachable'}\n${h.detail}`, h);
     }
 
+    case 'save_skill': {
+      let body: Record<string, unknown> = { ...a };
+      const localPath = str(a.path);
+      if (localPath) {
+        if (!ctx.localFiles) {
+          return fail('❌ `path` works with the local server (npx levea-mcp-server), which can read your disk. Here, send the SKILL.md text as `skill_md` (and bundled files as `resources`).');
+        }
+        try {
+          const local = await readLocalSkill(localPath);
+          const given = (a.resources && typeof a.resources === 'object') ? a.resources as Record<string, unknown> : {};
+          body = { ...a, skill_md: local.skill_md, resources: { ...local.resources, ...given } };
+          delete body.path;
+        } catch (err) {
+          return fail(`❌ Could not read ${localPath}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      if (!str(body.skill_md)) return fail('❌ `skill_md` (the SKILL.md text) or `path` is required.');
+      const r = (await executeDeterministicTool('save_skill', undefined, body, ctx.signal)) as Record<string, unknown>;
+      return ok(directHead('save_skill', r, 'saved'), r);
+    }
+
     case 'search_tools':
     case 'get_action_schema':
     case 'execute_action':
@@ -1318,9 +1411,10 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   'Bulk in one step: TRIM_LAYER { layer_id: "@primary", keep_ranges: [{start,end}] } keeps only those spans and stitches; UPDATE_LAYER { layer_ids: "@all:title", ... }; STYLE_CAPTIONS restyles every caption.',
   'Custom GPU shaders (WGSL fn fx(c: FxCtx); v3: textures, feedback, passes, data, particles): create_shader_effect then apply_shader_effect; contract + examples: load_skill shaderfx-effects.',
   'Craft playbooks: search_skills / load_skill. Brand kits and caption templates: list_brand_kits, list_caption_templates.',
+  'The user\'s own style: save_skill uploads their SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists theirs first; autonomous_edit / queue_edit apply it via skills: ["user/<slug>"], or on every edit when it says apply: always. In your own loop, load_skill it and follow it.',
 ].join('\n');
 
-export function createLeveaMcpServer(): Server {
+export function createLeveaMcpServer(opts: { localFiles?: boolean } = {}): Server {
   const server = new Server(
     { name: 'levea-mcp-server', version: PKG_VERSION },
     { capabilities: { tools: {} }, instructions: LEVEA_MCP_INSTRUCTIONS }
@@ -1345,6 +1439,7 @@ export function createLeveaMcpServer(): Server {
           }
         : undefined,
       signal: extra?.signal,
+      ...(opts.localFiles ? { localFiles: true } : {}),
     };
     try {
       return await dispatch(name, args, ctx);

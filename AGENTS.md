@@ -52,6 +52,10 @@ Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that re
 
 `check_job_status` (export jobs by numeric id), `check_task_status` (queued edits by taskId), `get_active_task` (currently-running edit for a project).
 
+### Your own skills (2)
+
+`save_skill` (`skill_md` or, with the local stdio server, `path`; stored as `user/<slug>`), `delete_skill`. `search_skills` lists them first; `autonomous_edit` / `queue_edit` apply them via `skills`, or always with frontmatter `apply: always`.
+
 ### Caption templates (5)
 
 `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 280+ built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
@@ -94,6 +98,9 @@ Full input schemas are returned by `tools/list` over MCP.
 2. **Use or Author Custom `SKILL.md` Playbooks:**
    - Users can install our 12 starter skills (`npx skills add brajendrak00068/agentic-ai-video-production` or `clawhub install levea-ai-video-editor`) or place their own custom `SKILL.md` in `.claude/skills/`, `.cursor/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/`, or `~/.config/opencode/skills/`.
    - A custom `SKILL.md` can specify a fixed `brandId`, `captionTemplatePreset`, `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Mode A) or a deterministic `execute_batch` + `render_preview` recipe (Mode B), and can call `load_skill` to compose Levea's built-in craft skills with the user's custom rules.
+3. **Upload a user's skill to their Levea account (`save_skill`)** so Levea's own editing agent follows it too:
+   - `save_skill({ path })` with the local stdio server (reads the `SKILL.md` folder), or `save_skill({ skill_md, resources })` from any client; saved as `user/<slug>`. Frontmatter `apply: always` applies it to every `autonomous_edit` / `queue_edit` of that user; otherwise pass `skills: ["user/<slug>"]`. `brand_id` / `caption_template` / `style_reference_url` in the frontmatter fill whatever the request leaves unset (the request wins).
+   - `search_skills` lists the user's skills first (`mine: true` for only theirs); `load_skill` / `read_skill_resource` take `user/<slug>`; `delete_skill` removes one.
 
 ## How to call it well
 
