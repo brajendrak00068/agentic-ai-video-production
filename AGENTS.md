@@ -6,7 +6,7 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 `levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
-## Tools (39 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
+## Tools
 
 The surface supports **two complementary execution modes** plus typed management & polling:
 - **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
@@ -156,11 +156,11 @@ With OAuth 2.1 (`scope="levea"`), no API key or `LEVEA_API_KEY` variable is need
 
 ### 2. Local stdio MCP (`npx -y levea-mcp-server`) — Bearer API key
 
-Set via the MCP client's `mcpServers[].env`. Canonical (v0.3.0+):
+Fallback only, for clients that cannot connect to a remote MCP server. It is a local proxy to the same hosted editor; prefer the hosted URL above. Set via the MCP client's `mcpServers[].env`:
 
 | Var | Required | Value |
 |---|---|---|
-| `LEVEA_API_URL` | yes | `https://api.livecore.ai` |
+| `LEVEA_API_URL` | no (defaults to `https://api.livecore.ai`) | `https://api.livecore.ai` |
 | `LEVEA_API_KEY` | yes | Generate at https://livecore.ai/?openclaw=1&utm_source=openclaw&utm_medium=plugin&utm_campaign=openclaw-ai-video-editor |
 
 Backward compat: the legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` names are still read as a silent fallback; use `LEVEA_*`.

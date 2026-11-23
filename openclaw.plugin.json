@@ -15,7 +15,6 @@
           "api-key"
         ],
         "envVars": [
-          "LEVEA_API_URL",
           "LEVEA_API_KEY"
         ]
       }
@@ -38,6 +37,19 @@
       "read_skill_resource",
       "asset_upload_url"
     ]
+  },
+  "uiHints": {
+    "apiKey": {
+      "label": "Levea API key",
+      "help": "Generate a free key at https://livecore.ai/?openclaw=1. Takes precedence over the LEVEA_API_KEY env var.",
+      "sensitive": true
+    },
+    "apiUrl": {
+      "label": "Levea API URL",
+      "help": "Host only; defaults to https://api.livecore.ai. Takes precedence over the LEVEA_API_URL env var.",
+      "placeholder": "https://api.livecore.ai",
+      "advanced": true
+    }
   },
   "configSchema": {
     "type": "object",

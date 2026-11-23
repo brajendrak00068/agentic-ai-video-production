@@ -1,10 +1,10 @@
 {
   "name": "hermes-levea",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
-  "description": "Thin Hermes wrapper that registers the Levea AI video editor MCP server. The MCP server is the integration; this is just distribution.",
+  "description": "Thin Hermes wrapper that registers the Levea AI video editor MCP server (hosted Streamable HTTP by default; levea-mcp-server over stdio as the fallback). The MCP server is the integration; this is just distribution.",
   "dependencies": {
-    "levea-mcp-server": "^0.6.7"
+    "levea-mcp-server": "^0.7.3"
   },
   "license": "MIT"
 }

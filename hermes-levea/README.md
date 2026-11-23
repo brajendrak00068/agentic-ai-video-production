@@ -9,37 +9,54 @@ Hermes at that server.
 This keeps one tool surface (the MCP server, backed by one backend contract)
 instead of a bespoke Hermes codebase that drifts.
 
-## Configure
+## Register with Hermes (hosted server — default, nothing to install)
 
-Set your key once:
+Hermes reads MCP servers from `~/.hermes/config.yaml` under `mcp_servers`
+(HTTP servers take `url` + `headers` or `auth: oauth`; `${VAR}` placeholders
+resolve from the environment and `~/.hermes/.env`). Point it at the hosted
+Levea MCP endpoint (Streamable HTTP):
+
+```yaml
+mcp_servers:
+  levea:
+    url: "https://api.livecore.ai/api/v1/misc/mcp"
+    auth: oauth            # sign in once: `hermes mcp login levea`
+```
+
+Or with an API key instead of OAuth (key from https://livecore.ai/):
+
+```yaml
+mcp_servers:
+  levea:
+    url: "https://api.livecore.ai/api/v1/misc/mcp"
+    headers:
+      Authorization: "Bearer ${LEVEA_API_KEY}"
+```
+
+[`mcp.json`](./mcp.json) and [`hermes.plugin.json`](./hermes.plugin.json) carry
+the same remote entry (API-key header) for tools that import a JSON
+`mcpServers` block (for example `hermes import-agent claude-code`).
+
+## Fallback: local stdio server (`npx`)
+
+If your Hermes build cannot reach HTTP MCP servers, run the npm package over
+stdio instead (Node 18+):
+
+```yaml
+mcp_servers:
+  levea:
+    command: npx
+    args: ["-y", "levea-mcp-server@^0.7.3"]
+    env:
+      LEVEA_API_URL: "https://api.livecore.ai"
+      LEVEA_API_KEY: "${LEVEA_API_KEY}"
+```
 
 ```bash
 export LEVEA_API_KEY="your-levea-api-key"   # from https://livecore.ai/
 ```
 
-## Register with Hermes
-
-Either point Hermes at `hermes.plugin.json` in this folder, or add the MCP
-server directly to your Hermes MCP config (see [`mcp.json`](./mcp.json)):
-
-```jsonc
-{
-  "mcpServers": {
-    "levea": {
-      "command": "npx",
-      "args": ["-y", "levea-mcp-server"],
-      "env": {
-        "LEVEA_API_URL": "https://api.livecore.ai",
-        "LEVEA_API_KEY": "${LEVEA_API_KEY}"
-      }
-    }
-  }
-}
-```
-
-> The MCP transport/command/env fields are universal. If your Hermes build
-> expects a different manifest shape, only the wrapper field names change —
-> the MCP server itself does not.
+Both paths expose the same tools and call the same backend.
 
 ## Tools
 

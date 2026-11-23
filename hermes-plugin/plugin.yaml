@@ -1,5 +1,5 @@
 name: levea-video-editor
-version: 1.1.5
+version: 1.1.6
 manifest_version: 2
 description: "AI video editor and agentic video editing agent via Levea: a podcast editor, podcast clips maker and social media video editor that turns long-form videos, podcasts and interviews into short-form viral clips, podcast highlights, YouTube Shorts, Instagram Reels and TikToks from one natural-language prompt. Describe the edit in plain language (trim, 9:16 vertical video reframe with active-speaker face tracking, automatic animated captions, B-roll, multicam podcast editing, audio cleanup, AI voiceover, color grading, motion graphics, MP4 export) and get a verified, publish-ready MP4. Video repurposing and content repurposing for creators, podcasters and YouTubers. Includes durable queue and status polling tools."
 author: brajendrak00068
