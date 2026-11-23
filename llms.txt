@@ -23,7 +23,7 @@
 
 ## Canonical Documentation & Schemas
 
-- [Full LLM & MCP Reference (`llms-full.txt`)](https://livecore.ai/llms-full.txt): Complete 37-tool catalog, Mode A vs Mode B recipes, comparison matrix vs CapCut/Descript/Opus Clip/Remotion, and FAQ.
+- [Full LLM & MCP Reference (`llms-full.txt`)](https://livecore.ai/llms-full.txt): Complete 43-tool catalog, Mode A vs Mode B recipes, comparison matrix vs CapCut/Descript/Opus Clip/Remotion, and FAQ.
 - [OpenAPI 3.0 Specification (`openapi.json`)](https://livecore.ai/openapi.json): REST contract for `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`.
 - [OAuth 2.1 Protected Resource Metadata (RFC 9728)](https://api.livecore.ai/.well-known/oauth-protected-resource/api/v1/misc/mcp)
 - [OAuth 2.1 Authorization Server Metadata (RFC 8414)](https://api.livecore.ai/.well-known/oauth-authorization-server)
