@@ -98,7 +98,25 @@ function sanitizeRequestId(value: unknown): string | undefined {
 }
 
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
-const PLUGIN_VERSION = '1.2.11';
+const PLUGIN_NAME = 'openclaw-ai-video-editor';
+const KEY_URL = 'https://livecore.ai/?openclaw=1&utm_source=openclaw-plugin&utm_medium=missing-key&utm_campaign=openclaw-ai-video-editor';
+
+/**
+ * The version in package.json. index.ts (loaded from source by the host) sits
+ * next to it; the built dist/index.js sits one level below it.
+ */
+const PLUGIN_VERSION: string = (() => {
+  for (const rel of ['./package.json', '../package.json']) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pkg = require(rel) as { name?: string; version?: string };
+      if (pkg?.name === PLUGIN_NAME && typeof pkg.version === 'string') return pkg.version;
+    } catch {
+      // try the next location
+    }
+  }
+  return 'unknown';
+})();
 
 let runtimePluginConfig: { apiUrl?: string; apiKey?: string } = {};
 
@@ -128,10 +146,11 @@ function normalizeHostUrl(rawInput: string): string {
 }
 
 function openClawV1Root(): string {
+  // Explicit plugin config (what the user entered for this plugin) wins over env.
   const configured = firstString(
+    runtimePluginConfig.apiUrl,
     process.env.LEVEA_API_URL,
     process.env.ADSCENE_API_URL,
-    runtimePluginConfig.apiUrl,
   );
   const raw = normalizeHostUrl(configured || DEFAULT_LEVEA_API_URL);
   if (raw.endsWith('/api/v1/misc/openclaw/v1/execute')) {
@@ -148,10 +167,11 @@ function openClawUrl(path: string): string {
 }
 
 function resolveOptionalApiKey(): string | undefined {
+  // Explicit plugin config wins; the env vars are the fallback.
   return firstString(
+    runtimePluginConfig.apiKey,
     process.env.LEVEA_API_KEY,
     process.env.ADSCENE_API_KEY,
-    runtimePluginConfig.apiKey,
   );
 }
 
@@ -163,8 +183,12 @@ function telemetryEnabled(): boolean {
 
 // Sends only an event name, the plugin name and version, and whether a key is
 // set: no prompts, media, keys, or project data. Disable with LEVEA_TELEMETRY=off.
+// Each event is sent at most once per process, never once per tool call.
+const sentTelemetryEvents = new Set<string>();
 function sendFunnelTelemetry(event: string, hasApiKey: boolean): void {
   if (process.env.VITEST || process.env.NODE_ENV === 'test' || !telemetryEnabled()) return;
+  if (sentTelemetryEvents.has(event)) return;
+  sentTelemetryEvents.add(event);
   try {
     const root = openClawV1Root().replace(/\/openclaw\/v1$/, '/openclaw-keys/telemetry');
     void axios.post(
@@ -182,7 +206,11 @@ function apiKey(): string {
   if (!key) {
     sendFunnelTelemetry('auth_missing_local', false);
     throw new Error(
-      'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://livecore.ai/?openclaw=1&utm_source=openclaw-plugin&utm_medium=missing-key&utm_campaign=openclaw-ai-video-editor and set LEVEA_API_KEY in your environment or OpenClaw plugin config.'
+      'No Levea API key found. Checked, in order: this plugin\'s OpenClaw config '
+      + `(plugins.entries.${PLUGIN_NAME}.config.apiKey: not set), then the environment `
+      + '(LEVEA_API_KEY: not set; legacy ADSCENE_API_KEY: not set). '
+      + `Generate a free API key at ${KEY_URL} and set it as the plugin's apiKey config `
+      + '(preferred) or as LEVEA_API_KEY in the environment of the OpenClaw gateway process.'
     );
   }
   return key;
@@ -317,19 +345,36 @@ export function normalizeBackendResponse(
   };
 }
 
-async function callBackend(
+/** How long one status read may take (the server holds a ?wait=true long-poll ~25 s). */
+const STATUS_READ_LIMIT_MS = 60_000;
+/** Longest Retry-After the plugin honours before retrying (seconds). */
+const MAX_RETRY_AFTER_SEC = 65;
+
+type RawOutcome =
+  | { ok: true; status: number; data: any; headers: Record<string, unknown> }
+  | { ok: false; error: any; timedOut: boolean; cancelled: boolean };
+
+interface RequestOptions {
+  query?: Record<string, string>;
+  /** Wall-clock limit for this one request (default REQUEST_TIMEOUT_MS). */
+  limitMs?: number;
+}
+
+/** One HTTP request, no normalization and no retry. */
+async function requestOnce(
   method: 'GET' | 'POST',
   path: string,
   body: unknown,
   context: OperationContext,
-  options: NormalizeOptions,
-): Promise<EditorResponse> {
+  opts: RequestOptions = {},
+): Promise<RawOutcome> {
   // A wall-clock limit: the backend keeps a long edit's response alive with
   // keep-alive bytes, so axios's own (idle) timeout never fires. The host's
   // cancel signal still aborts the call.
+  const limitMs = Math.max(1_000, opts.limitMs ?? REQUEST_TIMEOUT_MS);
   const controller = new AbortController();
   let timedOut = false;
-  const wall = setTimeout(() => { timedOut = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+  const wall = setTimeout(() => { timedOut = true; controller.abort(); }, limitMs);
   const onHostAbort = () => controller.abort();
   if (context.signal) {
     if (context.signal.aborted) controller.abort();
@@ -340,23 +385,127 @@ async function callBackend(
       method,
       url: openClawUrl(path),
       ...(body !== undefined ? { data: body } : {}),
+      ...(opts.query ? { params: opts.query } : {}),
       headers: requestHeaders(context),
-      timeout: REQUEST_TIMEOUT_MS,
+      timeout: limitMs,
       validateStatus: () => true,
       signal: controller.signal,
     });
-    const result = normalizeBackendResponse(response.status, response.data, options);
-    const clientRequestId = sanitizeRequestId(context.toolCallId);
-    return clientRequestId && !result.clientRequestId
-      ? { ...result, clientRequestId }
-      : result;
+    return { ok: true, status: response.status, data: response.data, headers: (response.headers || {}) as Record<string, unknown> };
   } catch (error: any) {
-    if (timedOut) return stillRunning(options.fallbackProjectId, context.toolCallId);
-    return handleError(error, options.fallbackProjectId, context.toolCallId);
+    return { ok: false, error, timedOut, cancelled: Boolean(context.signal?.aborted) && !timedOut };
   } finally {
     clearTimeout(wall);
     context.signal?.removeEventListener('abort', onHostAbort);
   }
+}
+
+/** 429, 5xx, or a network failure (not a host cancel): worth another try. */
+function isTransientOutcome(outcome: RawOutcome): boolean {
+  if (outcome.ok) return outcome.status === 429 || outcome.status >= 500;
+  if (outcome.cancelled) return false;
+  // A missing key is a configuration error, never transient.
+  return !/api key/i.test(String(outcome.error?.message || ''));
+}
+
+/** Delay before retry `attempt` (0-based): the server's Retry-After when given, else exponential backoff. */
+function retryDelayMs(outcome: RawOutcome, attempt: number): number {
+  if (outcome.ok) {
+    const bodyWait = Number(outcome.data?.retryAfter ?? outcome.data?.retryAfterSec);
+    const headerWait = Number(outcome.headers?.['retry-after']);
+    const wait = Number.isFinite(bodyWait) && bodyWait >= 0 ? bodyWait : headerWait;
+    if (Number.isFinite(wait) && wait >= 0) {
+      return Math.min(MAX_RETRY_AFTER_SEC, Math.max(1, Math.ceil(wait))) * 1000 + Math.floor(Math.random() * 500);
+    }
+  }
+  return Math.min(30_000, 2_000 * 2 ** attempt) + Math.floor(Math.random() * 500);
+}
+
+function withClientRequestId(result: EditorResponse, context: OperationContext): EditorResponse {
+  const clientRequestId = sanitizeRequestId(context.toolCallId);
+  return clientRequestId && !result.clientRequestId ? { ...result, clientRequestId } : result;
+}
+
+/** Turn a raw outcome into the plugin's result shape. */
+function finishOutcome(
+  method: 'GET' | 'POST',
+  outcome: RawOutcome,
+  context: OperationContext,
+  options: NormalizeOptions,
+): EditorResponse {
+  if (outcome.ok) {
+    return withClientRequestId(normalizeBackendResponse(outcome.status, outcome.data, options), context);
+  }
+  if (outcome.cancelled) return cancelledResult(options.label, options.fallbackProjectId, context.toolCallId);
+  if (outcome.timedOut && method === 'POST') return stillRunning(options.fallbackProjectId, context.toolCallId);
+  if (outcome.timedOut) {
+    return withClientRequestId({
+      success: false,
+      status: 'unknown',
+      code: 'TIMEOUT',
+      message: `${options.label}: the status read timed out; nothing was changed. Try the same call again.`,
+      ...(options.fallbackProjectId ? { projectId: options.fallbackProjectId, project_id: options.fallbackProjectId } : {}),
+    }, context);
+  }
+  return handleError(outcome.error, options.fallbackProjectId, context.toolCallId);
+}
+
+/**
+ * One backend call. Read-only GETs are retried once on 429 / 5xx / network
+ * errors; a POST is never retried automatically (it may already have run).
+ * `transient` tells polling loops the failure is worth another poll.
+ */
+async function callBackendDetailed(
+  method: 'GET' | 'POST',
+  path: string,
+  body: unknown,
+  context: OperationContext,
+  options: NormalizeOptions,
+  opts: RequestOptions & { retryOnce?: boolean } = {},
+): Promise<{ result: EditorResponse; transient: boolean; outcome: RawOutcome }> {
+  let outcome = await requestOnce(method, path, body, context, opts);
+  if (method === 'GET' && opts.retryOnce !== false && isTransientOutcome(outcome) && !context.signal?.aborted) {
+    try {
+      await waitForDelay(retryDelayMs(outcome, 0), context.signal);
+      outcome = await requestOnce(method, path, body, context, opts);
+    } catch {
+      return { result: cancelledResult(options.label, options.fallbackProjectId, context.toolCallId), transient: false, outcome };
+    }
+  }
+  return { result: finishOutcome(method, outcome, context, options), transient: isTransientOutcome(outcome), outcome };
+}
+
+async function callBackend(
+  method: 'GET' | 'POST',
+  path: string,
+  body: unknown,
+  context: OperationContext,
+  options: NormalizeOptions,
+  opts: RequestOptions & { retryOnce?: boolean } = {},
+): Promise<EditorResponse> {
+  return (await callBackendDetailed(method, path, body, context, options, opts)).result;
+}
+
+/**
+ * The host cancelled the tool call. The request may already have reached
+ * Levea, so the edit can still be running (or applied) there.
+ */
+function cancelledResult(label: string, projectId: string | undefined, toolCallId?: string, taskId?: string): EditorResponse {
+  const clientRequestId = sanitizeRequestId(toolCallId);
+  const how = [
+    taskId ? `check_task_status { task_id: "${taskId}" }` : '',
+    projectId ? `get_active_task { project_id: "${projectId}" }` : '',
+  ].filter(Boolean).join(' or ');
+  return {
+    success: false,
+    status: 'cancelled',
+    code: 'CANCELLED',
+    message: `Cancelled by the host before ${label} answered. The request may already have reached Levea, so the edit may still be running (or already applied) there. `
+      + (how ? `Check with ${how} before starting it again.` : 'Check the project before starting it again.'),
+    ...(projectId ? { projectId, project_id: projectId } : {}),
+    ...(taskId ? { taskId } : {}),
+    ...(clientRequestId ? { clientRequestId } : {}),
+  };
 }
 
 /**
@@ -370,7 +519,8 @@ function stillRunning(projectId: string | undefined, toolCallId?: string): Edito
     status: 'running',
     code: 'STILL_RUNNING',
     message: `The edit is still running on Levea after ${Math.round(REQUEST_TIMEOUT_MS / 60_000)} min (full edits with motion graphics and export can take 10-20 minutes). `
-      + `Call get_active_task with project_id "${projectId || ''}" to follow it; it returns the result when the edit completes. Do not start the edit again.`,
+      + `Call get_active_task with project_id "${projectId || ''}" to see whether it is still running and which task it is; `
+      + 'check_task_status with that taskId returns its result (and video URL) once it completes. Do not start the edit again.',
     ...(projectId ? { projectId, project_id: projectId } : {}),
     ...(clientRequestId ? { clientRequestId } : {}),
   };
@@ -393,7 +543,7 @@ export async function handleEditorOperation(
   const body = buildEditBody({ ...request, prompt, project_id: projectId }, 'all');
 
   return callBackend('POST', '/execute', body, context, {
-    label: 'autonomous_edit',
+    label: 'ai-video-editor',
     requireMessage: true,
     requireVerification: true,
     fallbackProjectId: projectId,
@@ -422,17 +572,7 @@ export async function handleQueueEditOperation(
   });
 }
 
-async function pollOperation(
-  path: string,
-  label: string,
-  context: OperationContext,
-  options: { fallbackProjectId?: string; acceptActiveContract?: boolean } = {},
-): Promise<EditorResponse> {
-  const result = await callBackend('GET', path, undefined, context, {
-    label,
-    fallbackProjectId: options.fallbackProjectId,
-    acceptActiveContract: options.acceptActiveContract,
-  });
+function failedStateAsFailure(result: EditorResponse, label: string): EditorResponse {
   const status = String(result.status || '').toLowerCase();
   if (result.success === true && FAILED_JOB_STATES.has(status)) {
     return {
@@ -444,6 +584,72 @@ async function pollOperation(
   return result;
 }
 
+async function pollOperation(
+  path: string,
+  label: string,
+  context: OperationContext,
+  options: { fallbackProjectId?: string; acceptActiveContract?: boolean; query?: Record<string, string> } = {},
+): Promise<EditorResponse> {
+  const result = await callBackend('GET', path, undefined, context, {
+    label,
+    fallbackProjectId: options.fallbackProjectId,
+    acceptActiveContract: options.acceptActiveContract,
+  }, { query: options.query, limitMs: STATUS_READ_LIMIT_MS });
+  return failedStateAsFailure(result, label);
+}
+
+/**
+ * Poll a job until a terminal state, the deadline, or a host cancel. 429 / 5xx
+ * / network errors only back off and poll again (a single 502 never ends the
+ * wait); a non-transient refusal (401, 404 …) is final.
+ */
+async function pollJobUntil(
+  jobId: string,
+  deadline: number,
+  context: OperationContext,
+): Promise<EditorResponse> {
+  const path = `/jobs/${encodeURIComponent(jobId)}`;
+  const label = `job ${jobId}`;
+  let last: EditorResponse | undefined;
+  let transientStreak = 0;
+  for (;;) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    const polled = await callBackendDetailed('GET', path, undefined, context, { label }, {
+      retryOnce: false,
+      limitMs: Math.min(STATUS_READ_LIMIT_MS, remaining),
+    });
+    if (polled.result.code === 'CANCELLED') return { ...(last || {}), ...polled.result, jobId };
+    let delay = 4_000;
+    if (polled.transient) {
+      // Keep the last good read; only note the transient failure.
+      delay = retryDelayMs(polled.outcome, transientStreak++);
+      last = last ? { ...last, lastPollError: polled.result.message } : polled.result;
+    } else {
+      transientStreak = 0;
+      last = failedStateAsFailure(polled.result, label);
+      const status = String(last.status || '').toLowerCase();
+      if (TERMINAL_JOB_STATES.has(status)) return last;
+      if (last.success !== true) return last;
+    }
+    if (Date.now() + delay >= deadline) break;
+    try {
+      await waitForDelay(delay, context.signal);
+    } catch {
+      return cancelledResult(label, firstString(last?.projectId), context.toolCallId);
+    }
+  }
+  const waitedMin = Math.max(1, Math.round(REQUEST_TIMEOUT_MS / 60_000));
+  return {
+    ...(last || { status: 'unknown' }),
+    jobId,
+    success: false,
+    code: 'POLL_TIMEOUT',
+    message: `Job ${jobId} is still ${String(last?.status || 'running')} after waiting up to ${waitedMin} min; it keeps running on Levea. `
+      + `Call check_job_status { job_id: "${jobId}", wait: true } again to keep waiting.`,
+  };
+}
+
 export async function handleJobStatusOperation(
   jobId: string,
   wait = false,
@@ -451,32 +657,22 @@ export async function handleJobStatusOperation(
 ): Promise<EditorResponse> {
   const id = firstString(jobId);
   if (!id) return { success: false, message: 'Missing required parameter: job_id.', code: 'MISSING_JOB_ID' };
-  const path = `/jobs/${encodeURIComponent(id)}`;
-  let result = await pollOperation(path, `job ${id}`, context);
-  if (!wait) return result;
-
-  const deadline = Date.now() + REQUEST_TIMEOUT_MS;
-  while (result.success && !TERMINAL_JOB_STATES.has(String(result.status || '').toLowerCase())) {
-    if (Date.now() >= deadline) {
-      return { ...result, success: false, message: `Timed out waiting for job ${id}.`, code: 'POLL_TIMEOUT' };
-    }
-    try {
-      await waitForDelay(4_000, context.signal);
-    } catch {
-      return { ...result, success: false, message: `Polling job ${id} was cancelled.`, code: 'POLL_CANCELLED' };
-    }
-    result = await pollOperation(path, `job ${id}`, context);
-  }
-  return result;
+  if (!wait) return pollOperation(`/jobs/${encodeURIComponent(id)}`, `job ${id}`, context);
+  return pollJobUntil(id, Date.now() + REQUEST_TIMEOUT_MS, context);
 }
 
+/**
+ * Read a task. `?wait=true` asks the server to hold the read (~25 s) until the
+ * task changes or finishes — a running direct call ("dc_…") answers with its
+ * full result as soon as it completes. Returns the state at that point.
+ */
 export function handleTaskStatusOperation(
   taskId: string,
   context: OperationContext = {},
 ): Promise<EditorResponse> {
   const id = firstString(taskId);
   if (!id) return Promise.resolve({ success: false, message: 'Missing required parameter: task_id.', code: 'MISSING_TASK_ID' });
-  return pollOperation(`/task-status/${encodeURIComponent(id)}`, `task ${id}`, context);
+  return pollOperation(`/task-status/${encodeURIComponent(id)}`, `task ${id}`, context, { query: { wait: 'true' } });
 }
 
 export function handleActiveTaskOperation(
@@ -595,7 +791,7 @@ export function toOpenClawToolResult(result: EditorResponse) {
     : (backendStatus && PENDING_TOOL_STATES.has(backendStatus.toLowerCase())
       ? 'pending'
       : (backendStatus || 'completed'));
-  const details = backendStatus && backendStatus !== normalizedStatus
+  const fullDetails = backendStatus && backendStatus !== normalizedStatus
     ? { ...result, backendStatus, status: normalizedStatus }
     : { ...result, status: normalizedStatus };
   const mcpBlocks = Array.isArray((result as any)?.mcpContent) ? (result as any).mcpContent : [];
@@ -606,6 +802,9 @@ export function toOpenClawToolResult(result: EditorResponse) {
       data: blk.data,
       mimeType: typeof blk.mimeType === 'string' ? blk.mimeType : 'image/jpeg',
     }));
+  // Frames attached as image blocks are not repeated as base64 in details:
+  // 8 frames of base64 (~400 KB) would flood the model's context.
+  const details = imageBlocks.length > 0 ? withoutAttachedImages(fullDetails) : fullDetails;
   return {
     content: [{ type: 'text' as const, text: displayMessage(result) }, ...imageBlocks],
     // OpenClaw's AgentToolResult contract calls the structured payload
@@ -641,23 +840,271 @@ export async function handleUniversalToolOperation(
     );
   }
   const projectId = firstString(params?.project_id, params?.projectId);
+  const callParams = normalizeDirectParams(params);
   const body: Record<string, any> = {
     tool: toolName,
-    params,
+    params: callParams,
     ...(projectId ? { projectId, project_id: projectId } : {}),
-    ...(params?.scene !== undefined ? { scene: params.scene } : {}),
+    ...(callParams?.scene !== undefined ? { scene: callParams.scene } : {}),
   };
-  const res = await callBackend('POST', '/execute', body, context, {
+  const normalizeOptions: NormalizeOptions = {
     label: toolName,
     requireMessage: false,
     requireVerification: false,
     fallbackProjectId: projectId,
-  });
-  if (!params?.include_scene && res && typeof res === 'object') {
+  };
+  // One deadline for the whole call: the POST, waiting for a long call, and
+  // waiting for an export job it queued.
+  const callStart = Date.now();
+  const deadline = callStart + REQUEST_TIMEOUT_MS;
+  // Never retried automatically: the POST may already have run.
+  const first = await requestOnce('POST', '/execute', body, context);
+  if (!first.ok) return finishOutcome('POST', first, context, normalizeOptions);
+
+  let httpStatus = first.status;
+  let data: any = first.data;
+  let waitedSec: number | undefined;
+  // A long call (FACE_RETOUCH, generation, EXPORT_VIDEO …) answers HTTP 202
+  // { status: "running", taskId: "dc_…" } and keeps running on Levea. Wait for
+  // it here so one tool call returns the call's own full response.
+  const runningId = runningTaskId(data);
+  if (runningId) {
+    const waited = await waitForDirectCall(runningId, data, deadline, context);
+    waitedSec = waited.waitedSec;
+    if (waited.outcome === 'cancelled') {
+      return cancelledResult(toolName, projectId, context.toolCallId, runningId);
+    }
+    if (waited.outcome === 'running') {
+      return directStillRunning(toolName, runningId, waited.data, waited.waitedSec, projectId, context);
+    }
+    data = waited.data;
+    httpStatus = 200;
+  }
+
+  let res = withClientRequestId(normalizeBackendResponse(httpStatus, data, normalizeOptions), context);
+  if (!callParams?.include_scene && res && typeof res === 'object') {
     const { scene: _omittedScene, ...rest } = res as Record<string, any>;
-    return rest as EditorResponse;
+    res = rest as EditorResponse;
+  }
+  if (waitedSec !== undefined) res.waitedSec = waitedSec;
+
+  // An export still rendering when the call answered: wait for its job within
+  // this call's own deadline and add the job's outcome to the reply. The
+  // reply's own fields (polish, deliverableWarnings, verificationReport,
+  // stepReceipts) are kept; the job never replaces them.
+  if (res.success === true && exportStillRendering(res)) {
+    const left = deadline - Date.now() - EXPORT_WAIT_MARGIN_MS;
+    if (left > 0 && !context.signal?.aborted) {
+      const job = await pollJobUntil(String(res.jobId), Date.now() + left, context);
+      res = { ...res, ...withExportJob(res, job) };
+    } else {
+      res = { ...res, exportHint: exportHint(res.jobId) };
+      res.message = `${res.message} ${res.exportHint}`;
+    }
   }
   return res;
+}
+
+/** Leave `allow_partial` as the backend expects it: true / false / "until_failure". */
+function normalizeDirectParams(params: Record<string, any>): Record<string, any> {
+  if (!params || typeof params !== 'object') return params;
+  const v = params.allow_partial;
+  if (v === 'true' || v === 'false') return { ...params, allow_partial: v === 'true' };
+  return params;
+}
+
+/** Time left unspent at the end of a call's deadline when it waits for an export job. */
+const EXPORT_WAIT_MARGIN_MS = 10_000;
+const EXPORT_JOB_PENDING: ReadonlySet<string> = new Set(['running', 'queued', 'processing', 'pending', 'rendering']);
+const JOB_REPORT_FIELDS = ['polish', 'deliverableWarnings', 'exportCallSteps', 'verificationReport', 'deliverySampledDecode'] as const;
+
+function isPlainObject(v: unknown): v is Record<string, any> {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * The task id of a direct call the backend answered "still running" (HTTP 202),
+ * else undefined. Only the direct call's own 202 names one: it carries the call
+ * id (`callId`, the same id as taskId) or pollWith.task_id. An export still
+ * rendering also answers status "running" with its job id; following that would
+ * replace the whole reply with the export row.
+ */
+function runningTaskId(d: any): string | undefined {
+  if (!isPlainObject(d) || d.status !== 'running') return undefined;
+  const id = d.taskId ?? d.task_id;
+  if (typeof id !== 'string' || !id.trim()) return undefined;
+  const callId = typeof d.callId === 'string' ? d.callId.trim() : '';
+  const pollWith = isPlainObject(d.pollWith) ? d.pollWith : null;
+  const pollId = typeof pollWith?.task_id === 'string' ? pollWith.task_id.trim() : '';
+  return (callId && callId === id.trim()) || (pollId && pollId === id.trim()) ? id.trim() : undefined;
+}
+
+/**
+ * Long-poll a running direct call (GET /task-status/:id?wait=true, held ~25 s
+ * server-side) until it finishes, the deadline passes, or the host cancels.
+ * 429 / 5xx / network errors back off and poll again; a 4xx hands back the
+ * 202 body as it was (still running).
+ */
+async function waitForDirectCall(
+  taskId: string,
+  first: Record<string, any>,
+  deadline: number,
+  context: OperationContext,
+): Promise<{ outcome: 'done' | 'running' | 'cancelled'; data: Record<string, any>; waitedSec: number }> {
+  const t0 = Date.now();
+  let data = first;
+  let transientStreak = 0;
+  const end = (outcome: 'done' | 'running' | 'cancelled', d: Record<string, any>) =>
+    ({ outcome, data: d, waitedSec: Math.round((Date.now() - t0) / 1000) });
+  const pause = async (ms: number): Promise<boolean> => {
+    if (Date.now() + ms >= deadline) return false;
+    try { await waitForDelay(ms, context.signal); return true; } catch { return false; }
+  };
+  while (Date.now() < deadline) {
+    if (context.signal?.aborted) return end('cancelled', data);
+    const pollStart = Date.now();
+    const st = await requestOnce('GET', `/task-status/${encodeURIComponent(taskId)}`, undefined, context, {
+      query: { wait: 'true' },
+      limitMs: Math.min(STATUS_READ_LIMIT_MS, deadline - Date.now()),
+    });
+    if (!st.ok && st.cancelled) return end('cancelled', data);
+    if (isTransientOutcome(st)) {
+      if (!(await pause(retryDelayMs(st, transientStreak++)))) break;
+      continue;
+    }
+    if (!st.ok) break;
+    transientStreak = 0;
+    if (st.status >= 400) break; // unknown to this key / refused: hand back the 202 as it was
+    const s = (isPlainObject(st.data) ? st.data : {}) as Record<string, any>;
+    if (s.status && s.status !== 'running') {
+      // The call's own full response once finished. Anything else (a job's
+      // clip list) is never spread over the reply: it stays under `result`.
+      if (isPlainObject(s.result)) {
+        const result = s.result;
+        return end('done', {
+          ...result,
+          ...(typeof result.success !== 'boolean' ? { success: s.status === 'completed' } : {}),
+          ...(s.failureCode && !result.failureCode ? { failureCode: s.failureCode } : {}),
+        });
+      }
+      return end('done', {
+        success: s.status === 'completed',
+        status: s.status,
+        taskId,
+        ...(s.result !== undefined && s.result !== null ? { result: s.result } : {}),
+        ...(s.failureCode ? { failureCode: s.failureCode } : {}),
+        ...(s.error ? { error: s.error } : {}),
+        message: firstString(s.message, s.error) || `${taskId}: ${String(s.status)}.`,
+      });
+    }
+    // Still running: keep the live progress so a deadline answer says where it is.
+    const { result: _r, frames: _f, mcpContent: _m, ...live } = s;
+    data = { ...data, ...live, status: 'running', success: false, taskId };
+    // The server long-polls ~25 s; if it answered at once (older server), back off.
+    if (Date.now() - pollStart < 3_000) {
+      if (!(await pause(Math.min(15, Math.max(3, Number(data.retryAfterSec) || 5)) * 1000))) break;
+    }
+  }
+  return end(context.signal?.aborted ? 'cancelled' : 'running', data);
+}
+
+function directStillRunning(
+  toolName: string,
+  taskId: string,
+  live: Record<string, any>,
+  waitedSec: number,
+  projectId: string | undefined,
+  context: OperationContext,
+): EditorResponse {
+  const { result: _r, frames: _f, mcpContent: _m, scene: _s, ...rest } = live;
+  const pd = isPlainObject(rest.progressDetail) ? rest.progressDetail : undefined;
+  const where = pd && pd.stepsTotal
+    ? ` Step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}.`
+    : '';
+  return withClientRequestId({
+    ...rest,
+    ...(projectId ? { projectId, project_id: projectId } : {}),
+    success: false,
+    status: 'running',
+    code: 'STILL_RUNNING',
+    taskId,
+    waitedSec,
+    message: `${toolName} is still running on Levea after waiting ${waitedSec} s; nothing is lost and it is never run twice.${where} `
+      + `Call check_task_status { task_id: "${taskId}" } to keep waiting for its result (or resend the identical call). Do not change the params while it runs.`,
+  }, context);
+}
+
+function exportHint(jobId: unknown): string {
+  return `The export is still rendering; check_job_status { job_id: "${String(jobId)}", wait: true } returns the video.`;
+}
+
+/** A direct reply whose EXPORT_VIDEO step queued a job still rendering (jobId, a pending status, no video yet). */
+function exportStillRendering(r: Record<string, any>): boolean {
+  if (r.jobId === undefined || r.jobId === null || String(r.jobId).trim() === '') return false;
+  if (typeof r.videoUrl === 'string' && r.videoUrl) return false;
+  if (!EXPORT_JOB_PENDING.has(String(r.status ?? '').toLowerCase())) return false;
+  const receipts = Array.isArray(r.stepReceipts) ? r.stepReceipts as Array<{ action?: unknown }> : [];
+  return r.action === 'EXPORT_VIDEO' || receipts.some((s) => s?.action === 'EXPORT_VIDEO');
+}
+
+/**
+ * The fields a finished (or still running) export job adds to the direct reply
+ * that queued it. The job's report fields fill in only where the reply has
+ * none of its own.
+ */
+function withExportJob(reply: Record<string, any>, job: EditorResponse): Record<string, any> {
+  const record: Record<string, any> = { ...job };
+  const report: Record<string, any> = {};
+  for (const k of JOB_REPORT_FIELDS) {
+    if (record[k] !== undefined) report[k] = record[k];
+    delete record[k];
+  }
+  const status = String(job.status || '').toLowerCase();
+  const finished = ['completed', 'complete', 'succeeded', 'success'].includes(status);
+  // A wait that ran out or was cancelled leaves the export rendering on Levea.
+  const waitEnded = job.code === 'POLL_TIMEOUT' || job.code === 'CANCELLED';
+  const failed = !waitEnded && job.success === false && !EXPORT_JOB_PENDING.has(status);
+  const pending = !finished && !failed;
+  const out: Record<string, any> = {
+    status: failed && !FAILED_JOB_STATES.has(status)
+      ? 'failed'
+      : (waitEnded || !job.status ? reply.status : job.status),
+    exportJob: record,
+    ...(job.videoUrl ? { videoUrl: job.videoUrl } : {}),
+    ...(failed ? { exportError: firstString(job.error, job.message) || 'export failed' } : {}),
+    ...(reply.polish === undefined && report.polish !== undefined ? { polish: report.polish } : {}),
+    ...(reply.deliverableWarnings === undefined && report.deliverableWarnings !== undefined ? { deliverableWarnings: report.deliverableWarnings } : {}),
+    ...(reply.verificationReport === undefined && report.verificationReport !== undefined ? { verificationReport: report.verificationReport } : {}),
+    ...(reply.stepReceipts === undefined && report.exportCallSteps !== undefined ? { exportCallSteps: report.exportCallSteps } : {}),
+    ...(report.deliverySampledDecode !== undefined ? { deliverySampledDecode: report.deliverySampledDecode } : {}),
+  };
+  if (pending) {
+    out.exportHint = exportHint(reply.jobId);
+    out.message = `${reply.message} ${out.exportHint}`;
+  } else if (failed) {
+    out.message = `${reply.message} Export failed: ${out.exportError}`;
+  } else if (job.videoUrl) {
+    out.message = `${reply.message} Export finished.`;
+  }
+  return out;
+}
+
+/** Keys that carry frame image data already attached as image content blocks. */
+const IMAGE_DATA_KEYS: ReadonlySet<string> = new Set(['base64', 'dataUrl', 'frameImages', 'mcpContent']);
+
+/** Drop base64 frame data from the structured details once the frames are attached as image blocks. */
+function withoutAttachedImages(value: unknown, depth = 0): unknown {
+  if (depth > 4 || !value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((x) => withoutAttachedImages(x, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(value as Record<string, unknown>)) {
+    if (IMAGE_DATA_KEYS.has(k)) {
+      if (k === 'base64') out.image = 'attached as an image content block';
+      continue;
+    }
+    out[k] = withoutAttachedImages(x, depth + 1);
+  }
+  return out;
 }
 
 // Tool input schemas come from the edit contract (contract/edit-contract.json).
@@ -682,9 +1129,23 @@ const JOB_STATUS_PARAMETERS = {
 
 const TASK_STATUS_PARAMETERS = {
   type: 'object',
-  properties: { task_id: { type: 'string', minLength: 1, description: 'Numeric task id returned by queue_edit.' } },
+  properties: {
+    task_id: {
+      type: 'string',
+      minLength: 1,
+      description: 'Task id: the taskId returned by queue_edit (numeric, sent as a string), or a "dc_…" id from a direct call (execute_action / execute_batch / render_preview) that answered status "running".',
+    },
+  },
   required: ['task_id'],
   additionalProperties: false,
+} as const;
+
+/** Options shared by execute_action and execute_batch (passed through to the backend). */
+const DIRECT_CALL_OPTION_PROPERTIES = {
+  idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
+  rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
+  dry_run: { type: 'boolean', description: 'true: check every step\'s parameters against its schema (unknown names, enum values, types, ranges) and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it.' },
+  allow_unknown_params: { type: 'boolean', description: 'true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs.' },
 } as const;
 
 const ACTIVE_TASK_PARAMETERS = {
@@ -741,7 +1202,7 @@ export default definePluginEntry({
     api.registerTool({
       name: 'check_job_status',
       label: 'Check Video Job',
-      description: 'Read an export/async job. wait=true polls until a terminal state.',
+      description: 'Read an export/async job by job_id. wait=true polls until the job finishes or fails (up to the plugin request timeout; rate limits and temporary server errors are retried, not reported as failure).',
       parameters: JOB_STATUS_PARAMETERS,
       execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
         toOpenClawToolResult(await handleJobStatusOperation(String(params?.job_id || ''), params?.wait === true, { toolCallId, signal })),
@@ -750,7 +1211,7 @@ export default definePluginEntry({
     api.registerTool({
       name: 'check_task_status',
       label: 'Check Queued Edit',
-      description: 'Read a queued edit task by the taskId returned from queue_edit.',
+      description: 'Read a task: a queued edit (taskId from queue_edit) or a direct call that answered status "running" (taskId "dc_…" from execute_action / execute_batch / render_preview). The server holds the read up to ~25 s for a change; a finished "dc_…" call returns that call\'s full response under result. If the status is still running, call again. Separate from job_id (exports: check_job_status).',
       parameters: TASK_STATUS_PARAMETERS,
       execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
         toOpenClawToolResult(await handleTaskStatusOperation(String(params?.task_id || ''), { toolCallId, signal })),
@@ -759,7 +1220,7 @@ export default definePluginEntry({
     api.registerTool({
       name: 'get_active_task',
       label: 'Get Active Project Edit',
-      description: 'Reconnect to the currently running edit for a stable project_id.',
+      description: 'Return the currently running edit task for a project_id, if any (one read; it does not wait). Use the returned taskId with check_task_status for the result; once no task is active the edit has finished.',
       parameters: ACTIVE_TASK_PARAMETERS,
       execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
         toOpenClawToolResult(await handleActiveTaskOperation(String(params?.project_id || ''), { toolCallId, signal })),
@@ -768,7 +1229,7 @@ export default definePluginEntry({
     api.registerTool({
       name: 'search_tools',
       label: 'Search Canonical Editor Tools',
-      description: 'Search all 195 canonical video editing actions, 28 read/inspection tools, AND canonical preset catalogs (captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable) by keyword, category, or catalog filter, and retrieve the 5-phase NLE editorialPlaybook.',
+      description: 'Search every directly callable editing action, the read/inspection tools, AND preset catalogs (captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable) by keyword, category, or catalog filter. With a query, matching actions come back with their parameter specs. Also returns the 5-phase NLE editorialPlaybook.',
       parameters: {
         type: 'object',
         properties: {
@@ -776,10 +1237,13 @@ export default definePluginEntry({
           catalog: {
             type: 'string',
             enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes', 'properties', 'animatable'],
-            description: 'Optional catalog filter: "captions" (216 caption templates), "vfx" (368 GPU effects), "transitions" (168 transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
+            description: 'Optional catalog filter: "captions" (caption templates), "vfx" (GPU effects), "transitions", "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
           },
           category: { type: 'string', description: 'Optional domain/category filter.' },
-          limit: { type: 'number', description: 'Max actions to return.' },
+          limit: { type: 'number', description: 'Max actions to return (default: all matches; preset catalogs default to 50).' },
+          include_schemas: { type: 'boolean', description: 'Force parameter specs on (true) or off (false). Default: on when 25 or fewer actions match.' },
+          offset: { type: 'number', description: 'Page through a long result: pass the nextOffset a previous answer returned.' },
+          detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): one-line descriptions. "full": full action descriptions (pages sooner).' },
         },
         additionalProperties: false,
       },
@@ -790,33 +1254,51 @@ export default definePluginEntry({
     api.registerTool({
       name: 'get_action_schema',
       label: 'Get Canonical Action Schema',
-      description: 'Fetch the full JSON inputSchema and parameter constraints for any canonical editor action or read tool.',
+      description: 'Fetch the full JSON inputSchema and parameter constraints for one canonical editor action or read tool (action), or several in one call (actions). Pass action or actions.',
       parameters: {
         type: 'object',
         properties: {
           action: { type: 'string', minLength: 1, description: 'Canonical action name or read tool name.' },
+          actions: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Several action names at once (up to 40) — one round trip instead of many. They share one answer budget: small schemas come whole, larger ones summarised (listed in `compacted`; schemaDetail.paramsOmitted names the rest).',
+          },
+          params: {
+            type: ['array', 'object'],
+            items: { type: 'string' },
+            additionalProperties: { type: 'array', items: { type: 'string' } },
+            description: 'Only these parameters, in full (nested schemas, every enum value): ["name", ...], or { "ACTION": ["name", ...] } per action with actions: [...]. Use it for the parameters a summarised schema lists in schemaDetail.paramsOmitted.',
+          },
+          detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): a very large schema is compacted. "full": the whole schema as stored (some are hundreds of KB).' },
         },
-        required: ['action'],
         additionalProperties: false,
       },
-      execute: async (toolCallId: string, params: any, signal?: AbortSignal) =>
-        toOpenClawToolResult(await handleUniversalToolOperation('get_action_schema', params, { toolCallId, signal })),
+      execute: async (toolCallId: string, params: any, signal?: AbortSignal) => {
+        const hasAction = typeof params?.action === 'string' && params.action.trim() !== '';
+        const hasActions = Array.isArray(params?.actions) && params.actions.length > 0;
+        if (!hasAction && !hasActions) {
+          return toOpenClawToolResult({ success: false, message: 'Pass action (one name) or actions (several names).', code: 'MISSING_ACTION' });
+        }
+        return toOpenClawToolResult(await handleUniversalToolOperation('get_action_schema', params, { toolCallId, signal }));
+      },
     });
 
     api.registerTool({
       name: 'execute_action',
       label: 'Execute Canonical Editor Action',
-      description: 'Execute any single canonical editor action (all 195 actions) or read tool directly on a project scene without autonomous_edit.',
+      description: 'Execute any single canonical editor action or read tool directly on a project scene, without the ai-video-editor tool\'s planner. Long calls (FACE_RETOUCH, generation, EXPORT_VIDEO) wait for their own result, including a queued export job, up to the plugin request timeout; if still running, the result names a taskId for check_task_status. dry_run: true checks params without running. For several edits use execute_batch.',
       parameters: {
         type: 'object',
         properties: {
           action: { type: 'string', minLength: 1, description: 'Canonical action name or read tool name.' },
-          action_params: { type: 'object', description: 'Parameters for the canonical action.' },
+          action_params: { type: 'object', description: 'Parameters for the canonical action (see get_action_schema).' },
           project_id: { type: 'string', description: 'Stable project identifier.' },
           video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
           assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
           scene: { type: 'object', description: 'Optional inline scene.' },
           include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response.' },
+          ...DIRECT_CALL_OPTION_PROPERTIES,
         },
         required: ['action'],
         additionalProperties: false,
@@ -828,12 +1310,13 @@ export default definePluginEntry({
     api.registerTool({
       name: 'execute_batch',
       label: 'Execute Canonical Action Batch',
-      description: 'Execute an ordered array of canonical actions in one atomic round-trip with automatic safe-zone repair, timeline reconciliation, layout de-stacking, and project commit.',
+      description: 'Execute an ordered array of canonical actions and/or read tools (up to 25 steps) in one atomic round-trip with automatic safe-zone repair, timeline reconciliation, layout de-stacking, and project commit. The whole batch is validated first: unknown actions, unconfirmed destructive actions (need confirm_destructive: true) and invalid params (INVALID_PARAMS) reject it before anything runs. Atomic unless allow_partial. Long batches wait for their own result (and a queued export job) up to the plugin request timeout; if still running, the result names a taskId for check_task_status.',
       parameters: {
         type: 'object',
         properties: {
           actions: {
             type: 'array',
+            description: 'Ordered list of { action, params } steps to execute.',
             items: {
               type: 'object',
               properties: {
@@ -848,6 +1331,13 @@ export default definePluginEntry({
           assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
           scene: { type: 'object', description: 'Optional inline scene.' },
           include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response.' },
+          ...DIRECT_CALL_OPTION_PROPERTIES,
+          allow_partial: {
+            type: ['boolean', 'string'],
+            enum: [true, false, 'until_failure'],
+            description: 'false (default): atomic. true: commit every step that succeeded. "until_failure": commit the steps before the first failure.',
+          },
+          confirm_destructive: { type: 'boolean', description: 'Required true for destructive actions (CLEAR, DELETE_LAYER on many layers, …).' },
         },
         required: ['actions'],
         additionalProperties: false,

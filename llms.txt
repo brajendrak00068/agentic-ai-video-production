@@ -16,7 +16,7 @@
 
 - **Web Studio (No Install)**: [https://livecore.ai](https://livecore.ai)
 - **Hosted Streamable HTTP MCP Endpoint (OAuth 2.1 + PKCE `S256` + RFC 9728)**: `https://api.livecore.ai/api/v1/misc/mcp`
-- **Local stdio MCP Server (npm)**: `npx -y levea-mcp-server@latest`
+- **Local stdio MCP Server (npm, fallback for clients without remote MCP support)**: `npx -y levea-mcp-server@latest` with `LEVEA_API_KEY`
 - **OpenClaw / ClawHub Plugin**: `clawhub install openclaw-ai-video-editor` or `clawhub install levea-ai-video-editor`
 - **Agent Skills CLI (Claude Code / Cursor / Codex / Gemini CLI)**: `npx skills add brajendrak00068/agentic-ai-video-production`
 - **Claude Code Marketplace**: `/plugin marketplace add brajendrak00068/agentic-ai-video-production`

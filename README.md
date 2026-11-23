@@ -31,8 +31,8 @@
 | **Claude.ai (Web / Desktop / Mobile)** | **Settings → Connectors → Add custom connector** → Paste **`https://api.livecore.ai/api/v1/misc/mcp`** → Sign in with OAuth 2.1 (zero install). |
 | **ChatGPT (Web / Desktop Connectors)** | **Settings → Connectors → Create** → MCP Server URL: **`https://api.livecore.ai/api/v1/misc/mcp`** (OAuth 2.1 + PKCE automatic). Or use [`chatgpt/openapi.json`](./chatgpt/openapi.json) for Custom GPT Actions. |
 | **Claude Code (CLI / IDE)** | Run `/plugin marketplace add brajendrak00068/agentic-ai-video-production` then `/plugin install levea-video-editor` (or `claude mcp add --transport http levea https://api.livecore.ai/api/v1/misc/mcp`). |
-| **Claude Desktop (1-Click `.mcpb`)** | Download [`levea-mcp-server-0.7.4.mcpb`](https://github.com/brajendrak00068/agentic-ai-video-production/releases/latest/download/levea-mcp-server-0.7.4.mcpb) and double-click to install in Claude Desktop. |
-| **Cursor / Windsurf / Cline** | Add remote MCP **`https://api.livecore.ai/api/v1/misc/mcp`** (OAuth 2.1) or stdio `npx -y levea-mcp-server` with `LEVEA_API_KEY` from [livecore.ai](https://livecore.ai/?openclaw=1). |
+| **Claude Desktop** | **Settings → Connectors → Add custom connector** → **`https://api.livecore.ai/api/v1/misc/mcp`** (zero install). Or download the `.mcpb` from the [latest release](https://github.com/brajendrak00068/agentic-ai-video-production/releases/latest) and double-click it. |
+| **Cursor / Windsurf / Cline** | Add the remote MCP URL **`https://api.livecore.ai/api/v1/misc/mcp`** and sign in with OAuth 2.1 — nothing to install. Config snippets: see **Path A** below. |
 | **OpenClaw / ClawHub** | `openclaw plugins install clawhub:openclaw-ai-video-editor` + `clawhub install levea-ai-video-editor` |
 | **NousResearch Hermes** | `hermes plugins install levea-video-editor && hermes plugins enable levea-video-editor` |
 | **Agent Skills CLI (`npx skills`)** | `npx skills add brajendrak00068/agentic-ai-video-production` |
@@ -140,13 +140,29 @@ Grok Bot can add an MCP server by URL, and the hosted server speaks the exact co
 
 ### 🧑‍💻 Path A: For Developers & AI Engineers (The MCP Route)
 
-Expose Levea as a client-side Model Context Protocol (MCP) server stdio wrapper (`levea-mcp-server`) in your favorite AI editors (Cursor, Cline, Windsurf, or Claude Desktop).
+Connect your AI editor to the **hosted** Levea MCP server. It runs in the cloud, so there is nothing to install: the client opens a browser once and you sign in with OAuth 2.1.
 
-#### 1. Get an API Key
-Sign up at [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=github&utm_medium=readme&utm_campaign=agentic-ai-video-production) and generate a Levea API key.
+#### 1. Recommended: hosted MCP (nothing to install)
 
-#### 2. Register the MCP Server
-Add the following configuration block to your editor's MCP settings:
+```
+https://api.livecore.ai/api/v1/misc/mcp
+```
+
+| Client | Setup |
+| --- | --- |
+| **Claude Code** | `claude mcp add --transport http levea https://api.livecore.ai/api/v1/misc/mcp`, then run `/mcp` and sign in. |
+| **Claude Desktop / Claude.ai** | **Settings → Connectors → Add custom connector** → paste the URL. |
+| **Cursor** | `~/.cursor/mcp.json`: `{"mcpServers":{"levea":{"url":"https://api.livecore.ai/api/v1/misc/mcp"}}}` |
+| **Windsurf** | `mcp_config.json`: `{"mcpServers":{"levea":{"serverUrl":"https://api.livecore.ai/api/v1/misc/mcp"}}}` |
+| **Cline** | MCP settings: `{"mcpServers":{"levea":{"type":"streamableHttp","url":"https://api.livecore.ai/api/v1/misc/mcp"}}}` |
+| **Hermes** | Native plugin: [`hermes-plugin/`](./hermes-plugin) (`hermes plugins install levea-video-editor && hermes plugins enable levea-video-editor`). |
+| **OpenClaw** | `openclaw plugins install clawhub:openclaw-ai-video-editor` |
+
+Clients that can't do OAuth can send `Authorization: Bearer <your Levea API key>` to the same URL instead.
+
+#### 2. Fallback: local stdio wrapper (only if your client can't connect to a remote MCP server)
+
+`levea-mcp-server` is a small local proxy that forwards each tool call to the same hosted editor using an API key. It does no editing on your machine. Get a key at [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=github&utm_medium=readme&utm_campaign=agentic-ai-video-production), then:
 
 ```jsonc
 {
@@ -154,25 +170,13 @@ Add the following configuration block to your editor's MCP settings:
     "levea": {
       "command": "npx",
       "args": ["-y", "levea-mcp-server"],
-      "env": {
-        "LEVEA_API_URL": "https://api.livecore.ai",
-        "LEVEA_API_KEY": "your-key-from-livecore.ai"
-      }
+      "env": { "LEVEA_API_KEY": "your-key-from-livecore.ai" }
     }
   }
 }
 ```
 
-*Note: `LEVEA_API_URL` should point to the bare host domain `https://api.livecore.ai`. The client-side wrapper handles endpoint appending automatically.*
-
-| Client | Setup Commands / Instructions |
-| --- | --- |
-| **Cursor & Windsurf** | Go to Settings -> Features -> MCP -> Add New MCP Server. Set type to `command` and insert the config above. |
-| **Cline** | Open settings, scroll to MCP, and add the config to the Cline MCP settings file. |
-| **Claude Code** | Run: `claude mcp add levea -e LEVEA_API_URL=https://api.livecore.ai -e LEVEA_API_KEY=... -- npx -y levea-mcp-server` |
-| **Claude Desktop** | Add the server block to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows). |
-| **Hermes** | Native plugin: [`hermes-plugin/`](./hermes-plugin) (`hermes plugins install levea-video-editor && hermes plugins enable levea-video-editor`). Or register `levea-mcp-server` as an MCP server using the bundled [`hermes-levea/mcp.json`](./hermes-levea/mcp.json). |
-| **OpenClaw** | Install via ClawHub: `openclaw plugins install clawhub:openclaw-ai-video-editor` or add via CLI `openclaw mcp add levea --command "npx -y levea-mcp-server" --env LEVEA_API_URL=https://api.livecore.ai --env LEVEA_API_KEY=...`. |
+Claude Code equivalent: `claude mcp add levea -e LEVEA_API_KEY=... -- npx -y levea-mcp-server`. `LEVEA_API_URL` is optional (defaults to `https://api.livecore.ai`; set only the host if you override it).
 
 ---
 
