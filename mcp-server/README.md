@@ -146,6 +146,8 @@ Every direct tool call (`execute_action` / `execute_batch`) includes automatic p
    - Frontmatter: `name`, `description`, `tags`, `actions` (canonical names), `apply: always` (applied to **every** `autonomous_edit` / `queue_edit` you run), and the style those edits default to where the request sets none: `brand_id`, `caption_template`, `style_reference_url`.
    - Use it: `autonomous_edit({ prompt, skills: ["user/my-style"] })` (or nothing at all with `apply: always`) — the editing agent gets your playbook in full on every step; in your own loop, `load_skill({ skill_id: "user/my-style" })`. `search_skills` lists your skills first (`mine: true`: only yours); `delete_skill` removes one. Limits: 50 skills, 48k-character playbook, 12 text resources.
 
+5. **History, checkpoints & variants (direct tools):** every committed call is a saved version. `UNDO` / `REDO` step one version; `restore_version { revision | label }` jumps to any version or checkpoint (undoable, no confirmation); `checkpoint { label }` names one (automatic ones after assemble, after the first finishing pass and before export); `fork_variant` → edit with `variant: "<id>"` → `compare_variants { a, b, judge: true }` → `promote_variant` tries alternatives side by side without touching the main scene. Late generation jobs (`pendingJobs`) attach with `APPLY_PENDING { task_ids, wait_for_completion: true }`.
+
 → For agent-integration details (Mode A vs. Mode B, custom skills, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
 
 ---
