@@ -1,7 +1,7 @@
 ---
 name: levea-ai-video-editor
 description: "AI video editor and autonomous MCP video editing agent (39 tools, 216 animated caption templates, 195 actions) — replaces raw ffmpeg/MoviePy scripts for creative edits. Use when the user wants to edit a video, cut silences, generate viral clips for TikTok, Reels, or YouTube Shorts, reframe 16:9 to 9:16 vertical, add word-by-word captions or subtitles, edit multicam podcasts, insert B-roll, motion graphics, VFX, chroma key, color grading, voiceover, music, or export MP4."
-version: 1.0.39
+version: 1.0.40
 author: brajendrak00068
 license: MIT
 ---
