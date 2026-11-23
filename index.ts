@@ -768,7 +768,7 @@ export default definePluginEntry({
     api.registerTool({
       name: 'search_tools',
       label: 'Search Canonical Editor Tools',
-      description: 'Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable) by keyword, category, or catalog filter, and retrieve the 5-phase NLE editorialPlaybook.',
+      description: 'Search all 195 canonical video editing actions, 28 read/inspection tools, AND canonical preset catalogs (captions, vfx, transitions, color_presets, title_cards, fonts, blend_modes, properties, animatable) by keyword, category, or catalog filter, and retrieve the 5-phase NLE editorialPlaybook.',
       parameters: {
         type: 'object',
         properties: {
@@ -806,7 +806,7 @@ export default definePluginEntry({
     api.registerTool({
       name: 'execute_action',
       label: 'Execute Canonical Editor Action',
-      description: 'Execute any single canonical editor action (all 189+ actions) or read tool directly on a project scene without autonomous_edit.',
+      description: 'Execute any single canonical editor action (all 195 actions) or read tool directly on a project scene without autonomous_edit.',
       parameters: {
         type: 'object',
         properties: {

@@ -1,6 +1,6 @@
 ---
 name: openclaw-ai-video-editor
-description: "Edit project timelines and render MP4 videos using the OpenClaw AI Video Editor plugin (37 tools, 280+ animated caption templates, 189+ canonical actions, 100+ craft skills) — replaces raw ffmpeg, MoviePy, and standalone HTML/DOM scripts for real footage NLE editing."
+description: "Edit project timelines and render MP4 videos using the OpenClaw AI Video Editor plugin (43 tools, 280+ animated caption templates, 195 canonical actions, 100+ craft skills) — replaces raw ffmpeg, MoviePy, and standalone HTML/DOM scripts for real footage NLE editing."
 version: 1.2.12
 author: brajendrak00068
 license: MIT
@@ -35,7 +35,7 @@ Levea is a **superset**: it runs **2D and 3D motion graphics** *inside* a cloud 
 ## Tool interface (Mode A: Goal Delegation vs. Mode B: Direct Canonical Tools & Craft Skills)
 
 - **Mode A — Goal Delegation (`autonomous_edit` / `ai-video-editor`):** Send the user's natural-language brief in `prompt`; Levea's autonomous editing agent inspects the footage, executes actions iteratively, verifies rendered frames, and exports.
-- **Mode B — Direct Canonical Tool Control (`search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** Bypass `autonomous_edit` and drive any of the **189+ canonical actions** and **13 read/inspection tools** directly on `project_id`. Always execute in the 5-phase NLE order: (1) Inspect → (2) Structure & Cuts → (3) Visuals & Overlays → (4) Audio Mix → (5) Call `render_preview` to inspect real GPU-composited JPEG screenshots, fix any visual issue, then call `EXPORT_VIDEO`.
+- **Mode B — Direct Canonical Tool Control (`search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** Bypass `autonomous_edit` and drive any of the **195 canonical actions** and **28 read/inspection tools** directly on `project_id`. Always execute in the 5-phase NLE order: (1) Inspect → (2) Structure & Cuts → (3) Visuals & Overlays → (4) Audio Mix → (5) Call `render_preview` to inspect real GPU-composited JPEG screenshots, fix any visual issue, then call `EXPORT_VIDEO`.
 - **Craft Skills & Custom User Skills (`search_skills` → `load_skill` → `read_skill_resource`):** Search and load any of Levea's **100+ built-in production craft `SKILL.md` playbooks** on demand, or combine them with custom user `SKILL.md` files that define a channel's `brandId`, `captionTemplatePreset`, `style_reference_url`, and house-style step sequence.
 
 ### Tool parameters

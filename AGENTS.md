@@ -6,11 +6,11 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 `levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
-## Tools (41 Annotated Tools Unlocking All 189+ Canonical Actions, 13 Read Tools & 100+ Craft Skills)
+## Tools (43 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
 
 The surface supports **two complementary execution modes** plus typed management & polling:
 - **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
-- **Mode B — Universal Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **189+ canonical actions**, **13 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
+- **Mode B — Universal Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
 
 ### Mode A: Goal Delegation (1 + 2 variants)
 
@@ -24,9 +24,9 @@ The surface supports **two complementary execution modes** plus typed management
 
 | Tool | What it does |
 |---|---|
-| `search_tools` | Search all 189+ canonical actions, 13 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`, `properties`, `animatable`); returns matching actions/presets and the 5-phase NLE `editorialPlaybook` |
+| `search_tools` | Search all 195 canonical actions, 28 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`, `properties`, `animatable`); returns matching actions/presets and the 5-phase NLE `editorialPlaybook` |
 | `get_action_schema` | Fetch the full JSON `inputSchema` and parameter constraints for any canonical action or read tool |
-| `execute_action` | Execute any single canonical action (all 189+ actions, e.g. `REMOVE_SILENCES`, `VERTICAL_REFRAME`, `COLOR_GRADE`, `GENERATE_CAPTIONS`, `PLAN_MOTION_GRAPHICS`, `GENERATE_MUSIC`, `AUTO_DUCK`, `EXPORT_VIDEO`) or read tool (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, `shot_timeline`, `read_source_transcript`, `measure_audio`, `measure_picture`, `measure_color`) directly on `project_id`. Pass `video_url` or `assets` on the first call to bootstrap a new project |
+| `execute_action` | Execute any single canonical action (all 195 actions, e.g. `REMOVE_SILENCES`, `VERTICAL_REFRAME`, `COLOR_GRADE`, `GENERATE_CAPTIONS`, `PLAN_MOTION_GRAPHICS`, `GENERATE_MUSIC`, `AUTO_DUCK`, `EXPORT_VIDEO`) or read tool (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, `shot_timeline`, `read_source_transcript`, `measure_audio`, `measure_picture`, `measure_color`) directly on `project_id`. Pass `video_url` or `assets` on the first call to bootstrap a new project |
 | `execute_batch` | Execute an ordered array of `{ action, params }` steps in one atomic round-trip with automatic safe-zone checks, timeline reconciliation, layout de-stacking, async asset completion, and project commit |
 | `render_preview` | Render real GPU-composited JPEG screenshots at `timestamps: [...]` (with optional `0..1` `region` crop) showing all live video layers, captions, title cards, grades, and VFX; returns native MCP `image` blocks + `frames[]` so the agent can visually verify frames before `EXPORT_VIDEO` |
 | `search_skills` | Search 100+ production craft skills (`SKILL.md` playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) |
@@ -72,6 +72,18 @@ Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that re
 
 `asset_upload_url` (signed PUT URL — upload local files via the API), `list_assets`, `delete_asset`, `transcribe_asset`.
 
+### Your skills (2)
+
+`save_skill` (save your own `SKILL.md` folder — `path` from the local npx server, or `skill_md` text — to your account as `user/<slug>`; frontmatter `apply: always`, `brand_id`, `caption_template`, `style_reference_url`), `delete_skill`. Saved skills appear in `search_skills` / `load_skill` / `read_skill_resource`; pass `skills: ["user/<slug>"]` on `autonomous_edit` / `queue_edit`.
+
+### ShaderFX (4)
+
+`create_shader_effect`, `list_shader_effects`, `apply_shader_effect`, `delete_shader_effect` — your own WGSL GPU filters, transitions and generators.
+
+### History (inside `execute_action` / `execute_batch`)
+
+`UNDO` / `REDO`, `revert_steps`, `checkpoint { label }`, `restore_version { revision | label }` (no confirmation, undoable; the redo branch is kept), `list_versions`, `scene_diff`, and variants: `fork_variant { label }`, then send calls with `variant: "<id or label>"`, `compare_variants { a, b, judge: true }`, `promote_variant`, `list_variants`, `delete_variant` (needs `confirm_destructive`). Restore receipts list side effects; async jobs never write into a scene a restore moved off.
+
 ### Diagnostics (1)
 
 `editor_health` (unauthenticated connectivity probe).
@@ -81,7 +93,7 @@ Full input schemas are returned by `tools/list` over MCP.
 ### When to use Mode A (`autonomous_edit`) vs. Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview`)
 
 - **Use Mode A (`autonomous_edit`)** when the user gives a broad or creative goal ("Turn this podcast into 3 viral TikTok clips with Hormozi captions, B-roll, and music"). One call runs Levea's autonomous editing agent + 100+ craft skills end-to-end.
-- **Use Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`)** when your agent wants 100% direct deterministic control, surgical <50ms tweaks, custom timestamp math from local files, or an interactive `observe → edit → render_preview screenshot → adjust → export` loop without invoking our internal planner.
+- **Use Mode B (`search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`)** when your agent wants 100% direct deterministic control, surgical tweaks that apply in about a second, custom timestamp math from local files, or an interactive `observe → edit → render_preview screenshot → adjust → export` loop without invoking our internal planner.
 - **5-Phase NLE Execution Order for Mode B:**
   1. **Inspect:** `list_layers`, `query_transcript`, `list_sources`
   2. **Structure & Cuts:** `CLEAR`, `REGISTER_REMOTE_ASSET`, `SET_SOURCE_RANGE`, `TRIM_LAYER`, `SPLIT_LAYER`, `REMOVE_SILENCES`, `CONFIGURE_CANVAS`, `VERTICAL_REFRAME` *(always cut and resize before adding timed overlays/captions)*

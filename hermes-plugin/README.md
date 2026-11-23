@@ -28,7 +28,7 @@ Optional: `LEVEA_API_URL` (defaults to `https://api.livecore.ai`).
 | `levea_job_status` | Read an export/render job; `wait: true` polls until it finishes (up to 10 min). |
 | `levea_task_status` | Read a queued edit by `taskId`. |
 | `levea_active_task` | Reconnect to the running edit for a `project_id`. |
-| `levea_search_tools` | Search all 189+ canonical editing actions, 13 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`). |
+| `levea_search_tools` | Search all 195 canonical editing actions, 28 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`). |
 | `levea_get_action_schema` | Fetch the full JSON inputSchema and parameter constraints for any canonical action or read tool. |
 | `levea_execute_action` | Execute any single canonical action or read tool directly on a project scene. |
 | `levea_execute_batch` | Execute an ordered batch of canonical actions in one atomic round-trip with automatic timeline reconciliation and project commit. |
