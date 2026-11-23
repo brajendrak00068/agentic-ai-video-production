@@ -1,6 +1,6 @@
 ---
 name: openclaw-ai-video-editor
-description: "Edit project timelines and render MP4 videos using the OpenClaw AI Video Editor plugin (43 tools, 280+ animated caption templates, 195 canonical actions, 100+ craft skills) — replaces raw ffmpeg, MoviePy, and standalone HTML/DOM scripts for real footage NLE editing."
+description: "Edit project timelines and render MP4 videos using the OpenClaw AI Video Editor plugin (39 tools, 280+ animated caption templates, 195 canonical actions, 100+ craft skills) — replaces raw ffmpeg, MoviePy, and standalone HTML/DOM scripts for real footage NLE editing."
 version: 1.2.12
 author: brajendrak00068
 license: MIT

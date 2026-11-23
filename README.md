@@ -348,7 +348,7 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | **Editorial reasoning** | You listen and hunt for the climax | Agent surfaces narrative peaks and high-retention moments |
 | **Verification & Repair** | You eyeball it and manually re-render | `autonomous_edit` checks every edit on the rendered frames, repairs failures automatically and returns a typed verification report; with direct tools your agent runs `VERIFY_EDIT` (depth `editorial` adds a rendered critic) and `EXPORT_VIDEO` applies a safe polish pass first |
 | **Multi-platform export** | One render per aspect ratio | TikTok + Reels + Shorts + YouTube in one pass |
-| **Extensibility** | Plugins call external binaries | 43 MCP tools unlocking 195 editing actions, 28 inspection tools, and 100+ craft skills |
+| **Extensibility** | Plugins call external binaries | 39 MCP tools unlocking 195 editing actions, 28 inspection tools, and 100+ craft skills |
 
 ---
 
@@ -402,15 +402,14 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ---
 
-## 📂 MCP Tool Surface (43 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
+## 📂 MCP Tool Surface (39 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
 
-The MCP server (`levea-mcp-server`, 43 tools) exposes **both** high-level goal delegation (`autonomous_edit`) **and** direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), alongside typed management and polling tools. The OpenClaw and Hermes plugins expose the same dual-mode editing and discovery surface.
+The MCP server (`levea-mcp-server`, 39 tools) exposes **both** high-level goal delegation (`autonomous_edit`) **and** direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`), alongside typed management and polling tools. The OpenClaw and Hermes plugins expose the same dual-mode editing and discovery surface.
 
 | Group | Tools | Description |
 | --- | --- | --- |
 | **Mode A: Goal Delegation** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Send a natural-language brief; Levea's autonomous editing agent inspects the footage, edits, verifies on rendered frames, and exports. |
 | **Mode B: Universal Direct Canonical Suite (195 Actions, 28 Read Tools & 100+ Skills)** | `search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` | Discover any of the 195 canonical actions, 28 read tools, and 100+ editing craft skills on demand, execute single actions or atomic batches (with automatic safe-zone checks, timeline reconciliation, and async asset completion), and inspect real GPU-composited JPEG screenshots (`render_preview`, like `ffmpeg` frame grabs) without calling `autonomous_edit`. |
-| **Deterministic Layer Shortcuts** | `update_layer`, `delete_layer`, `trim_layer`, `apply_transition` | Fast typed shortcuts for single-layer property updates, deletes, trims, and ~170 named transitions. |
 | **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, generation jobs, and the active task of a project. |
 | **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (280+ built-in: Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
 | **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, voice tone, and grading rules. |

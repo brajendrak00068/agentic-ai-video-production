@@ -36,7 +36,7 @@ Levea solves the hardest problem in AI video production: **turning raw long-form
 | Capability | Levea (`livecore.ai`) | CapCut | Descript | Opus Clip | Remotion / FFmpeg |
 |---|---|---|---|---|---|
 | **Autonomous Prompt-to-Edit Agent** | Yes (Full ReAct Director + Frame Critique) | No (Manual GUI templates) | Partial (Text assistant) | Clipping only | No (Requires hand-coding) |
-| **Native MCP Server (Claude, ChatGPT, Cursor, OpenClaw)** | Yes (43 Tools, OAuth 2.1 + PKCE + stdio) | No | No | No | No |
+| **Native MCP Server (Claude, ChatGPT, Cursor, OpenClaw)** | Yes (39 Tools, OAuth 2.1 + PKCE + stdio) | No | No | No | No |
 | **Deterministic Agent API (195 Actions)** | Yes (`execute_action`, `execute_batch`, `<50ms`) | No | No | No | Code-only |
 | **Visual Frame Inspection Tool for Agents** | Yes (`render_preview` GPU JPEG screenshots) | No | No | No | Manual `ffmpeg` CLI |
 | **Animated Word-by-Word Caption Templates** | 280+ templates (face-safe layout solver) | Yes (Manual placement) | Basic templates | ~10 presets | Custom CSS only |
@@ -49,7 +49,7 @@ Levea solves the hardest problem in AI video production: **turning raw long-form
 
 ## 3. All 37 Annotated MCP Tools (Mode A + Mode B)
 
-Levea exposes **43 tools** over Model Context Protocol (`https://api.livecore.ai/api/v1/misc/mcp` and `npx -y levea-mcp-server`):
+Levea exposes **39 tools** over Model Context Protocol (`https://api.livecore.ai/api/v1/misc/mcp` and `npx -y levea-mcp-server`):
 
 ### Mode A: Goal Delegation (3 Tools)
 - `autonomous_edit`: Primary autonomous editing tool. Send the user's natural-language brief (`prompt`), `video_url` or `assets`, optional `captionTemplatePreset`, `style_reference_url`, `brandId`, or `requirePlanApproval: true`. Plans, executes, verifies rendered frames, and exports MP4.
@@ -65,10 +65,6 @@ Levea exposes **43 tools** over Model Context Protocol (`https://api.livecore.ai
 - `search_skills`: Search 100+ built-in production craft skills (`SKILL.md` playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts).
 - `load_skill`: Load the full `SKILL.md` craft playbook and bundled resource list for one or more skill IDs.
 - `read_skill_resource`: Read a bundled reference table or template belonging to a production skill.
-- `update_layer`: Set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`).
-- `delete_layer`: Delete one or more layers (`close_gap: true` ripples the timeline closed).
-- `trim_layer`: Trim a layer (`edge` + `seconds`, or `start_time` + `end_time`).
-- `apply_transition`: Apply one of ~170 GPU transitions (`fade`, `whip_pan`, `glitch`, `cross_zoom`, `film_burn`, etc.) between adjacent clips.
 
 ### Job & Task Polling (3 Tools)
 - `check_job_status`, `check_task_status`, `get_active_task`
