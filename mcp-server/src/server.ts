@@ -173,6 +173,7 @@ const DIRECT_COMMON_PROPS: Record<string, JsonSchema> = {
   rerun: { type: 'boolean', description: 'Run an identical call again on purpose.' },
   dry_run: { type: 'boolean', description: 'Only check params (fast); nothing runs.' },
   allow_unknown_params: { type: 'boolean', description: 'Run despite params an action does not take (they are ignored and listed).' },
+  reconcile: { type: 'boolean', description: 'Default true: after a change, a structural finishing pass (safe-zone repair, timeline reconcile, layout de-stacking) runs; the response lists each run in finishingApplied and what it changed in structuralChanges. false: the pass does not run (finishingSkipped).' },
 };
 
 const TOOL_DEFS: Tool[] = [
@@ -589,7 +590,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_batch',
     description:
-      'Run an ordered list of canonical actions and/or read tools (≤ 25 steps) in one round trip — the fastest way to edit. The whole batch is validated before anything runs (unknown actions, bad params → INVALID_PARAMS with suggestions; destructive actions need confirm_destructive: true) and is atomic unless allow_partial. One receipt per step. Results are unverified: check with render_preview before EXPORT_VIDEO. Pro workflow (source_map → PLAN_EDITORIAL_CUT → ASSEMBLE_PICTURE_EDIT → finishing → VERIFY_EDIT → EXPORT_VIDEO), history (UNDO, restore_version, checkpoint, fork_variant): search_tools editorialPlaybook.',
+      'Run an ordered list of canonical actions and/or read tools (≤ 25 steps) in one round trip. The whole batch is validated before anything runs (unknown actions, bad params → INVALID_PARAMS with suggestions; destructive actions need confirm_destructive: true) and is atomic unless allow_partial: the first failed step stops it and nothing is saved (BATCH_STEP_FAILED). One receipt per step. A structural finishing pass runs after the steps unless reconcile: false (finishingApplied). Without project_id the result is not saved (persisted: false). Results are unverified: check with render_preview before EXPORT_VIDEO. Pro workflow (source_map → PLAN_EDITORIAL_CUT → ASSEMBLE_PICTURE_EDIT → finishing → VERIFY_EDIT → EXPORT_VIDEO), history (UNDO, restore_version, checkpoint, fork_variant): search_tools editorialPlaybook.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -608,7 +609,7 @@ const TOOL_DEFS: Tool[] = [
         ...DIRECT_COMMON_PROPS,
         allow_partial: {
           anyOf: [{ type: 'boolean' }, { type: 'string', enum: ['until_failure'] }],
-          description: 'false (default): atomic. true: commit every step that succeeded. "until_failure": commit the steps before the first failure.',
+          description: 'false (default): the first failed step stops the batch and nothing is saved (failureCode BATCH_STEP_FAILED, failedStepIndex). true: every step runs and the ones that succeeded are saved; the response then has success: false, partial: true and failedSteps. "until_failure": the steps before the first failure are saved and the rest are not run.',
         },
         confirm_destructive: { type: 'boolean', description: 'Required true for destructive actions (CLEAR, bulk DELETE_LAYER, …).' },
       },
@@ -1366,13 +1367,13 @@ async function dispatch(name: string, input: Record<string, unknown>, ctx: Dispa
         args = { ...rest, params: params_by_action };
       }
       const r = (await executeDeterministicTool(name, pid, args, ctx.signal, ctx.progress)) as Record<string, unknown>;
-      return ok(directHead(name, r, 'completed'), r);
+      return directResult(name, r, 'completed');
     }
 
     case 'render_preview': {
       const pid = str(a.project_id) || str(a.projectId);
       const r = (await executeDeterministicTool('RENDER_PREVIEW', pid, a, ctx.signal, ctx.progress)) as Record<string, unknown>;
-      return ok(directHead('render_preview', r, 'rendered preview frames'), r);
+      return directResult('render_preview', r, 'rendered preview frames');
     }
 
     default: {
@@ -1381,7 +1382,7 @@ async function dispatch(name: string, input: Record<string, unknown>, ctx: Dispa
       // Unregistered names never reach here (refused in the CallTool handler).
       const pid = str(a.project_id) || str(a.projectId);
       const r = (await executeDeterministicTool(name, pid, a, ctx.signal, ctx.progress)) as Record<string, unknown>;
-      return ok(directHead(name, r, 'completed'), r);
+      return directResult(name, r, 'completed');
     }
   }
 }
@@ -1415,15 +1416,81 @@ function directHead(name: string, r: Record<string, unknown>, fallback: string):
     const where = pd && pd.stepsTotal ? ` Step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}.` : '';
     return `⏳ ${name} is still running on Levea${waited}; nothing lost, never run twice.${where} To keep waiting, resend the identical call (it waits again and returns the full result when done) or call check_task_status { task_id: "${taskId}" }. Do not change the params while it runs.`;
   }
-  const head = (r.success === false
+  const receipts: any[] = Array.isArray(r.stepReceipts) ? r.stepReceipts : [];
+  const head = (receipts.length > 0 ? stepsReport(name, r, receipts) : (r.success === false
     ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
-    : `✅ ${name}: ${r.observation || r.message || fallback}`) + polishLine(r);
+    : `✅ ${name}: ${r.observation || r.message || fallback}`)) + polishLine(r);
   const ignored = Array.isArray(r.ignored_params) ? r.ignored_params : [];
   if (ignored.length === 0) return head;
   const names = ignored.flatMap((g: any) => Array.isArray(g?.ignored_params) ? g.ignored_params : [g])
     .map((i: any) => (i?.didYouMean ? `${i.param} (did you mean ${i.didYouMean}?)` : String(i?.param ?? '')))
     .filter(Boolean);
   return `${head}\n⚠ IGNORED params (no effect): ${names.join(', ')}`;
+}
+
+/** First line of an observation, at most `max` characters; `cut` says whether anything was left out. */
+function firstLine(text: unknown, max = 300): { line: string; cut: boolean } {
+  const s = String(text ?? '').trim();
+  const nl = s.indexOf('\n');
+  const line = nl >= 0 ? s.slice(0, nl) : s;
+  if (line.length > max) return { line: `${line.slice(0, max)}…`, cut: true };
+  return { line, cut: nl >= 0 };
+}
+
+/**
+ * The text of a direct call that ran steps, built from the backend response:
+ * the outcome, one ✅ / ❌ line per step receipt with its observation, the
+ * steps not run, then the project + revision, whether the edit was saved,
+ * each run of the finishing pass, deliverable warnings and the exported
+ * video. The full response is in structuredContent (every receipt in full).
+ */
+function stepsReport(name: string, r: Record<string, any>, receipts: any[]): string {
+  const lines: string[] = [];
+  if (r.partial === true) {
+    lines.push(`⚠️ ${name}: partial — ${Array.isArray(r.failedSteps) ? r.failedSteps.length : 'some'} step(s) failed; the steps that succeeded were applied.`);
+  } else if (r.success === false) {
+    lines.push(`❌ ${name} failed${r.failureCode ? ` (${r.failureCode})` : ''}: ${firstLine(r.error || r.message || 'unknown').line}`);
+  } else {
+    lines.push(`✅ ${name}: ${receipts.length} step(s) succeeded.`);
+  }
+  let anyCut = false;
+  for (const s of receipts) {
+    const obs = firstLine(s?.observation);
+    anyCut = anyCut || obs.cut;
+    lines.push(`${s?.success ? '✅' : '❌'} ${String(s?.action ?? 'step')}${s?.failureCode ? ` [${s.failureCode}]` : ''}: ${obs.line}`);
+  }
+  if (Array.isArray(r.notRun) && r.notRun.length > 0) {
+    lines.push(`⏭ not run: ${r.notRun.map((n: any) => `step ${n?.step} ${n?.action}`).join(', ')}`);
+  }
+  if (anyCut) lines.push('(observations shortened to their first line; full receipts: structuredContent.stepReceipts)');
+  // An unsaved call answers with the scratch scene's id, which is no project.
+  if (typeof r.projectId === 'string' && r.projectId && r.persisted !== false) {
+    lines.push(`project ${r.projectId}${r.projectRevision !== undefined && r.projectRevision !== null ? ` · revision ${r.projectRevision}` : ''}`);
+  }
+  if (typeof r.persisted === 'boolean') {
+    lines.push(`persisted: ${r.persisted}${r.persistWarning ? ` — ${r.persistWarning}` : ''}`);
+  } else if (r.committed === false) {
+    lines.push('committed: false (nothing was saved)');
+  }
+  if (Array.isArray(r.finishingApplied)) {
+    lines.push(r.finishingApplied.length > 0
+      ? `finishing pass: ${r.finishingApplied.map((f: any) => `${f?.pass} (${f?.changed ? 'changed the scene: structuralChanges' : 'no change'})`).join('; ')}`
+      : `finishing pass: not run${r.finishingSkipped ? ` (${r.finishingSkipped})` : ''}`);
+  }
+  for (const w of Array.isArray(r.deliverableWarnings) ? r.deliverableWarnings : []) lines.push(`⚠ ${String(w)}`);
+  if (typeof r.videoUrl === 'string' && r.videoUrl) lines.push(`📹 ${r.videoUrl}`);
+  if (r.jobId !== undefined && r.jobId !== null) lines.push(`🆔 job ${r.jobId}`);
+  return lines.join('\n');
+}
+
+/**
+ * A direct tool's MCP result. Beyond ok()'s rule, a partial batch (some steps
+ * failed, the others saved: success false, type partial_success) is an error
+ * here: the agent asked for every step. A call still running is not.
+ */
+function directResult(name: string, r: Record<string, unknown>, fallback: string) {
+  const result = ok(directHead(name, r, fallback), r);
+  return r.success === false && r.partial === true && r.status !== 'running' ? { ...result, isError: true } : result;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1436,26 +1503,24 @@ function directHead(name: string, r: Record<string, unknown>, fallback: string):
  * fresh instance per HTTP request inside `runWithLeveaConfig`.
  */
 /**
- * Sent in the MCP `initialize` result so every client (Claude, Cursor, Codex,
- * OpenClaw, Hermes, …) sees how to use the surface before its first call,
- * instead of discovering it only if it happens to call search_tools.
+ * Sent in the MCP `initialize` result: what the surface is and how it behaves,
+ * so every client (Claude, Cursor, Codex, OpenClaw, Hermes, …) knows before its
+ * first call. Facts only — the calling agent decides how to edit.
  */
 export const LEVEA_MCP_INSTRUCTIONS = [
-  'Levea is a cloud video editor. Two ways to use it:',
-  'A) Broad creative goal ("make 3 vertical clips with captions and music"): send the user\'s brief verbatim to autonomous_edit (or queue_edit + check_task_status for long edits). Never re-call it to check progress; on status "running" poll get_active_task.',
-  'B) You drive the edit yourself (surgical changes, your own plan): use the direct tools. Fastest pattern, 3-4 calls total:',
-  '  1. execute_batch of read tools (timeline_view = the whole edit as one short text block; query_transcript, list_sources, shot_timeline) — pass video_url or assets on this first call to seed a new project; keep the returned project_id and pass it on every later call. Do not send the scene back; the server keeps it.',
-  '  2. ONE execute_batch with every edit in NLE order: structure & cuts (SET_SOURCE_RANGE, TRIM_LAYER, SPLIT_LAYER, REMOVE_SILENCES, CONFIGURE_CANVAS, VERTICAL_REFRAME — follows faces, or subject: "the product" to follow an object) before visuals (COLOR_GRADE, APPLY_VFX, TITLE_CARD, GENERATE_CAPTIONS, STYLE_CAPTIONS) before audio (CLEAN_AUDIO, GENERATE_MUSIC, ADD_SFX, AUTO_DUCK, MASTER_AUDIO).',
-  '  3. render_preview at 2-4 timestamps and look at the frames; fix what you see with one more batch.',
-  '  4. execute_action EXPORT_VIDEO → videoUrl, or a jobId to poll with check_job_status.',
-  'Unsure of an action\'s params? search_tools with a query returns matching actions with param specs; get_action_schema takes actions: [..] for several at once. A batch (max 25 steps) is checked before anything runs and is atomic (allow_partial: true to keep successful steps); destructive actions need confirm_destructive: true. The server adds no creative content of its own on this path, and masters loudness at export if you skipped MASTER_AUDIO.',
-  'Long direct calls (FACE_RETOUCH, LIPSYNC_VIDEO, generation, DETECT_* on a long source, export) wait for their own result, up to this server\'s request timeout. If one still answers ⏳ running, resend the identical call to keep waiting (it is never run twice; changed params start a new call) — do not loop on other tools meanwhile.',
-  'Verify before export: render_preview frames for picture (titles, captions, faces, framing); inspect_layer for keyframes / effects / audio routing that timeline_view only lists; measure_audio for loudness and ducking.',
-  'No id lookups between steps: params accept references — @last (layer the latest step created; also across calls), @last:<kind>, @step<N>, @primary (main video), @first:<kind>, @all:<kind> (bulk, in layer_ids) and times @end-3, @mid, @last.end+0.5. Kinds: video, audio, text, caption, title, broll, music, sfx or any role. Receipts list createdLayerIds.',
-  'Bulk in one step: TRIM_LAYER { layer_id: "@primary", keep_ranges: [{start,end}] } keeps only those spans and stitches; UPDATE_LAYER { layer_ids: "@all:title", ... }; STYLE_CAPTIONS restyles every caption.',
-  'Custom GPU shaders (WGSL fn fx(c: FxCtx); v3: textures, feedback, passes, data, particles): create_shader_effect then apply_shader_effect; contract + examples: load_skill shaderfx-effects.',
-  'Craft playbooks: search_skills / load_skill. Brand kits and caption templates: list_brand_kits, list_caption_templates.',
-  'The user\'s own style: save_skill uploads their SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists theirs first; autonomous_edit / queue_edit apply it via skills: ["user/<slug>"], or on every edit when it says apply: always. In your own loop, load_skill it and follow it.',
+  'Levea is a cloud video editor with two modes:',
+  '- autonomous_edit (also autonomous_edit_streaming, queue_edit): Levea plans and executes an edit from a natural-language prompt. Calling it again does not report progress: an edit that answers status "running" is polled with get_active_task { project_id } (queue_edit: check_task_status { task_id }).',
+  '- Direct tools (execute_action, execute_batch, render_preview, the shader-effect tools): you plan; Levea executes each action exactly as given and reports what happened.',
+  'search_tools lists the canonical actions and read tools; get_action_schema returns an action\'s parameter schema (actions: [..] for several).',
+  'State lives in a project. A call that sends video_url / assets without project_id creates a project and returns its projectId; pass project_id on every later call. Any other call without project_id is not saved (persisted: false). The server keeps the project\'s scene: calls with project_id do not send scene back (an inline scene is ignored when the project has one).',
+  'execute_batch is validated before anything runs (INVALID_PARAMS lists every problem); destructive actions need confirm_destructive: true. It stops at the first failed step and saves nothing (failureCode BATCH_STEP_FAILED, failedStepIndex), unless allow_partial is set.',
+  'After a call changes the scene, a structural finishing pass (safe-zone repair, timeline reconcile, layout de-stacking) runs unless reconcile: false; the response lists each run in finishingApplied and what it changed in structuralChanges.',
+  'Step params accept references instead of ids: @last, @last:<kind>, @step<N>, @primary, @first:<kind>, @all:<kind>, and times such as @end-3 or @last.end+0.5. Receipts list createdLayerIds.',
+  'A call still running on the server answers ⏳ running: an identical resend waits for it and is never applied twice.',
+  'EXPORT_VIDEO masters loudness to a delivery target first when the edit has no MASTER_AUDIO (master_audio: false on the step skips it).',
+  'render_preview returns GPU-composited frames of the timeline; the measure_* read tools (measure_audio, measure_picture, measure_color) return measurements.',
+  'Craft skills (search_skills, load_skill, read_skill_resource) are optional reference material.',
+  'The user\'s own skills: save_skill stores a SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists them first; autonomous_edit / queue_edit apply one via skills: ["user/<slug>"], or on every edit when its frontmatter says apply: always; load_skill returns it; delete_skill removes it.',
 ].join('\n');
 
 /** The MCP server createLeveaMcpServer returns (an SDK `Server`; typed structurally so the package's .d.ts needs no SDK install). */
