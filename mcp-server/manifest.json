@@ -137,6 +137,13 @@
               "type": "string",
               "description": "Optional link to a style-reference video (YouTube, TikTok, Instagram, Drive, or a direct file URL). The editor downloads and measures it (cuts, beats, caption look, transitions, grade) and edits the user's footage to match its style. Its footage, wording, logos and music are never reused. Use this instead of pasting the link into the prompt when the link is a reference, not footage to edit."
             },
+            "skills": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of your own skill ids (\"user/<slug>\", from save_skill / search_skills { mine: true }) to apply to this edit: each playbook guides the editing agent, and the style it sets (brand_id, caption_template, style_reference_url) is used where this request sets none. Skills saved with apply: always are applied automatically."
+            },
             "flaggedIssues": {
               "type": "array",
               "items": {
@@ -300,6 +307,13 @@
             "style_reference_url": {
               "type": "string",
               "description": "Optional link to a style-reference video (YouTube, TikTok, Instagram, Drive, or a direct file URL). The editor downloads and measures it (cuts, beats, caption look, transitions, grade) and edits the user's footage to match its style. Its footage, wording, logos and music are never reused. Use this instead of pasting the link into the prompt when the link is a reference, not footage to edit."
+            },
+            "skills": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of your own skill ids (\"user/<slug>\", from save_skill / search_skills { mine: true }) to apply to this edit: each playbook guides the editing agent, and the style it sets (brand_id, caption_template, style_reference_url) is used where this request sets none. Skills saved with apply: always are applied automatically."
             },
             "flaggedIssues": {
               "type": "array",
@@ -491,6 +505,444 @@
           ]
         }
       },
+      "create_shader_effect": {
+        "description": "Save a reusable ShaderFX (ABI v2 / v3) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv (0..1 canvas, top-left), px, res (render-target px), time = local_time (seconds since the effect layer started), progress (transition: 0→1 across the overlap; else time / layer length), intensity, frame (v3) }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …; float → f32, vec2/vec3 → vec2/vec3<f32>, color → vec4<f32>, bool → f32 0/1). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns effect_id and the param table (name, type, slot, accessor). overwrite: true replaces your effect of the same name. Source ≤ 24 KB (v3: 48 KB); keep loops bounded. v3 (auto when used): textures, feedback, multi-pass, data, geometry (instanced particles / sprites). Full contract + worked examples: load_skill shaderfx-effects.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Effect name (shown in list_shader_effects)."
+            },
+            "source": {
+              "type": "string",
+              "description": "Author WGSL defining fn fx(c: FxCtx) -> vec4<f32> (plus any helper fns of your own). No bindings, no @fragment."
+            },
+            "manifest": {
+              "type": "object",
+              "description": "Effect manifest: { abi: 2, kind: \"filter\" | \"transition\" | \"generator\", output: \"add\" | \"normal\" | \"replace\", params: [{ name, type: \"float\" | \"vec2\" | \"vec3\" | \"color\" | \"bool\", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (vec3/color start on a 4-slot boundary); total ≤ 32. kind defaults to filter, output to normal. Leave abi out: the server picks v3 automatically when a v3 field is present (an explicit abi: 3 is rejected). ABI v3 adds passes: [{ name, scale?: 1 | 0.5 | 0.25 }] (≤ 4; source defines fn pass_<name>(c), read with buf_<name>(uv)), textures: [{ name }] (≤ 4; tex_<name>(uv)), feedback: { enabled, warmup_sec?, clear? } (prev(uv)), geometry: { mode: \"quads\" | \"points\", count } (source defines fn instance(i, c) -> FxInstance and optional fn shade(p, c))."
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional one-line description."
+            },
+            "textures": {
+              "type": "array",
+              "description": "[ABI v3] Up to 4 named textures: [{ name, layer_id | asset_url, space?: \"canvas\" | \"image\" }]. layer_id = that layer rendered alone (canvas space by default); asset_url = a public png/jpg/webp ≤ 4096² (image space by default, e.g. sprite sheets). Read with tex_<name>(uv), tex_size_<name>().",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Texture name, [a-z][a-z0-9_]{0,23}."
+                  },
+                  "layer_id": {
+                    "type": "string",
+                    "description": "Layer whose picture is the texture."
+                  },
+                  "asset_url": {
+                    "type": "string",
+                    "description": "Public image URL."
+                  },
+                  "space": {
+                    "type": "string",
+                    "enum": [
+                      "canvas",
+                      "image"
+                    ],
+                    "description": "Sampling space (default canvas for layer_id, image for asset_url)."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "feedback": {
+              "type": "object",
+              "description": "[ABI v3] { enabled: true, warmup_sec?: 0..4 (default 1), clear?: [r, g, b, a] }: prev(uv) reads this layer's previous output frame (trails, echoes). Previews re-render warmup_sec before the frame. { enabled: false } turns a saved effect's feedback off."
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "[ABI v3] Up to 16384 floats for data(i), data_len(), data_vec2(i), data_vec4(i) (charts, per-instance state, lookup tables)."
+            },
+            "data_url": {
+              "type": "string",
+              "description": "[ABI v3] Public http(s) / gs:// URL of a JSON array (or { data: [...] }) or CSV, resolved to floats at apply time (inline data wins)."
+            },
+            "geometry": {
+              "type": "object",
+              "description": "[ABI v3] { mode: \"quads\" (default) | \"points\", count: integer 1..65536 }: draw count instanced quads; the source defines fn instance(i: u32, c: FxCtx) -> FxInstance (pos canvas uv, size px, rotation rad, color, uv_rect, alive <= 0 culls) and optionally fn shade(p: FxPixel, c: FxCtx); no fx needed. Default shade: soft round point x color, or the first texture through uv_rect x color."
+            },
+            "is_public": {
+              "type": "boolean",
+              "description": "Share the effect publicly (default false)."
+            },
+            "overwrite": {
+              "type": "boolean",
+              "description": "Replace your existing effect with the same name."
+            },
+            "project_id": {
+              "type": "string",
+              "description": "Optional project context."
+            }
+          },
+          "required": [
+            "name",
+            "source",
+            "manifest"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Create shader effect",
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "list_shader_effects": {
+        "description": "List the ShaderFX effects in your library (id, name, description, kind, output, params). Pass an id to apply_shader_effect.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional name / description filter."
+            },
+            "include_public": {
+              "type": "boolean",
+              "description": "Also list public effects."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max effects to return."
+            },
+            "project_id": {
+              "type": "string",
+              "description": "Optional project context."
+            }
+          },
+          "required": []
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "List shader effects",
+          "readOnlyHint": true,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "apply_shader_effect": {
+        "description": "Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind (optional: request, else manifest, else inferred from the layer ids) \"filter\": target_layer_id = the layer whose picture src() reads (omit = everything composited below); window = start_time/end_time, else the target's, else the whole timeline. \"transition\": from_layer_id (clip A) + to_layer_id (clip B); progress runs 0→1 across their overlap. Clips meeting at a cut get a duration_sec overlap (default 0.8 s) laid on media handles, program length unchanged; SHADER_FX_NO_HANDLES if neither clip has media beyond the cut (overlap them first or shorten duration_sec). \"generator\": paints on its own. params = values by manifest name; param_keyframes animates them. v3 inputs: textures, feedback, data / data_url, geometry. Then check with render_preview before export.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "Project whose committed scene is edited."
+            },
+            "effect_id": {
+              "type": "string",
+              "description": "Saved effect id (from create_shader_effect / list_shader_effects)."
+            },
+            "source": {
+              "type": "string",
+              "description": "Inline author WGSL (alternative to effect_id; needs manifest)."
+            },
+            "manifest": {
+              "type": "object",
+              "description": "Inline manifest (with source); may declare v3 passes / textures / feedback / geometry."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "filter",
+                "transition",
+                "generator"
+              ],
+              "description": "Effect kind; match the manifest kind."
+            },
+            "target_layer_id": {
+              "type": "string",
+              "description": "[filter] Layer whose picture is src(); omit for the composited backdrop."
+            },
+            "from_layer_id": {
+              "type": "string",
+              "description": "[transition] Outgoing clip A."
+            },
+            "to_layer_id": {
+              "type": "string",
+              "description": "[transition] Incoming clip B."
+            },
+            "params": {
+              "type": "object",
+              "description": "Param values by manifest name, e.g. { \"strength\": 0.8, \"tint\": \"#ffcc66\", \"direction\": [1, 0] }. Unknown names are errors; floats clamp to min/max."
+            },
+            "textures": {
+              "type": "array",
+              "description": "[ABI v3] Up to 4 named textures: [{ name, layer_id | asset_url, space?: \"canvas\" | \"image\" }]. layer_id = that layer rendered alone (canvas space by default); asset_url = a public png/jpg/webp ≤ 4096² (image space by default, e.g. sprite sheets). Read with tex_<name>(uv), tex_size_<name>().",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Texture name, [a-z][a-z0-9_]{0,23}."
+                  },
+                  "layer_id": {
+                    "type": "string",
+                    "description": "Layer whose picture is the texture."
+                  },
+                  "asset_url": {
+                    "type": "string",
+                    "description": "Public image URL."
+                  },
+                  "space": {
+                    "type": "string",
+                    "enum": [
+                      "canvas",
+                      "image"
+                    ],
+                    "description": "Sampling space (default canvas for layer_id, image for asset_url)."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "feedback": {
+              "type": "object",
+              "description": "[ABI v3] { enabled: true, warmup_sec?: 0..4 (default 1), clear?: [r, g, b, a] }: prev(uv) reads this layer's previous output frame (trails, echoes). Previews re-render warmup_sec before the frame. { enabled: false } turns a saved effect's feedback off."
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "description": "[ABI v3] Up to 16384 floats for data(i), data_len(), data_vec2(i), data_vec4(i) (charts, per-instance state, lookup tables)."
+            },
+            "data_url": {
+              "type": "string",
+              "description": "[ABI v3] Public http(s) / gs:// URL of a JSON array (or { data: [...] }) or CSV, resolved to floats at apply time (inline data wins)."
+            },
+            "geometry": {
+              "type": "object",
+              "description": "[ABI v3] { mode: \"quads\" (default) | \"points\", count: integer 1..65536 }: draw count instanced quads; the source defines fn instance(i: u32, c: FxCtx) -> FxInstance (pos canvas uv, size px, rotation rad, color, uv_rect, alive <= 0 culls) and optionally fn shade(p: FxPixel, c: FxCtx); no fx needed. Default shade: soft round point x color, or the first texture through uv_rect x color."
+            },
+            "data_columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "[ABI v3] CSV data_url only: columns to read, as header names or 0-based indexes (\"3\"), row by row in this order."
+            },
+            "param_keyframes": {
+              "type": "object",
+              "description": "Animate params: { \"<param name>\": [{ \"time\": <timeline seconds>, \"value\": <param type>, \"easing\"?: \"ease_out\" }, ...] } with at least 2 keyframes each. vec/color keyframe per component; bool steps."
+            },
+            "start_time": {
+              "type": "number",
+              "description": "[filter/generator] Timeline seconds the effect starts (ignored for transitions)."
+            },
+            "end_time": {
+              "type": "number",
+              "description": "[filter/generator] Timeline seconds the effect ends (ignored for transitions)."
+            },
+            "duration_sec": {
+              "type": "number",
+              "description": "[transition] Overlap length in seconds (default 0.8, at most half the shorter clip)."
+            },
+            "easing": {
+              "type": "string",
+              "description": "[transition] Easing of progress (default linear), e.g. ease_in_out."
+            },
+            "output": {
+              "type": "string",
+              "enum": [
+                "add",
+                "normal",
+                "replace"
+              ],
+              "description": "Override the manifest output mode."
+            },
+            "intensity": {
+              "type": "number",
+              "description": "c.intensity for the layer (default 1)."
+            },
+            "opacity": {
+              "type": "number",
+              "description": "Layer opacity 0..1 (default 1)."
+            }
+          },
+          "required": [
+            "project_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Apply shader effect",
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "delete_shader_effect": {
+        "description": "Delete a saved ShaderFX effect from your library. Layers that already use it keep their own copy of the shader.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "effect_id": {
+              "type": "string",
+              "description": "Effect id to delete."
+            },
+            "project_id": {
+              "type": "string",
+              "description": "Optional project context."
+            }
+          },
+          "required": [
+            "effect_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Delete shader effect",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
       "check_job_status": {
         "description": "Poll an export / async job by jobId (numeric). Supports wait:true to block until terminal.",
         "inputSchema": {
@@ -549,13 +1001,13 @@
         }
       },
       "check_task_status": {
-        "description": "Poll a queued edit task by taskId (returned by queue_edit). Separate from job_id (exports).",
+        "description": "Poll a queued edit task by taskId (returned by queue_edit), or a direct tool call that answered status \"running\" (taskId \"dc_…\" from execute_action / execute_batch / render_preview: waits up to ~25 s for it, and its result is that call's full response once status is completed / failed). Direct calls already wait for their own result, so you rarely need this. Separate from job_id (exports).",
         "inputSchema": {
           "type": "object",
           "properties": {
             "task_id": {
               "type": "string",
-              "description": "Task id from queue_edit."
+              "description": "Task id from queue_edit, or a \"dc_…\" id from a direct call still running."
             }
           },
           "required": [
@@ -1320,12 +1772,16 @@
         }
       },
       "get_project": {
-        "description": "Fetch one project by id.",
+        "description": "Fetch one project's record by id (name, revision, dates) with a short layer index (id, type, role, name, start_time, end_time). The full scene JSON is several MB: pass include_scene: true only if you really need it. To read the edit, execute_action timeline_view is the compact whole-timeline view.",
         "inputSchema": {
           "type": "object",
           "properties": {
             "project_id": {
               "type": "string"
+            },
+            "include_scene": {
+              "type": "boolean",
+              "description": "true returns the full scene JSON (several MB) instead of the layer index."
             }
           },
           "required": [
@@ -1779,7 +2235,7 @@
         }
       },
       "search_tools": {
-        "description": "Search all 195 canonical video editing actions, 28 read/inspection tools, AND canonical preset catalogs (216 caption templates, 368 GPU VFX effects, 168 transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook.",
+        "description": "Search every directly callable editing action, the read/inspection tools, AND preset catalogs (216 caption templates, 368 GPU VFX effects, 168 transitions, color LUTs, title cards, fonts, blend modes) by keyword, category, or catalog filter. With a query, matching actions come back WITH their parameter specs (required params end in \"*\"), so you usually do not need get_action_schema. Also returns the editorialPlaybook (fastest call pattern + NLE order). Call once with no query to see the whole surface.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1810,7 +2266,23 @@
             },
             "limit": {
               "type": "number",
-              "description": "Max items to return (default 50)."
+              "description": "Max actions to return (default: all matches; preset catalogs default to 50)."
+            },
+            "include_schemas": {
+              "type": "boolean",
+              "description": "Force parameter specs on (true) or off (false). Default: on when 25 or fewer actions match."
+            },
+            "offset": {
+              "type": "number",
+              "description": "Page through a long result: pass the nextOffset a previous answer returned (answers stay under ~10k tokens)."
+            },
+            "detail": {
+              "type": "string",
+              "enum": [
+                "summary",
+                "full"
+              ],
+              "description": "\"summary\" (default): one-line descriptions. \"full\": full action descriptions (pages sooner)."
             }
           },
           "required": []
@@ -1862,11 +2334,44 @@
             "action": {
               "type": "string",
               "description": "Canonical action name or read tool name."
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Several action names at once (up to 40) — one round trip instead of many. They share one answer budget (~10k tokens): small schemas come whole, larger ones summarised (listed in `compacted`; schemaDetail.paramsOmitted names the rest)."
+            },
+            "params": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "description": "Only these parameters, in full (nested schemas, every enum value): [\"name\", ...], or { \"ACTION\": [\"name\", ...] } per action with actions: [...]. Use it for the parameters a summarised schema lists in schemaDetail.paramsOmitted."
+            },
+            "detail": {
+              "type": "string",
+              "enum": [
+                "summary",
+                "full"
+              ],
+              "description": "\"summary\" (default): a very large schema is compacted to stay under ~10k tokens. \"full\": the whole schema as stored (CREATE_LAYER / UPDATE_LAYER are 200-380 KB)."
             }
           },
-          "required": [
-            "action"
-          ]
+          "required": []
         },
         "outputSchema": {
           "type": "object",
@@ -1908,7 +2413,7 @@
         }
       },
       "execute_action": {
-        "description": "Execute any single canonical editor action (all 195 actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project.",
+        "description": "Execute any single canonical editor action (all 195 actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed. Parameters are checked before anything runs (INVALID_PARAMS lists every problem with suggestions); dry_run: true checks without running. For several edits use execute_batch.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1942,6 +2447,22 @@
             "include_scene": {
               "type": "boolean",
               "description": "If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers)."
+            },
+            "idempotency_key": {
+              "type": "string",
+              "description": "Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered \"running\" is deduplicated even without one)."
+            },
+            "rerun": {
+              "type": "boolean",
+              "description": "true runs an identical call again on purpose instead of returning the earlier answer."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "description": "true: check every step's parameters against its schema (unknown names, enum values, types, ranges) in under a second and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it."
+            },
+            "allow_unknown_params": {
+              "type": "boolean",
+              "description": "true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs."
             }
           },
           "required": [
@@ -1989,7 +2510,7 @@
         }
       },
       "execute_batch": {
-        "description": "Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs safe-zone checks, timeline reconciliation, layout de-stacking, async asset completion, and commits the updated scene to project_id.",
+        "description": "Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. Pro path for any edit that picks or reorders content (shorts, highlights, recuts): 1) seed once (video_url / assets; reuse the returned project_id on every later call) and read source_map — the WHOLE source in one reply (timed sentence lines per ~1-min section + measured loudness, pauses, speaker turns, shots), not page one of the transcript; 2) PLAN_EDITORIAL_CUT — a story plan: hook with a specific promise in the first 3 s, setup, a payoff that resolves the hook, ending (optionally HOOK_CANDIDATES to rank rendered openings); 3) ASSEMBLE_PICTURE_EDIT from that plan; 4) finishing batch (reframe, captions, B-roll via bin_search inserts so cutaways show the words being said, music + AUTO_DUCK, SFX, grade) — send it with dry_run: true first, then the same batch without it; 5) VERIFY_EDIT depth \"editorial\" — a critic that watches and hears the render and returns fixes for hook, payoff, arc, pacing, B-roll fit, captions, mix; apply them; 6) EXPORT_VIDEO (its polish gate fixes safe craft issues and returns a polish report). Surgical tweaks (one caption colour, one trim) skip straight to the batch. History: UNDO / REDO step one version; restore_version { revision } or { label } jumps to a saved version or checkpoint (undoable, no confirmation); name versions with checkpoint { label }; try alternatives with fork_variant / compare_variants / promote_variant (pass variant beside project_id to edit a variant). The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true), and any parameter an action does not take or a value outside its enum / type / range (INVALID_PARAMS), rejects it before anything runs, listing every problem with did-you-mean suggestions; declared aliases are corrected and reported in corrected_params. Exact names: get_action_schema (several actions in one call). Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called. Answers stay under ~10k tokens: a long read output in a batch is paged (its receipt names the start / offset that continues) and replyBudget lists anything shortened. query_transcript returns timed sentence lines (detail: \"words\" for per-word times); timeline_view is compact on a busy timeline (detail: \"full\" for every field).",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -2033,6 +2554,29 @@
             "include_scene": {
               "type": "boolean",
               "description": "If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers)."
+            },
+            "idempotency_key": {
+              "type": "string",
+              "description": "Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered \"running\" is deduplicated even without one)."
+            },
+            "rerun": {
+              "type": "boolean",
+              "description": "true runs an identical call again on purpose instead of returning the earlier answer."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "description": "true: check every step's parameters against its schema (unknown names, enum values, types, ranges) in under a second and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it."
+            },
+            "allow_unknown_params": {
+              "type": "boolean",
+              "description": "true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs."
+            },
+            "allow_partial": {
+              "description": "false (default): atomic. true: commit every step that succeeded. \"until_failure\": commit the steps before the first failure."
+            },
+            "confirm_destructive": {
+              "type": "boolean",
+              "description": "Required true for destructive actions (CLEAR, DELETE_LAYER on many layers, …)."
             }
           },
           "required": [
@@ -2160,13 +2704,17 @@
         }
       },
       "search_skills": {
-        "description": "Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category.",
+        "description": "Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category. Your own saved skills (save_skill) are listed first with source \"user\"; mine: true lists only yours.",
         "inputSchema": {
           "type": "object",
           "properties": {
             "query": {
               "type": "string",
               "description": "Search keyword (e.g. \"color\", \"caption\", \"podcast\", \"montage\", \"motion\")."
+            },
+            "mine": {
+              "type": "boolean",
+              "description": "Only your own saved skills (save_skill)."
             },
             "category": {
               "type": "string",
@@ -2332,6 +2880,131 @@
             "assistant"
           ]
         }
+      },
+      "save_skill": {
+        "description": "Save (or update) one of your own SKILL.md playbooks on your Levea account, so the editor edits the way you do: your house style, a client's rules, how you pace and caption. It is kept as \"user/<slug>\" and works like a built-in skill: search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` — or on every edit when its frontmatter says apply: always. Frontmatter: name, description, tags, categories, actions (canonical action names), apply: always, and the style edits default to where the request sets none: brand_id, caption_template, style_reference_url. Pass skill_md (the text) or, with the local npx server, path (a SKILL.md file or the folder holding it; its text files such as references/*.md are uploaded as resources). Limits: 50 skills, 48k-character playbook, 12 resources / 128k characters.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "skill_md": {
+              "type": "string",
+              "description": "The whole SKILL.md: YAML frontmatter (name, description, …) then the playbook in markdown."
+            },
+            "path": {
+              "type": "string",
+              "description": "Local npx server only: path to a SKILL.md file, or to the folder that holds SKILL.md (its other text files are uploaded as resources)."
+            },
+            "resources": {
+              "type": "object",
+              "description": "Bundled text files, { \"references/look.md\": \"…\" }.",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "skill_id": {
+              "type": "string",
+              "description": "Slug to save under (default: the frontmatter name)."
+            },
+            "apply_by_default": {
+              "type": "boolean",
+              "description": "Apply this skill to every autonomous_edit you run (overrides frontmatter apply)."
+            }
+          },
+          "required": []
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Save your own skill",
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
+      },
+      "delete_skill": {
+        "description": "Delete one of your own saved skills (\"user/<slug>\").",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "skill_id": {
+              "type": "string",
+              "description": "The skill to delete (\"user/<slug>\")."
+            }
+          },
+          "required": [
+            "skill_id"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "export_url": {
+              "type": "string",
+              "description": "Direct URL to finished MP4 render"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Asynchronous job ID"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of actions executed"
+            },
+            "result": {
+              "type": "object",
+              "description": "Execution outcome payload"
+            },
+            "error": {
+              "type": "string",
+              "description": "Error message if failed"
+            }
+          }
+        },
+        "annotations": {
+          "title": "Delete your own skill",
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false,
+          "audience": [
+            "user",
+            "assistant"
+          ]
+        }
       }
     }
   },
@@ -2349,12 +3022,28 @@
       "description": "Fire-and-forget async path. Returns immediately with a `taskId`. Use when the edit may exceed the MCP request timeout (long viral-clip generation, multi-format export). Poll with check_task_status or get_active_task."
     },
     {
+      "name": "create_shader_effect",
+      "description": "Save a reusable ShaderFX (ABI v2 / v3) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv (0..1 canvas, top-left), px, res (render-target px), time = local_time (seconds since the effect layer started), progress (transition: 0→1 across the overlap; else time / layer length), intensity, frame (v3) }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …; float → f32, vec2/vec3 → vec2/vec3<f32>, color → vec4<f32>, bool → f32 0/1). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns effect_id and the param table (name, type, slot, accessor). overwrite: true replaces your effect of the same name. Source ≤ 24 KB (v3: 48 KB); keep loops bounded. v3 (auto when used): textures, feedback, multi-pass, data, geometry (instanced particles / sprites). Full contract + worked examples: load_skill shaderfx-effects."
+    },
+    {
+      "name": "list_shader_effects",
+      "description": "List the ShaderFX effects in your library (id, name, description, kind, output, params). Pass an id to apply_shader_effect."
+    },
+    {
+      "name": "apply_shader_effect",
+      "description": "Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind (optional: request, else manifest, else inferred from the layer ids) \"filter\": target_layer_id = the layer whose picture src() reads (omit = everything composited below); window = start_time/end_time, else the target's, else the whole timeline. \"transition\": from_layer_id (clip A) + to_layer_id (clip B); progress runs 0→1 across their overlap. Clips meeting at a cut get a duration_sec overlap (default 0.8 s) laid on media handles, program length unchanged; SHADER_FX_NO_HANDLES if neither clip has media beyond the cut (overlap them first or shorten duration_sec). \"generator\": paints on its own. params = values by manifest name; param_keyframes animates them. v3 inputs: textures, feedback, data / data_url, geometry. Then check with render_preview before export."
+    },
+    {
+      "name": "delete_shader_effect",
+      "description": "Delete a saved ShaderFX effect from your library. Layers that already use it keep their own copy of the shader."
+    },
+    {
       "name": "check_job_status",
       "description": "Poll an export / async job by jobId (numeric). Supports wait:true to block until terminal."
     },
     {
       "name": "check_task_status",
-      "description": "Poll a queued edit task by taskId (returned by queue_edit). Separate from job_id (exports)."
+      "description": "Poll a queued edit task by taskId (returned by queue_edit), or a direct tool call that answered status \"running\" (taskId \"dc_…\" from execute_action / execute_batch / render_preview: waits up to ~25 s for it, and its result is that call's full response once status is completed / failed). Direct calls already wait for their own result, so you rarely need this. Separate from job_id (exports)."
     },
     {
       "name": "get_active_task",
@@ -2406,7 +3095,7 @@
     },
     {
       "name": "get_project",
-      "description": "Fetch one project by id."
+      "description": "Fetch one project's record by id (name, revision, dates) with a short layer index (id, type, role, name, start_time, end_time). The full scene JSON is several MB: pass include_scene: true only if you really need it. To read the edit, execute_action timeline_view is the compact whole-timeline view."
     },
     {
       "name": "create_project",
@@ -2430,7 +3119,7 @@
     },
     {
       "name": "transcribe_asset",
-      "description": "Transcribe an existing asset. Returns a compact summary + sentence lines with times by default; detail \"words\" pages word-level timing."
+      "description": "Transcribe an existing asset (cached after the first call). By default returns a compact answer: language, duration_sec, word_count, speakers, transcript_id and one page of sentence lines \"[start s–end s] [speaker] text\" in source seconds. detail \"words\" returns words with only text / start / end / speaker, paged with offset / limit; detail \"full\" returns the raw transcription record (very large)."
     },
     {
       "name": "editor_health",
@@ -2438,7 +3127,7 @@
     },
     {
       "name": "search_tools",
-      "description": "Search all 195 canonical video editing actions, 28 read/inspection tools, AND canonical preset catalogs (216 caption templates, 368 GPU VFX effects, 168 transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook."
+      "description": "Search every directly callable editing action, the read/inspection tools, AND preset catalogs (216 caption templates, 368 GPU VFX effects, 168 transitions, color LUTs, title cards, fonts, blend modes) by keyword, category, or catalog filter. With a query, matching actions come back WITH their parameter specs (required params end in \"*\"), so you usually do not need get_action_schema. Also returns the editorialPlaybook (fastest call pattern + NLE order). Call once with no query to see the whole surface."
     },
     {
       "name": "get_action_schema",
@@ -2446,11 +3135,11 @@
     },
     {
       "name": "execute_action",
-      "description": "Execute any single canonical editor action (all 195 actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project."
+      "description": "Execute any single canonical editor action (all 195 actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed. Parameters are checked before anything runs (INVALID_PARAMS lists every problem with suggestions); dry_run: true checks without running. For several edits use execute_batch."
     },
     {
       "name": "execute_batch",
-      "description": "Execute an ordered array of canonical actions (and/or read tools) in a single atomic round-trip without autonomous_edit. Automatically runs safe-zone checks, timeline reconciliation, layout de-stacking, async asset completion, and commits the updated scene to project_id."
+      "description": "Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. Pro path for any edit that picks or reorders content (shorts, highlights, recuts): 1) seed once (video_url / assets; reuse the returned project_id on every later call) and read source_map — the WHOLE source in one reply (timed sentence lines per ~1-min section + measured loudness, pauses, speaker turns, shots), not page one of the transcript; 2) PLAN_EDITORIAL_CUT — a story plan: hook with a specific promise in the first 3 s, setup, a payoff that resolves the hook, ending (optionally HOOK_CANDIDATES to rank rendered openings); 3) ASSEMBLE_PICTURE_EDIT from that plan; 4) finishing batch (reframe, captions, B-roll via bin_search inserts so cutaways show the words being said, music + AUTO_DUCK, SFX, grade) — send it with dry_run: true first, then the same batch without it; 5) VERIFY_EDIT depth \"editorial\" — a critic that watches and hears the render and returns fixes for hook, payoff, arc, pacing, B-roll fit, captions, mix; apply them; 6) EXPORT_VIDEO (its polish gate fixes safe craft issues and returns a polish report). Surgical tweaks (one caption colour, one trim) skip straight to the batch. History: UNDO / REDO step one version; restore_version { revision } or { label } jumps to a saved version or checkpoint (undoable, no confirmation); name versions with checkpoint { label }; try alternatives with fork_variant / compare_variants / promote_variant (pass variant beside project_id to edit a variant). The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true), and any parameter an action does not take or a value outside its enum / type / range (INVALID_PARAMS), rejects it before anything runs, listing every problem with did-you-mean suggestions; declared aliases are corrected and reported in corrected_params. Exact names: get_action_schema (several actions in one call). Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called. Answers stay under ~10k tokens: a long read output in a batch is paged (its receipt names the start / offset that continues) and replyBudget lists anything shortened. query_transcript returns timed sentence lines (detail: \"words\" for per-word times); timeline_view is compact on a busy timeline (detail: \"full\" for every field)."
     },
     {
       "name": "render_preview",
@@ -2458,7 +3147,7 @@
     },
     {
       "name": "search_skills",
-      "description": "Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category."
+      "description": "Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category. Your own saved skills (save_skill) are listed first with source \"user\"; mine: true lists only yours."
     },
     {
       "name": "load_skill",
@@ -2467,6 +3156,14 @@
     {
       "name": "read_skill_resource",
       "description": "Read a bundled reference or template file (e.g. \"references/...\" or \"templates/...\") belonging to a production skill."
+    },
+    {
+      "name": "save_skill",
+      "description": "Save (or update) one of your own SKILL.md playbooks on your Levea account, so the editor edits the way you do: your house style, a client's rules, how you pace and caption. It is kept as \"user/<slug>\" and works like a built-in skill: search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` — or on every edit when its frontmatter says apply: always. Frontmatter: name, description, tags, categories, actions (canonical action names), apply: always, and the style edits default to where the request sets none: brand_id, caption_template, style_reference_url. Pass skill_md (the text) or, with the local npx server, path (a SKILL.md file or the folder holding it; its text files such as references/*.md are uploaded as resources). Limits: 50 skills, 48k-character playbook, 12 resources / 128k characters."
+    },
+    {
+      "name": "delete_skill",
+      "description": "Delete one of your own saved skills (\"user/<slug>\")."
     }
   ],
   "homepage": "https://livecore.ai/",
