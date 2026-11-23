@@ -1,4 +1,3 @@
-import axios, { AxiosError, AxiosInstance } from 'axios';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
@@ -10,11 +9,19 @@ import { randomUUID } from 'crypto';
  *
  * Pass-through only. All endpoints live under `/api/v1/misc/openclaw/v1/*`
  * (API-key auth). The MCP tool surface here mirrors what the route exposes.
+ *
+ * Dependency-free on purpose (node:http/https with shared keep-alive agents):
+ * the published package installs nothing, so `npx -y levea-mcp-server`
+ * starts well inside MCP clients' connect timeouts.
  */
 
 /** Backend edit request body, built from the edit contract (editContract.buildEditBody). */
 export type EditRequestBody = Record<string, unknown>;
 
+/**
+ * An edit's result: the backend's own reply (every field it sent), with
+ * success / message / videoUrl normalised and the project id always present.
+ */
 export interface ExecuteResult {
   success: boolean;
   message?: string;
@@ -22,9 +29,14 @@ export interface ExecuteResult {
   videoUrl?: string;
   jobId?: number | string;
   status?: string;
+  type?: string;
+  projectId?: string;
+  project_id?: string;
   workingMemory?: Record<string, unknown>;
   reply?: string;
-  raw?: unknown;
+  /** Only on a "still running" result (kept small: { type, status, projectId, project_id }). */
+  raw?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface JobStatus {
@@ -45,6 +57,9 @@ export interface JobStatus {
   verificationReport?: unknown;
   deliverySampledDecode?: unknown;
 }
+
+/** Called while a long call waits: one short human-readable line per poll / heartbeat. */
+export type ProgressFn = (message: string) => void;
 
 /** The report fields a job poll carries for a direct export (backend: TaskResultResolver.directExportReplyFields). */
 const JOB_REPORT_FIELDS = ['polish', 'deliverableWarnings', 'exportCallSteps', 'verificationReport', 'deliverySampledDecode'] as const;
@@ -68,6 +83,8 @@ function envMs(name: string, fallback: number): number {
 const DEFAULT_TIMEOUT_MS = envMs('LEVEA_REQUEST_TIMEOUT_MS', 300_000);
 /** The SSE variant reports progress while it waits, so it can wait longer than a plain request. */
 const STREAM_TIMEOUT_MS = envMs('LEVEA_STREAM_TIMEOUT_MS', 1_800_000);
+/** How often a long wait without its own events reports progress. */
+const PROGRESS_INTERVAL_MS = 15_000;
 const DEFAULT_LEVEA_API_URL = 'https://api.livecore.ai';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const MCP_CLIENT_VERSION: string = (require('../package.json') as { version: string }).version;
@@ -142,6 +159,104 @@ function v1(path: string): string {
   return `${baseRoot()}/v1${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// HTTP: one shared keep-alive agent per protocol (the hosted endpoint loops
+// many calls back to the same API host; a fresh TLS handshake per call is
+// wasted latency). Auth headers are per request, never on the agent.
+// ───────────────────────────────────────────────────────────────────────────
+
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 64 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 64 });
+
+interface HttpResponse {
+  status: number;
+  data: Record<string, unknown>;
+  headers: http.IncomingHttpHeaders;
+}
+
+interface RequestOpts {
+  body?: unknown;
+  params?: Record<string, string | undefined>;
+  signal?: AbortSignal;
+  /** Idle (socket inactivity) timeout. */
+  timeoutMs?: number;
+  /** Send the caller's API key (default true). */
+  auth?: boolean;
+}
+
+class RequestError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+    if (code === 'ABORT_ERR') this.name = 'AbortError';
+  }
+}
+
+function parseBody(text: string): Record<string, unknown> {
+  const t = text.trim();
+  if (!t) return {};
+  if (t.startsWith('{') || t.startsWith('[')) {
+    try {
+      const v = JSON.parse(t);
+      return v && typeof v === 'object' && !Array.isArray(v) ? v : { data: v };
+    } catch { /* not JSON */ }
+  }
+  return { message: t.length > 2000 ? `${t.slice(0, 2000)}…` : t };
+}
+
+/** One HTTP request. Resolves for any status; rejects on network errors, idle timeout, or abort. */
+function request(method: string, url: string, opts: RequestOpts = {}): Promise<HttpResponse> {
+  // Built before any socket or timer exists: a missing key rejects cleanly.
+  const headers: Record<string, string | number> = {
+    Accept: 'application/json',
+    'X-Levea-Client': clientHeader(),
+  };
+  if (opts.auth !== false) headers.Authorization = `Bearer ${apiKey()}`;
+  const u = new URL(url);
+  for (const [k, v] of Object.entries(opts.params || {})) if (v !== undefined) u.searchParams.set(k, v);
+  const payload = opts.body === undefined ? undefined : JSON.stringify(opts.body);
+  if (payload !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    headers['Content-Length'] = Buffer.byteLength(payload);
+  }
+  const isHttps = u.protocol === 'https:';
+  const transport = isHttps ? https : http;
+  return new Promise<HttpResponse>((resolve, reject) => {
+    if (opts.signal?.aborted) { reject(new RequestError('The request was aborted', 'ABORT_ERR')); return; }
+    let done = false;
+    let req: http.ClientRequest | undefined;
+    const onAbort = () => fail(new RequestError('The request was aborted', 'ABORT_ERR'));
+    function fail(err: Error) {
+      if (done) return;
+      done = true;
+      opts.signal?.removeEventListener('abort', onAbort);
+      req?.destroy();
+      reject(err);
+    }
+    req = transport.request(
+      u,
+      { method, headers, agent: isHttps ? httpsAgent : httpAgent },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('error', (e) => fail(e));
+        res.on('end', () => {
+          if (done) return;
+          done = true;
+          opts.signal?.removeEventListener('abort', onAbort);
+          resolve({ status: res.statusCode || 0, data: parseBody(Buffer.concat(chunks).toString('utf8')), headers: res.headers });
+        });
+      },
+    );
+    req.setTimeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, () => fail(new RequestError(`timeout after ${opts.timeoutMs ?? DEFAULT_TIMEOUT_MS} ms`, 'ETIMEDOUT')));
+    req.on('error', (e) => fail(e));
+    opts.signal?.addEventListener('abort', onAbort, { once: true });
+    if (payload !== undefined) req.write(payload);
+    req.end();
+  });
+}
+
 /** Telemetry is on unless LEVEA_TELEMETRY is off / false / 0. */
 function telemetryEnabled(): boolean {
   const v = String(process.env.LEVEA_TELEMETRY ?? '').trim().toLowerCase();
@@ -154,11 +269,11 @@ function sendMcpFunnelTelemetry(event: string, hasApiKey: boolean): void {
   if (process.env.VITEST || process.env.NODE_ENV === 'test' || !telemetryEnabled()) return;
   try {
     const telemetryUrl = `${baseRoot()}-keys/telemetry`;
-    void axios.post(
-      telemetryUrl,
-      { event, client: 'levea-mcp-server', version: MCP_CLIENT_VERSION, hasApiKey },
-      { timeout: 3000, validateStatus: () => true },
-    ).catch(() => {});
+    void request('POST', telemetryUrl, {
+      body: { event, client: 'levea-mcp-server', version: MCP_CLIENT_VERSION, hasApiKey },
+      timeoutMs: 3000,
+      auth: false,
+    }).catch(() => {});
   } catch {
     // Non-blocking telemetry
   }
@@ -180,35 +295,87 @@ function apiKey(): string {
     sendMcpFunnelTelemetry('auth_missing_local', false);
     throw new Error(
       'LEVEA_API_KEY is required. Generate a free API key in 1 click at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-server&utm_medium=missing-key&utm_campaign=levea-mcp-server ' +
-        'and set LEVEA_API_KEY in your MCP client env / mcpServers config.'
+        'and set LEVEA_API_KEY in your MCP client env / mcpServers config. (Or connect to the hosted endpoint https://api.livecore.ai/api/v1/misc/mcp, which signs in with OAuth and needs no key.)'
     );
   }
   return key;
 }
 
-function http2(): AxiosInstance {
-  return axios.create({
-    headers: {
-      Authorization: `Bearer ${apiKey()}`,
-      'Content-Type': 'application/json',
-      'X-Levea-Client': clientHeader(),
-    },
-    timeout: DEFAULT_TIMEOUT_MS,
-    validateStatus: (s) => s < 500,
-  });
+function authRejected(label: string, code: number): Error {
+  const scoped = Boolean(requestConfig.getStore());
+  return new Error(
+    `${label} failed: authentication rejected (HTTP ${code}). ` +
+      (scoped
+        ? 'Your Levea credential was refused: reconnect / sign in again, or send a fresh key generated at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-hosted&utm_medium=auth-failed&utm_campaign=levea-mcp-server . '
+        : 'LEVEA_API_KEY is invalid or revoked: regenerate a key at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-server&utm_medium=auth-failed&utm_campaign=levea-mcp-server and update your MCP client config. ') +
+      'Do not retry with the same key.'
+  );
 }
 
-function describeError(err: unknown, label: string): never {
-  const e = err as AxiosError<{ message?: string; error?: string }>;
-  const upstream = e.response?.data?.error || e.response?.data?.message || e.message;
-  const code = e.response?.status;
-  if (code === 401 || code === 403) {
-    throw new Error(
-      `${label} failed: authentication rejected (HTTP ${code}). ` +
-        `Check LEVEA_API_KEY — generate a fresh key at https://livecore.ai/?openclaw=1&utm_source=levea-mcp-server&utm_medium=auth-failed&utm_campaign=levea-mcp-server .`
-    );
+function upstreamMessage(d: Record<string, unknown>, status: number): string {
+  const e = d.error;
+  if (typeof e === 'string' && e) return e;
+  if (e && typeof e === 'object' && typeof (e as { message?: unknown }).message === 'string') return (e as { message: string }).message;
+  if (typeof d.message === 'string' && d.message) return d.message;
+  return `HTTP ${status}`;
+}
+
+function isAbort(err: unknown): boolean {
+  const e = err as { code?: string; name?: string };
+  return e?.code === 'ABORT_ERR' || e?.name === 'AbortError';
+}
+
+/**
+ * A backend call with Levea's error rules:
+ *  - 401 / 403 → the "regenerate your key, do not retry" error (thrown);
+ *  - 5xx / network error → retried once with backoff when `retry` (read-only
+ *    and poll calls only — never a mutating execute), else thrown;
+ *  - any other status is returned for the caller to read.
+ */
+async function call(
+  label: string,
+  method: string,
+  path: string,
+  opts: RequestOpts & { retry?: boolean } = {},
+): Promise<HttpResponse> {
+  const attempts = opts.retry ? 2 : 1;
+  for (let attempt = 1; ; attempt++) {
+    let res: HttpResponse;
+    try {
+      res = await request(method, v1(path), opts);
+    } catch (err) {
+      // Only transport failures (they carry a system code) are retried; a missing key or an abort is final.
+      const transient = typeof (err as { code?: unknown })?.code === 'string' && !isAbort(err);
+      if (!transient || attempt >= attempts || opts.signal?.aborted) {
+        throw new Error(`${label} failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      await sleep(1000 + Math.random() * 1000, opts.signal);
+      continue;
+    }
+    if (res.status === 401 || res.status === 403) throw authRejected(label, res.status);
+    if (res.status >= 500) {
+      if (attempt < attempts && !opts.signal?.aborted) { await sleep(1000 + Math.random() * 1000, opts.signal); continue; }
+      throw new Error(`${label} failed (HTTP ${res.status}): ${upstreamMessage(res.data, res.status)}`);
+    }
+    return res;
   }
-  throw new Error(`${label} failed${code ? ` (HTTP ${code})` : ''}: ${upstream}`);
+}
+
+/**
+ * The JSON body of a management call. A 4xx is a failure even when the body
+ * does not say success:false (so the tool result is an MCP error).
+ */
+async function callJson(
+  label: string,
+  method: string,
+  path: string,
+  opts: RequestOpts & { retry?: boolean } = {},
+): Promise<Record<string, unknown>> {
+  const res = await call(label, method, path, opts);
+  if (res.status >= 400) {
+    return { ...res.data, success: false, httpStatus: res.status, error: upstreamMessage(res.data, res.status) };
+  }
+  return res.data;
 }
 
 function withProjectId(body: EditRequestBody): EditRequestBody {
@@ -230,18 +397,15 @@ function exportedVideoUrl(d: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function flattenResult(d: Record<string, unknown>): ExecuteResult {
-  return {
-    success: d.success !== false,
-    message: (d.message as string | undefined) ?? (d.reply as string | undefined),
-    data: d.data,
-    videoUrl: exportedVideoUrl(d),
-    jobId: d.jobId as string | number | undefined,
-    status: d.status as string | undefined,
-    workingMemory: d.workingMemory as Record<string, unknown> | undefined,
-    reply: d.reply as string | undefined,
-    raw: d,
-  };
+/** The backend's reply as-is (no duplicate copy), with the normalised fields set. */
+function flattenResult(d: Record<string, unknown>, projectId?: unknown): ExecuteResult {
+  const out: ExecuteResult = { ...d, success: d.success !== false };
+  const message = (d.message as string | undefined) ?? (d.reply as string | undefined);
+  if (message !== undefined) out.message = message;
+  const videoUrl = exportedVideoUrl(d);
+  if (videoUrl) out.videoUrl = videoUrl;
+  if (typeof projectId === 'string' && projectId && !d.projectId && !d.project_id) out.projectId = projectId;
+  return out;
 }
 
 /**
@@ -255,6 +419,9 @@ function stillRunning(body: EditRequestBody, waitedMs: number): ExecuteResult {
   return {
     success: false,
     status: 'running',
+    type: 'still_running',
+    projectId,
+    project_id: projectId,
     message:
       `The edit is still running on Levea after ${minutes} min (full edits with motion graphics and export can take 10-20 minutes). ` +
       `Call get_active_task with project_id "${projectId}" to follow it; once no task is active, get_project returns the finished edit.`,
@@ -262,11 +429,14 @@ function stillRunning(body: EditRequestBody, waitedMs: number): ExecuteResult {
   };
 }
 
-function isTimeout(err: unknown): boolean {
-  const e = err as { code?: string; name?: string; message?: string };
-  return e?.code === 'ECONNABORTED' || e?.code === 'ETIMEDOUT' || e?.code === 'ERR_CANCELED'
-    || e?.name === 'CanceledError' || e?.name === 'TimeoutError' || e?.name === 'AbortError'
-    || String(e?.message || '').toLowerCase().includes('timeout');
+function cancelled(projectId: unknown): ExecuteResult {
+  return {
+    success: false,
+    status: 'cancelled',
+    type: 'cancelled',
+    message: 'Cancelled by the client; the edit may still be running on Levea.',
+    ...(typeof projectId === 'string' && projectId ? { projectId, project_id: projectId } : {}),
+  };
 }
 
 /**
@@ -289,39 +459,53 @@ function callSignal(limitMs: number, hostSignal?: AbortSignal) {
   };
 }
 
+/** The first progress line of an edit: names the project so a client that stops waiting can follow it. */
+function editStartedMessage(projectId: unknown): string {
+  return `Edit started on project_id "${String(projectId)}". It can take 10-20 minutes; if your client stops waiting, call get_active_task { project_id: "${String(projectId)}" } (never re-send the edit).`;
+}
+
+/** Progress every PROGRESS_INTERVAL_MS while a single long request is open. */
+function progressTicker(onProgress: ProgressFn | undefined, line: (elapsedSec: number) => string): () => void {
+  if (!onProgress) return () => undefined;
+  const t0 = Date.now();
+  const timer = setInterval(() => {
+    try { onProgress(line(Math.round((Date.now() - t0) / 1000))); } catch { /* ignore */ }
+  }, PROGRESS_INTERVAL_MS);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
+
+function emit(onProgress: ProgressFn | undefined, message: string): void {
+  if (!onProgress) return;
+  try { onProgress(message); } catch { /* ignore consumer errors */ }
+}
+
 /** Execute autonomous_edit (or any allowed tool) — single JSON response. */
-export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal): Promise<ExecuteResult> {
+export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal, onProgress?: ProgressFn): Promise<ExecuteResult> {
+  apiKey(); // a missing key fails before anything starts (no "edit started" progress)
   const body = withProjectId(edit);
   // A wall-clock limit: the backend keeps a long edit's response alive with
-  // keep-alive bytes, so axios's own (idle) timeout never fires.
-  const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
+  // keep-alive bytes, so the socket idle timeout never fires.
+  const call_ = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
+  emit(onProgress, editStartedMessage(body.projectId));
+  const stopTicker = progressTicker(onProgress, (s) => `Still editing project_id "${String(body.projectId)}" (${s} s elapsed).`);
   try {
-    const res = await http2().post(v1('/execute'), body, { signal: call.signal });
-    const d = (res.data || {}) as Record<string, unknown>;
+    const res = await call(`execute(${String(body.tool || 'autonomous_edit')})`, 'POST', '/execute', { body, signal: call_.signal });
+    const d = res.data;
     if (res.status >= 400) {
-      const msg = (d.error as string) || (d.message as string) || `HTTP ${res.status}`;
-      return { success: false, message: msg, status: 'error', raw: d };
+      return { ...d, success: false, status: 'error', httpStatus: res.status, message: upstreamMessage(d, res.status), projectId: String(body.projectId) };
     }
-    return flattenResult(d);
+    return flattenResult(d, body.projectId);
   } catch (err) {
-    if (call.timedOut()) return stillRunning(body, DEFAULT_TIMEOUT_MS);
-    if (hostSignal?.aborted) return { success: false, status: 'cancelled', message: 'Cancelled by the client; the edit may still be running on Levea.', raw: { type: 'cancelled', projectId: body.projectId } };
-    return describeError(err, `execute(${String(body.tool || 'autonomous_edit')})`);
+    if (call_.timedOut()) return stillRunning(body, DEFAULT_TIMEOUT_MS);
+    if (hostSignal?.aborted) return cancelled(body.projectId);
+    throw err;
   } finally {
-    call.dispose();
+    stopTicker();
+    call_.dispose();
   }
 }
 
-/**
- * Run a universal canonical tool (search_tools, get_action_schema, execute_action,
- * execute_batch, render_preview, or any canonical action / read tool) via
- * /v1/execute without invoking the autonomous_edit planner.
- *
- * The backend echoes the whole edited scene; unless `params.include_scene === true`
- * it is dropped here (the caller gets `liveLayers` + `layerCount` and can read
- * the full scene with `get_project`) so multi-step edits do not flood the
- * calling model's context window.
- */
 /** Longest server-requested wait the client sits through before retrying a rate-limited call once. */
 const RATE_LIMIT_MAX_WAIT_SEC = 65;
 
@@ -337,8 +521,10 @@ function rateLimitWaitSec(res: { status: number; data?: unknown; headers?: Recor
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise(resolve => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+    if (signal?.aborted) { resolve(); return; }
+    const onAbort = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -365,6 +551,13 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
+/** "step 2 of 5 (COLOR_GRADE)" from a running direct call's progressDetail, else ''. */
+function stepWhere(d: Record<string, unknown>): string {
+  const pd = d.progressDetail as { stepsDone?: number; stepsTotal?: number; currentAction?: string } | undefined;
+  if (!pd || !pd.stepsTotal) return '';
+  return `, step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}`;
+}
+
 /**
  * Long-poll a running direct call (GET /task-status/:id?wait=true blocks up to
  * 25 s server-side) until it finishes or this request's own deadline. Returns
@@ -373,27 +566,31 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
  * wait — it is never run twice). null when the call was not running.
  */
 async function waitForDirectCall(
+  tool: string,
   first: Record<string, unknown>,
   signal: AbortSignal,
+  onProgress?: ProgressFn,
 ): Promise<{ data: Record<string, unknown>; httpStatus?: number; waitedSec: number } | null> {
   const taskId = runningTaskId(first);
   if (!taskId) return null;
   const t0 = Date.now();
   let data = first;
+  const pid = first.projectId ?? first.project_id;
   const done = (d: Record<string, unknown>, httpStatus?: number) => ({ data: d, httpStatus, waitedSec: Math.round((Date.now() - t0) / 1000) });
+  emit(onProgress, `${tool} is running on Levea (task ${taskId}${pid ? `, project_id "${String(pid)}"` : ''}); waiting for its result.`);
   while (!signal.aborted) {
     const pollStart = Date.now();
-    let st: { status: number; data: unknown };
+    let st: HttpResponse;
     try {
-      st = await http2().get(v1(`/task-status/${encodeURIComponent(taskId)}`), { params: { wait: 'true' }, signal });
+      st = await call(`check(${taskId})`, 'GET', `/task-status/${encodeURIComponent(taskId)}`, { params: { wait: 'true' }, signal });
     } catch {
       if (signal.aborted) break;
       await sleep(5_000, signal);
       continue;
     }
-    const s = (st.data || {}) as Record<string, any>;
+    const s = st.data as Record<string, any>;
     if (st.status >= 400) break; // unknown to this key / refused: hand back the 202 as it was
-    if (st.status < 400 && s.status && s.status !== 'running') {
+    if (s.status && s.status !== 'running') {
       // The call's own full response once finished. Anything else (a job's
       // clip list) is never spread over the reply: it stays under `result`.
       if (isPlainObject(s.result)) {
@@ -410,11 +607,10 @@ async function waitForDirectCall(
         message: s.message,
       });
     }
-    if (st.status < 400) {
-      // Still running: keep the live progress so a deadline answer says where it is.
-      const { result: _r, frames: _f, mcpContent: _m, ...live } = s;
-      data = { ...data, ...live, status: 'running', success: false, taskId };
-    }
+    // Still running: keep the live progress so a deadline answer says where it is.
+    const { result: _r, frames: _f, mcpContent: _m, ...live } = s;
+    data = { ...data, ...live, status: 'running', success: false, taskId };
+    emit(onProgress, `${tool} still running (task ${taskId}, ${Math.round((Date.now() - t0) / 1000)} s${stepWhere(data)}).`);
     // The server long-polls ~25 s; if it answered at once (older server), back off.
     if (Date.now() - pollStart < 3_000) await sleep(Math.min(15, Math.max(3, Number(data.retryAfterSec) || 5)) * 1000, signal);
   }
@@ -475,15 +671,30 @@ function withExportJob(reply: Record<string, unknown>, job: JobStatus): Record<s
   };
 }
 
+/** Direct tools that only read: a 5xx / network failure is retried once. */
+const READ_ONLY_DIRECT_TOOLS: ReadonlySet<string> = new Set(['search_tools', 'get_action_schema', 'search_skills', 'load_skill', 'read_skill_resource']);
+
+/**
+ * Run a universal canonical tool (search_tools, get_action_schema, execute_action,
+ * execute_batch, render_preview, or any canonical action / read tool) via
+ * /v1/execute without invoking the autonomous_edit planner.
+ *
+ * The backend echoes the whole edited scene; unless `params.include_scene === true`
+ * it is dropped here (the caller gets `liveLayers` + `layerCount` and can read
+ * the full scene with `get_project`) so multi-step edits do not flood the
+ * calling model's context window.
+ */
 export async function executeDeterministicTool(
   tool: string,
   projectId: string | undefined,
   params: Record<string, unknown>,
   hostSignal?: AbortSignal,
+  onProgress?: ProgressFn,
 ): Promise<unknown> {
-  const call = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
+  const call_ = callSignal(DEFAULT_TIMEOUT_MS, hostSignal);
   const callStart = Date.now();
   const resolvedProjectId = projectId || (typeof params?.project_id === 'string' && params.project_id.trim() ? params.project_id.trim() : undefined);
+  const label = `execute(${tool})`;
   try {
     const body = {
       tool,
@@ -491,22 +702,24 @@ export async function executeDeterministicTool(
       ...(resolvedProjectId ? { projectId: resolvedProjectId, project_id: resolvedProjectId } : {}),
       ...(params?.scene !== undefined ? { scene: params.scene } : {}),
     };
-    let res = await http2().post(v1('/execute'), body, { signal: call.signal });
+    const retry = READ_ONLY_DIRECT_TOOLS.has(tool);
+    let res = await call(label, 'POST', '/execute', { body, signal: call_.signal, retry });
     // Rate limited: the server refunded the request and ran nothing, so one
     // retry after its retryAfter (short waits only) is safe and spares the
     // agent a failed step it would otherwise resend at once.
     const waitSec = rateLimitWaitSec(res);
-    if (waitSec !== null && !call.signal.aborted) {
-      await sleep(waitSec * 1000, call.signal);
-      res = await http2().post(v1('/execute'), body, { signal: call.signal });
+    if (waitSec !== null && !call_.signal.aborted) {
+      emit(onProgress, `${tool} rate-limited; retrying in ${Math.round(waitSec)} s.`);
+      await sleep(waitSec * 1000, call_.signal);
+      res = await call(label, 'POST', '/execute', { body, signal: call_.signal, retry });
     }
-    let d = (res.data || {}) as Record<string, unknown>;
+    let d = res.data;
     let httpStatus = res.status;
     // A long call answers 202 { status: "running", taskId: "dc_…" } and keeps
     // running on Levea. Wait for it here instead of handing the agent a
     // "still running" it would resend in a loop: one tool call returns the
     // call's own full response.
-    const waited = await waitForDirectCall(d, call.signal);
+    const waited = await waitForDirectCall(tool, { ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}), ...d }, call_.signal, onProgress);
     if (waited) { d = waited.data; httpStatus = waited.httpStatus ?? httpStatus; }
     const { scene, ...rest } = d;
     const layers = (scene as { layers?: unknown } | undefined)?.layers;
@@ -523,19 +736,22 @@ export async function executeDeterministicTool(
     // verificationReport, stepReceipts) are kept; the job never replaces them.
     if (httpStatus < 400 && exportStillRendering(out)) {
       const left = callStart + DEFAULT_TIMEOUT_MS - Date.now() - EXPORT_WAIT_MARGIN_MS;
-      if (left > 0 && !call.signal.aborted) {
-        const job = await waitForJob(String(out.jobId), { timeoutMs: left });
+      if (left > 0 && !call_.signal.aborted) {
+        const job = await waitForJob(String(out.jobId), { timeoutMs: left, signal: call_.signal, onProgress });
         Object.assign(out, withExportJob(out, job));
       }
     }
-    if (httpStatus >= 400 && out.success === undefined) out.success = false;
-    if (httpStatus >= 400) out.httpStatus = httpStatus;
+    if (httpStatus >= 400) {
+      out.success = false;
+      out.httpStatus = httpStatus;
+      if (out.error === undefined) out.error = upstreamMessage(d, httpStatus);
+    }
     return out;
   } catch (err) {
     if (hostSignal?.aborted) return { success: false, status: 'cancelled', error: `Cancelled by the client; ${tool} may still have been applied.`, ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}) };
-    return describeError(err, `execute(${tool})`);
+    throw err;
   } finally {
-    call.dispose();
+    call_.dispose();
   }
 }
 
@@ -558,101 +774,118 @@ export async function executeStreaming(
   edit: EditRequestBody,
   onEvent: (ev: SSEEvent) => void,
   hostSignal?: AbortSignal,
+  onProgress?: ProgressFn,
 ): Promise<ExecuteResult> {
   const editBody = withProjectId(edit);
   const body = JSON.stringify(editBody);
   const url = new URL(v1('/execute'));
   const isHttps = url.protocol === 'https:';
   const transport = isHttps ? https : http;
+  // Everything that can throw (a missing key) runs before any timer or socket exists.
+  const headers = {
+    Authorization: `Bearer ${apiKey()}`,
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+    'X-Levea-Client': clientHeader(),
+    'Content-Length': Buffer.byteLength(body),
+  };
+  emit(onProgress, editStartedMessage(editBody.projectId));
   return new Promise<ExecuteResult>((resolve, reject) => {
     let settled = false;
     let final: ExecuteResult | null = null;
     let grace: ReturnType<typeof setTimeout> | null = null;
+    let req: http.ClientRequest | undefined;
     // A wall-clock limit: the backend's 15 s heartbeats keep the stream busy,
     // so an idle timeout never fires during a long edit. Stopping the wait does
     // not stop the edit: it keeps running on Levea.
     const wall = setTimeout(() => finish(final ?? stillRunning(editBody, STREAM_TIMEOUT_MS)), STREAM_TIMEOUT_MS);
-    const onHostAbort = () => finish({ success: false, status: 'cancelled', message: 'Cancelled by the client; the edit may still be running on Levea.', raw: { type: 'cancelled', projectId: editBody.projectId } });
+    const onHostAbort = () => finish(cancelled(editBody.projectId));
     function finish(result: ExecuteResult | Error): void {
       if (settled) return;
       settled = true;
       clearTimeout(wall);
       if (grace) clearTimeout(grace);
       hostSignal?.removeEventListener('abort', onHostAbort);
-      req.destroy();
+      req?.destroy();
       if (result instanceof Error) reject(result);
       else resolve(result);
     }
-    const req = transport.request(
-      {
-        method: 'POST',
-        hostname: url.hostname,
-        port: url.port || (isHttps ? 443 : 80),
-        path: url.pathname + url.search,
-        headers: {
-          Authorization: `Bearer ${apiKey()}`,
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          'X-Levea-Client': clientHeader(),
-          'Content-Length': Buffer.byteLength(body),
+    try {
+      req = transport.request(
+        {
+          method: 'POST',
+          hostname: url.hostname,
+          port: url.port || (isHttps ? 443 : 80),
+          path: url.pathname + url.search,
+          headers,
         },
-      },
-      (res) => {
-        if (res.statusCode === 401 || res.statusCode === 403) {
-          finish(new Error(`Streaming auth rejected (HTTP ${res.statusCode}). Check LEVEA_API_KEY.`));
-          return;
-        }
-        if (res.statusCode && res.statusCode >= 400) {
-          finish(new Error(`Streaming HTTP ${res.statusCode}`));
-          return;
-        }
-        let buffer = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk: string) => {
-          // SSE messages are delimited by blank lines; accept CRLF line endings too.
-          buffer = (buffer + chunk).split('\r\n').join('\n');
-          let idx: number;
-          while ((idx = buffer.indexOf('\n\n')) !== -1) {
-            const raw = buffer.slice(0, idx);
-            buffer = buffer.slice(idx + 2);
-            const parsed = parseSSEMessage(raw);
-            if (!parsed) continue;
-            try { onEvent(parsed); } catch (_e) { /* ignore consumer errors */ }
-            const data = typeof parsed.data === 'object' ? parsed.data : { reply: parsed.data };
-            const ev = String(parsed.event || (data as Record<string, unknown>).type || '');
-            if (!TERMINAL_STREAM_EVENTS.has(ev)) continue;
-            if (ev === 'error') {
-              // Error events carry no success:false; they are failures.
-              const d = data as Record<string, unknown>;
-              finish({ ...flattenResult(d), success: false, status: 'error', message: (d.message as string) || (d.error as string) || 'The edit failed.' });
-              return;
+        (res) => {
+          if (res.statusCode === 401 || res.statusCode === 403) {
+            res.resume();
+            finish(authRejected('autonomous_edit_streaming', res.statusCode));
+            return;
+          }
+          if (res.statusCode && res.statusCode >= 400) {
+            const chunks: Buffer[] = [];
+            res.on('data', (c: Buffer) => chunks.push(c));
+            res.on('end', () => {
+              const d = parseBody(Buffer.concat(chunks).toString('utf8'));
+              finish({ ...d, success: false, status: 'error', httpStatus: res.statusCode, message: upstreamMessage(d, res.statusCode || 0), projectId: String(editBody.projectId) });
+            });
+            res.on('error', (e) => finish(e));
+            return;
+          }
+          let buffer = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => {
+            // SSE messages are delimited by blank lines; accept CRLF line endings too.
+            buffer = (buffer + chunk).split('\r\n').join('\n');
+            let idx: number;
+            while ((idx = buffer.indexOf('\n\n')) !== -1) {
+              const raw = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + 2);
+              const parsed = parseSSEMessage(raw);
+              if (!parsed) continue;
+              try { onEvent(parsed); } catch (_e) { /* ignore consumer errors */ }
+              const data = typeof parsed.data === 'object' ? parsed.data : { reply: parsed.data };
+              const ev = String(parsed.event || (data as Record<string, unknown>).type || '');
+              if (!TERMINAL_STREAM_EVENTS.has(ev)) continue;
+              if (ev === 'error') {
+                // Error events carry no success:false; they are failures.
+                const d = data as Record<string, unknown>;
+                const msg = (typeof d.message === 'string' && d.message) || (typeof d.error === 'string' && d.error) || 'The edit failed.';
+                finish({ ...flattenResult(d, editBody.projectId), success: false, status: 'error', message: msg });
+                return;
+              }
+              final = flattenResult(data as Record<string, unknown>, editBody.projectId);
+              // The backend may still send its closing payload; do not wait forever.
+              if (!grace) grace = setTimeout(() => finish(final as ExecuteResult), AFTER_TERMINAL_GRACE_MS);
             }
-            final = flattenResult(data as Record<string, unknown>);
-            // The backend may still send its closing payload; do not wait forever.
-            if (!grace) grace = setTimeout(() => finish(final as ExecuteResult), AFTER_TERMINAL_GRACE_MS);
-          }
-        });
-        res.on('end', () => {
-          // The closing payload is a bare JSON object after the last event.
-          const rest = buffer.trim();
-          if (rest.startsWith('{')) {
-            try {
-              finish(flattenResult(JSON.parse(rest) as Record<string, unknown>));
-              return;
-            } catch (_e) { /* not JSON: fall through */ }
-          }
-          finish(final ?? { success: false, message: 'Stream ended without a terminal event', status: 'incomplete' });
-        });
-        res.on('error', (e) => finish(e));
+          });
+          res.on('end', () => {
+            // The closing payload is a bare JSON object after the last event.
+            const rest = buffer.trim();
+            if (rest.startsWith('{')) {
+              try {
+                finish(flattenResult(JSON.parse(rest) as Record<string, unknown>, editBody.projectId));
+                return;
+              } catch (_e) { /* not JSON: fall through */ }
+            }
+            finish(final ?? { success: false, message: 'Stream ended without a terminal event', status: 'incomplete', projectId: String(editBody.projectId) });
+          });
+          res.on('error', (e) => finish(e));
+        }
+      );
+      req.on('error', (e) => finish(e));
+      if (hostSignal) {
+        if (hostSignal.aborted) { onHostAbort(); return; }
+        hostSignal.addEventListener('abort', onHostAbort, { once: true });
       }
-    );
-    req.on('error', (e) => finish(e));
-    if (hostSignal) {
-      if (hostSignal.aborted) { onHostAbort(); return; }
-      hostSignal.addEventListener('abort', onHostAbort, { once: true });
+      req.write(body);
+      req.end();
+    } catch (err) {
+      finish(err instanceof Error ? err : new Error(String(err)));
     }
-    req.write(body);
-    req.end();
   });
 }
 
@@ -678,39 +911,35 @@ function parseSSEMessage(raw: string): SSEEvent | null {
 }
 
 /** Poll one async job. */
-export async function getJobStatus(jobId: string): Promise<JobStatus> {
-  try {
-    const res = await http2().get(v1(`/jobs/${encodeURIComponent(jobId)}`));
-    const d = (res.data || {}) as Record<string, unknown>;
-    if (res.status === 404) {
-      return { success: false, jobId, status: 'not_found', progress: 0, message: 'Job not found' };
-    }
-    if (res.status >= 400) {
-      // A 4xx (revoked key, rate limit, …) is final for this poll: 'error' ends waitForJob.
-      return { success: false, jobId, status: 'error', progress: 0, message: (d.error as string) || (d.message as string) || `HTTP ${res.status}` };
-    }
-    return {
-      success: d.success !== false,
-      jobId: (d.jobId as string) || jobId,
-      status: (d.status as string) || 'unknown',
-      progress: (d.progress as number) || 0,
-      message: (d.message as string) || '',
-      result: d.result,
-      videoUrl: exportedVideoUrl(d),
-      error: (d.error as string | null) ?? null,
-      createdAt: d.createdAt as string | undefined,
-      updatedAt: d.updatedAt as string | undefined,
-      ...jobReportFields(d),
-    };
-  } catch (err) {
-    return describeError(err, `getJobStatus(${jobId})`);
+export async function getJobStatus(jobId: string, signal?: AbortSignal): Promise<JobStatus> {
+  const res = await call(`getJobStatus(${jobId})`, 'GET', `/jobs/${encodeURIComponent(jobId)}`, { signal, retry: true });
+  const d = res.data;
+  if (res.status === 404) {
+    return { success: false, jobId, status: 'not_found', progress: 0, message: 'Job not found' };
   }
+  if (res.status >= 400) {
+    // A 4xx (rate limit, …) is final for this poll: 'error' ends waitForJob.
+    return { success: false, jobId, status: 'error', progress: 0, message: upstreamMessage(d, res.status) };
+  }
+  return {
+    success: d.success !== false,
+    jobId: (d.jobId as string) || jobId,
+    status: (d.status as string) || 'unknown',
+    progress: (d.progress as number) || 0,
+    message: (d.message as string) || '',
+    result: d.result,
+    videoUrl: exportedVideoUrl(d),
+    error: (d.error as string | null) ?? null,
+    createdAt: d.createdAt as string | undefined,
+    updatedAt: d.updatedAt as string | undefined,
+    ...jobReportFields(d),
+  };
 }
 
-/** Block until a job reaches a terminal state or the deadline passes. */
+/** Block until a job reaches a terminal state, the deadline passes, or the signal aborts. */
 export async function waitForJob(
   jobId: string,
-  opts: { timeoutMs?: number; pollMs?: number } = {}
+  opts: { timeoutMs?: number; pollMs?: number; signal?: AbortSignal; onProgress?: ProgressFn } = {}
 ): Promise<JobStatus> {
   const timeoutMs = opts.timeoutMs ?? 600_000;
   const pollMs = opts.pollMs ?? 4_000;
@@ -719,13 +948,16 @@ export async function waitForJob(
     'completed', 'complete', 'succeeded', 'success',
     'failed', 'error', 'cancelled', 'canceled', 'not_found',
   ]);
-  let last = await getJobStatus(jobId);
+  let last = await getJobStatus(jobId, opts.signal);
   while (!terminal.has(last.status.toLowerCase())) {
+    emit(opts.onProgress, `job ${last.jobId}: ${last.status} (${last.progress}%)${last.message ? ` ${last.message}` : ''}`);
+    if (opts.signal?.aborted) return { ...last, message: `${last.message} (stopped waiting: cancelled)` };
     if (Date.now() > deadline) {
       return { ...last, message: `${last.message} (poll timed out)` };
     }
-    await new Promise((r) => setTimeout(r, pollMs));
-    last = await getJobStatus(jobId);
+    await sleep(pollMs, opts.signal);
+    if (opts.signal?.aborted) return { ...last, message: `${last.message} (stopped waiting: cancelled)` };
+    last = await getJobStatus(jobId, opts.signal);
   }
   return last;
 }
@@ -733,220 +965,95 @@ export async function waitForJob(
 /** Unauthenticated health probe. */
 export async function health(): Promise<{ ok: boolean; detail: string }> {
   try {
-    const res = await axios.get(v1('/health'), { timeout: 15_000 });
+    const res = await request('GET', v1('/health'), { timeoutMs: 15_000, auth: false });
     const status = (res.data as { status?: string })?.status;
     return { ok: status === 'healthy', detail: JSON.stringify(res.data) };
   } catch (err) {
-    const e = err as AxiosError;
-    return { ok: false, detail: e.message };
+    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Caption templates  (already exposed under /openclaw/v1/caption-templates)
+// Caption templates  (/openclaw/v1/caption-templates)
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function listCaptionTemplates(): Promise<unknown> {
-  try {
-    const res = await http2().get(v1('/caption-templates'));
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'listCaptionTemplates');
-  }
-}
+export const listCaptionTemplates = (): Promise<unknown> =>
+  callJson('listCaptionTemplates', 'GET', '/caption-templates', { retry: true });
 
-export async function saveCaptionTemplate(template: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/caption-templates'), template);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'saveCaptionTemplate');
-  }
-}
+export const saveCaptionTemplate = (template: Record<string, unknown>): Promise<unknown> =>
+  callJson('saveCaptionTemplate', 'POST', '/caption-templates', { body: template });
 
-export async function saveCurrentCaptionTemplate(body: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/caption-templates/save-current'), body);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'saveCurrentCaptionTemplate');
-  }
-}
+export const saveCurrentCaptionTemplate = (body: Record<string, unknown>): Promise<unknown> =>
+  callJson('saveCurrentCaptionTemplate', 'POST', '/caption-templates/save-current', { body });
 
-export async function applyCaptionTemplate(body: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/caption-templates/apply'), body);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'applyCaptionTemplate');
-  }
-}
+export const applyCaptionTemplate = (body: Record<string, unknown>): Promise<unknown> =>
+  callJson('applyCaptionTemplate', 'POST', '/caption-templates/apply', { body });
 
-export async function deleteCaptionTemplate(templateId: string): Promise<unknown> {
-  try {
-    const res = await http2().delete(v1(`/caption-templates/${encodeURIComponent(templateId)}`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `deleteCaptionTemplate(${templateId})`);
-  }
-}
+export const deleteCaptionTemplate = (templateId: string): Promise<unknown> =>
+  callJson(`deleteCaptionTemplate(${templateId})`, 'DELETE', `/caption-templates/${encodeURIComponent(templateId)}`);
 
 // ───────────────────────────────────────────────────────────────────────────
-// Queue / task status  (already exposed)
+// Queue / task status
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function queueEdit(edit: EditRequestBody): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/queue-edit'), withProjectId(edit));
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'queueEdit');
-  }
-}
+export const queueEdit = (edit: EditRequestBody): Promise<unknown> =>
+  callJson('queueEdit', 'POST', '/queue-edit', { body: withProjectId(edit) });
 
-export async function getTaskStatus(taskId: string, wait = false): Promise<unknown> {
-  try {
-    const res = await http2().get(v1(`/task-status/${encodeURIComponent(taskId)}`), wait ? { params: { wait: 'true' } } : undefined);
-    return res.data;
-  } catch (err) {
-    return describeError(err, `getTaskStatus(${taskId})`);
-  }
-}
+export const getTaskStatus = (taskId: string, wait = false, signal?: AbortSignal): Promise<unknown> =>
+  callJson(`getTaskStatus(${taskId})`, 'GET', `/task-status/${encodeURIComponent(taskId)}`, {
+    ...(wait ? { params: { wait: 'true' } } : {}),
+    signal,
+    retry: true,
+  });
 
-export async function getActiveTask(projectId: string): Promise<unknown> {
-  try {
-    const res = await http2().get(v1(`/projects/${encodeURIComponent(projectId)}/active-task`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `getActiveTask(${projectId})`);
-  }
-}
+export const getActiveTask = (projectId: string): Promise<unknown> =>
+  callJson(`getActiveTask(${projectId})`, 'GET', `/projects/${encodeURIComponent(projectId)}/active-task`, { retry: true });
 
 // ───────────────────────────────────────────────────────────────────────────
-// Brand kits  (requires backend to expose /openclaw/v1/brands/*)
+// Brand kits  (/openclaw/v1/brands/*)
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function listBrandKits(): Promise<unknown> {
-  try {
-    const res = await http2().get(v1('/brands'));
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'listBrandKits');
-  }
-}
+export const listBrandKits = (): Promise<unknown> => callJson('listBrandKits', 'GET', '/brands', { retry: true });
 
-export async function getBrandKit(id: string): Promise<unknown> {
-  try {
-    const res = await http2().get(v1(`/brands/${encodeURIComponent(id)}`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `getBrandKit(${id})`);
-  }
-}
+export const getBrandKit = (id: string): Promise<unknown> =>
+  callJson(`getBrandKit(${id})`, 'GET', `/brands/${encodeURIComponent(id)}`, { retry: true });
 
-export async function createBrandKit(brand: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/brands'), brand);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'createBrandKit');
-  }
-}
+export const createBrandKit = (brand: Record<string, unknown>): Promise<unknown> =>
+  callJson('createBrandKit', 'POST', '/brands', { body: brand });
 
-export async function updateBrandKit(id: string, brand: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().put(v1(`/brands/${encodeURIComponent(id)}`), brand);
-    return res.data;
-  } catch (err) {
-    return describeError(err, `updateBrandKit(${id})`);
-  }
-}
+export const updateBrandKit = (id: string, brand: Record<string, unknown>): Promise<unknown> =>
+  callJson(`updateBrandKit(${id})`, 'PUT', `/brands/${encodeURIComponent(id)}`, { body: brand });
 
-export async function deleteBrandKit(id: string): Promise<unknown> {
-  try {
-    const res = await http2().delete(v1(`/brands/${encodeURIComponent(id)}`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `deleteBrandKit(${id})`);
-  }
-}
+export const deleteBrandKit = (id: string): Promise<unknown> =>
+  callJson(`deleteBrandKit(${id})`, 'DELETE', `/brands/${encodeURIComponent(id)}`);
 
 // ───────────────────────────────────────────────────────────────────────────
-// Projects  (requires backend to expose /openclaw/v1/projects/*)
+// Projects  (/openclaw/v1/projects/*)
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function listProjects(): Promise<unknown> {
-  try {
-    const res = await http2().get(v1('/projects'));
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'listProjects');
-  }
-}
+export const listProjects = (): Promise<unknown> => callJson('listProjects', 'GET', '/projects', { retry: true });
 
-export async function getProject(id: string): Promise<unknown> {
-  try {
-    const res = await http2().get(v1(`/projects/${encodeURIComponent(id)}`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `getProject(${id})`);
-  }
-}
+export const getProject = (id: string): Promise<unknown> =>
+  callJson(`getProject(${id})`, 'GET', `/projects/${encodeURIComponent(id)}`, { retry: true });
 
-export async function createProject(project: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/projects'), project);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'createProject');
-  }
-}
+export const createProject = (project: Record<string, unknown>): Promise<unknown> =>
+  callJson('createProject', 'POST', '/projects', { body: project });
 
-export async function deleteProject(id: string): Promise<unknown> {
-  try {
-    const res = await http2().delete(v1(`/projects/${encodeURIComponent(id)}`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `deleteProject(${id})`);
-  }
-}
+export const deleteProject = (id: string): Promise<unknown> =>
+  callJson(`deleteProject(${id})`, 'DELETE', `/projects/${encodeURIComponent(id)}`);
 
 // ───────────────────────────────────────────────────────────────────────────
-// Assets  (requires backend to expose /openclaw/v1/assets/*)
+// Assets  (/openclaw/v1/assets/*)
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function assetUploadUrl(body: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/assets/upload-url'), body);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'assetUploadUrl');
-  }
-}
+export const assetUploadUrl = (body: Record<string, unknown>): Promise<unknown> =>
+  callJson('assetUploadUrl', 'POST', '/assets/upload-url', { body });
 
-export async function listAssets(query?: Record<string, string>): Promise<unknown> {
-  try {
-    const res = await http2().get(v1('/assets/list'), { params: query });
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'listAssets');
-  }
-}
+export const listAssets = (query?: Record<string, string>): Promise<unknown> =>
+  callJson('listAssets', 'GET', '/assets/list', { params: query, retry: true });
 
-export async function deleteAsset(fileName: string): Promise<unknown> {
-  try {
-    const res = await http2().delete(v1(`/assets/${encodeURIComponent(fileName)}`));
-    return res.data;
-  } catch (err) {
-    return describeError(err, `deleteAsset(${fileName})`);
-  }
-}
+export const deleteAsset = (fileName: string): Promise<unknown> =>
+  callJson(`deleteAsset(${fileName})`, 'DELETE', `/assets/${encodeURIComponent(fileName)}`);
 
-export async function transcribeAsset(body: Record<string, unknown>): Promise<unknown> {
-  try {
-    const res = await http2().post(v1('/assets/transcribe'), body);
-    return res.data;
-  } catch (err) {
-    return describeError(err, 'transcribeAsset');
-  }
-}
+export const transcribeAsset = (body: Record<string, unknown>): Promise<unknown> =>
+  callJson('transcribeAsset', 'POST', '/assets/transcribe', { body });

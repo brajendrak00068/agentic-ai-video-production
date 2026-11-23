@@ -7,7 +7,6 @@
  * it safe behind a load balancer with any number of replicas.
  */
 import type { IncomingMessage, ServerResponse } from 'http';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createLeveaMcpServer } from './server';
 import { runWithLeveaConfig, type LeveaClientConfig } from './client';
 
@@ -17,6 +16,8 @@ export async function handleLeveaMcpHttpRequest(
   parsedBody: unknown,
   config: LeveaClientConfig
 ): Promise<void> {
+  // Loaded on first use: the stdio binary never needs the HTTP transport.
+  const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
   await runWithLeveaConfig(config, async () => {
     const server = createLeveaMcpServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
