@@ -1,6 +1,6 @@
 ---
 name: motion-tracking-stabilization
-description: "Stabilize shaky video (optical-flow warp stabilizer), solve 3D camera tracker anchors, track 2D regions/points with rotation and scale, and attach graphics or props to moving hands and objects."
+description: "Stabilize shaky video (non-destructive stabilizer (smoothed camera path, border-hiding zoom, rolling-shutter correction)), solve 3D camera tracker anchors, track 2D regions/points with rotation and scale, and attach graphics or props to moving hands and objects."
 version: 1.0.2
 author: brajendrak00068
 license: MIT

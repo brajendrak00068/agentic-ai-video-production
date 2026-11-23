@@ -1,6 +1,6 @@
 ---
 name: levea-video-editing
-description: "AI video editor and autonomous editing agent for TikTok, Reels, YouTube Shorts, and podcasts (levea_video_edit + 195 canonical actions). Use when the user wants to edit a video, cut silences, add 280+ animated captions or subtitles, reframe 16:9 to 9:16 vertical, insert B-roll, motion graphics, VFX, color grading, voiceover, or export MP4."
+description: "AI video editor and autonomous editing agent for TikTok, Reels, YouTube Shorts, and podcasts (levea_video_edit + 195 canonical actions). Use when the user wants to edit a video, cut silences, add 216 animated captions or subtitles, reframe 16:9 to 9:16 vertical, insert B-roll, motion graphics, VFX, color grading, voiceover, or export MP4."
 version: 1.0.1
 author: brajendrak00068
 license: MIT
@@ -16,7 +16,7 @@ Levea supports two editing modes plus on-demand craft skills:
 ## When to use
 
 - Trimming, cutting, 9:16 vertical reframing, viral clips from long videos.
-- Captions (caption templates such as `hormozi`, `viral-pop`, `karaoke`, `subtitle-bar`, and 280+ more; name the look in the prompt or pass `captionTemplatePreset`), titles, overlays, motion graphics.
+- Captions (caption templates such as `hormozi`, `viral-pop`, `karaoke`, `subtitle-bar`, and 216 more; name the look in the prompt or pass `captionTemplatePreset`), titles, overlays, motion graphics.
 - B-roll, multicam podcast sync, audio cleanup, music, voiceover, color grading.
 - Exporting the verified timeline to MP4.
 

@@ -157,7 +157,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'apply_transition',
     description:
-      'Deterministic edit: apply a named transition between two adjacent clips, committed immediately (the same operation as the editor\'s transition picker). type is one of ~170 names, e.g. fade, cross_dissolve, dip_to_black, slide_left, push_left, wipe_left, zoom_in, whip_pan, light_leak, glitch, zoom_blur, page_curl, crt_power_off. An unknown name is rejected with the reason. Both layer ids must exist in the project. object_match_cut and parallax_occlusion need face tracking and are refused here — ask autonomous_edit for those.',
+      'Deterministic edit: apply a named transition between two adjacent clips, committed immediately (the same operation as the editor\'s transition picker). type is one of 168 names, e.g. fade, cross_dissolve, dip_to_black, slide_left, push_left, wipe_left, zoom_in, whip_pan, light_leak, glitch, zoom_blur, page_curl, crt_power_off. An unknown name is rejected with the reason. Both layer ids must exist in the project. object_match_cut and parallax_occlusion need face tracking and are refused here — ask autonomous_edit for those.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -547,7 +547,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'search_tools',
     description:
-      'Search every directly callable editing action, the read/inspection tools, AND preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, color LUTs, title cards, fonts, blend modes) by keyword, category, or catalog filter. With a query, matching actions come back WITH their parameter specs (required params end in "*"), so you usually do not need get_action_schema. Also returns the editorialPlaybook (fastest call pattern + NLE order). Call once with no query to see the whole surface.',
+      'Search every directly callable editing action, the read/inspection tools, AND preset catalogs (216 caption templates, 368 GPU VFX effects, 168 transitions, color LUTs, title cards, fonts, blend modes) by keyword, category, or catalog filter. With a query, matching actions come back WITH their parameter specs (required params end in "*"), so you usually do not need get_action_schema. Also returns the editorialPlaybook (fastest call pattern + NLE order). Call once with no query to see the whole surface.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -555,7 +555,7 @@ const TOOL_DEFS: Tool[] = [
         catalog: {
           type: 'string',
           enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes', 'properties', 'animatable'],
-          description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
+          description: 'Optional catalog filter: "captions" (216 caption templates), "vfx" (368 GPU effects), "transitions" (168 transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
         },
         category: { type: 'string', description: 'Optional domain/category filter.' },
         limit: { type: 'number', description: 'Max actions to return (default: all matches; preset catalogs default to 50).' },

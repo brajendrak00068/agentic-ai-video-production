@@ -35,7 +35,7 @@ The surface supports **two complementary execution modes** plus typed management
 | `update_layer` | Shortcut: set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`, …) |
 | `delete_layer` | Shortcut: delete one or more layers; `close_gap: true` ripples the timeline closed |
 | `trim_layer` | Shortcut: shorten a layer (`edge` + `seconds`, or `start_time` + `end_time`) |
-| `apply_transition` | Shortcut: put a named transition (~170 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
+| `apply_transition` | Shortcut: put a named transition (168 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
 
 ### ShaderFX — your own GPU effects (4)
 
@@ -58,7 +58,7 @@ Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that re
 
 ### Caption templates (5)
 
-`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 280+ built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
+`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 216 built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
 
 ### Brand kits (5)
 

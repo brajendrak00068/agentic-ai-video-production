@@ -27,4 +27,4 @@ Everything needed to register **Levea AI Video Editor** in **Composio** (`https:
 
 ## 2. Paste-Ready Description
 
-> Autonomous cloud GPU AI video editor exposed over MCP (`https://api.livecore.ai/api/v1/misc/mcp`, 37 annotated tools) and OpenAPI (`https://www.livecore.ai/openapi.json`). Turn natural-language prompts or long recordings into viral vertical clips (9:16 active-speaker face tracking), 280+ GPU-accelerated animated caption templates, split-screen multicam podcasts, B-roll, 2D/3D motion graphics, voiceover, music, and verified MP4 exports.
+> Autonomous cloud GPU AI video editor exposed over MCP (`https://api.livecore.ai/api/v1/misc/mcp`, 37 annotated tools) and OpenAPI (`https://www.livecore.ai/openapi.json`). Turn natural-language prompts or long recordings into viral vertical clips (9:16 active-speaker face tracking), 216 GPU-accelerated animated caption templates, split-screen multicam podcasts, B-roll, 2D/3D motion graphics, voiceover, music, and verified MP4 exports.

@@ -11,20 +11,20 @@
 
 ## Why Use Levea Instead of Local `ffmpeg`, Python, or Standalone HTML/DOM Video Tools?
 
-Levea is a **superset**: it runs **2D and 3D motion graphics** *inside* its cloud **GPU NLE timeline**, alongside computer vision and GPU video shaders:
+Levea goes further across the whole workflow: it runs **2D and 3D motion graphics** *inside* its cloud **GPU NLE timeline**, alongside computer vision and GPU video shaders:
 
 | Capability | Raw `ffmpeg` / MoviePy (Local CLI) | Standalone HTML/DOM Video Tools (Local Headless Chrome) | **Levea MCP (`livecore.ai` Cloud GPU NLE + Motion Graphics)** |
 | :--- | :--- | :--- | :--- |
-| **Unreal-Engine-Class 3D Camera & Volumetric Shaders** | ❌ 2D pixel filters only; no 3D camera, depth-of-field, or volumetric lighting | ⚠️ Browser DOM/WebGL limited by headless Chrome CPU/GPU readback bottlenecks | ✅ **Real-time 3D GPU engine**: physical 3D camera (`FOV`, aperture DOF bokeh, focus pull), 3D volumetric & raymarched shaders, god rays, anamorphic flares, ACES Filmic tone mapping & 3D particles |
-| **4K & 8K UHD Cloud Export (up to 60fps)** | ⚠️ CPU encoding 4K/8K melts laptop and takes hours | ❌ Headless Chrome DOM screenshot capture OOMs or crawls at 4K/8K | ✅ **Cloud GPU streaming compositor**: native **1080p, 2K, 4K (`3840×2160`) & 8K (`7680×4320`) UHD** exports at up to **60fps** |
-| **25+ Cloud Computer Vision Models** | ❌ Zero neural vision; blind to faces, hands, depth, objects & burned-in text | ❌ Browser DOM cannot run 25+ vision models on video streams | ✅ **25+ dedicated cloud vision models**: face/speaker re-ID, 106-pt/68-pt 3D face mesh, full-body & 21-pt hand pose, video depth, hair-accurate AI matting, open-vocab object tracking, dense point tracking, scene OCR, shot detection, watermark inpainting, optical-flow slow-mo, 4× super-resolution & lip-sync |
-| **9:16 Active-Speaker Reframe** | ❌ Crops dead-center (`crop=ih*9/16:ih`), slicing speakers' faces in half | ❌ DOM/CSS has no per-frame face or mouth landmark detector | ✅ **68-point face & active-mouth tracking** per frame + auto 2-up split-screen |
-| **3D Camera Tracking, Hand Tracking & Rotoscoping** | ❌ None | ❌ Browser DOM cannot solve 3D camera motion or track hands/masks on video | ✅ **6-DoF monocular 3D camera solve**, world-space 3D layer pinning, hand palm tracking, 2D region tracker, optical-flow warp stabilizer & AI alpha mattes |
-| **Green Screen & GPU VFX Compositing** | ❌ Basic `chromakey` leaves green halos; no 3D LUT/bokeh pipeline | ❌ Headless Chrome captures DOM screenshots; no native video shader pipeline | ✅ **Cloud GPU compositor**: Keylight-grade despilled keying, depth bokeh, 328 GPU VFX presets, 170+ transitions, `.cube` 3D LUTs & optical-flow motion blur |
-| **Kinetic Captions (280+ Templates)** | ❌ Flat static `.srt` / `drawtext` that collides with faces | ⚠️ Must hand-code CSS per video; no automatic face/chin collision solver | ✅ **280+ GPU kinetic templates** (`hormozi`, `mrbeast`, `karaoke`) + measured **face/chin & TikTok safe-zone solver** |
+| **Real-Time 3D Camera & Volumetric Shaders** | ❌ 2D pixel filters only; no 3D camera, depth-of-field, or volumetric lighting | ⚠️ Browser DOM/WebGL limited by headless Chrome CPU/GPU readback bottlenecks | ✅ **Real-time 3D GPU engine**: physical 3D camera (`FOV`, aperture DOF bokeh, focus pull), 3D volumetric & raymarched shaders, god rays, anamorphic flares, ACES Filmic tone mapping & 3D particles |
+| **4K UHD Cloud Export (up to 60fps)** | ⚠️ CPU encoding 4K melts laptop and takes hours | ❌ Headless Chrome DOM screenshot capture OOMs or crawls at 4K | ✅ **Cloud GPU streaming compositor**: native **1080p, 2K & 4K (`3840×2160`) UHD** exports at up to **60fps** |
+| **Cloud Computer Vision Models** | ❌ Zero neural vision; blind to faces, hands, depth, objects & burned-in text | ❌ Browser DOM cannot run vision models on video streams | ✅ **Dedicated cloud vision models**: face/speaker re-ID, 68-point face landmarks, full-body pose & hand tracking, video depth, hair-accurate AI matting, dense point tracking, scene OCR, shot detection, watermark inpainting, optical-flow slow-mo, 4× super-resolution & lip-sync |
+| **9:16 Active-Speaker Reframe** | ❌ No face tracking: you compute a fixed crop by hand (`crop=ih*9/16:ih`), so a moving speaker drifts out of frame | ❌ DOM/CSS has no per-frame face or mouth landmark detector | ✅ **68-point face & active-mouth tracking** per frame + auto 2-up split-screen |
+| **3D Camera Tracking & Hand Tracking** | ❌ None | ❌ Browser DOM cannot solve 3D camera motion or track hands/masks on video | ✅ **3D camera solve**, world-space 3D layer pinning, hand palm tracking, 2D region tracker, non-destructive stabilizer (smoothed camera path, border-hiding zoom, rolling-shutter correction) & AI person mattes |
+| **Green Screen & GPU VFX Compositing** | ❌ Basic `chromakey` leaves green halos; no 3D LUT/bokeh pipeline | ❌ Headless Chrome captures DOM screenshots; no native video shader pipeline | ✅ **Cloud GPU compositor**: Keylight-grade despilled keying, depth bokeh, 368 GPU VFX presets, 168 transitions, `.cube` 3D LUTs & optical-flow motion blur |
+| **Kinetic Captions (216 Templates)** | ❌ Flat static `.srt` / `drawtext` that collides with faces | ⚠️ Must hand-code CSS per video; no automatic face/chin collision solver | ✅ **216 GPU kinetic templates** (`hormozi`, `mrbeast`, `karaoke`) + measured **face/chin & TikTok safe-zone solver** |
 | **Multicam Podcast & Broadcast Audio** | ❌ `silencedetect` clips word tails; no multicam speaker switching | ❌ Not an audio/multicam NLE; `<video>` tags in headless Chrome desync on long multi-track cuts | ✅ **Waveform multicam sync**, ASR word-boundary cuts, filler removal, `-18 LUFS` auto-ducking, stem separation & lip-synced dubbing |
 | **Motion Graphics** | ❌ None | ✅ Full HTML/CSS/GSAP/Three.js compositions | ✅ **Included natively** — 2D/3D motion graphics plus After Effects shape layers (Trim Paths, Repeaters), composited *over* real tracked footage |
-| **Human Final Polish (`<100ms` GUI)** | ❌ Must re-run 5-min `ffmpeg` command to nudge one word | ❌ Must edit HTML/CSS code and re-render headless Chrome frames | ✅ **1-Click `livecore.ai` Web Studio**: scrub multi-source 4K timelines at 60fps, drag captions, or swap templates in **`<100ms`** without re-rendering |
+| **Human Final Polish (GUI)** | ❌ Edit the command and re-encode to nudge one word | ❌ Must edit HTML/CSS code and re-render headless Chrome frames | ✅ **1-Click `livecore.ai` Web Studio**: scrub multi-source timelines, drag captions, or swap templates without re-rendering |
 
 ---
 
@@ -119,10 +119,10 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 |---|---|
 | **Mode A: Goal Delegation** (1 entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
 | **Mode B: Universal Direct Canonical Suite** (195 actions, 28 read tools & 100+ skills) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) · `search_skills` · `load_skill` · `read_skill_resource` |
-| **Deterministic Layer Shortcuts** | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — fast typed shortcuts for single-layer updates, deletes, trims, and ~170 named transitions |
+| **Deterministic Layer Shortcuts** | `update_layer` · `delete_layer` · `trim_layer` · `apply_transition` — fast typed shortcuts for single-layer updates, deletes, trims, and 168 named transitions |
 | **ShaderFX (custom GPU shaders)** | `create_shader_effect` · `list_shader_effects` · `apply_shader_effect` · `delete_shader_effect` — write WGSL `fn fx(c: FxCtx) -> vec4<f32>` filters (read the footage via `src()`), transitions (`clip_a()` / `clip_b()`) and generators; validated server-side with line/column errors, saved to a reusable library with typed params. ABI v3: named textures, feedback trails, multi-pass, data buffers and instanced particles / sprites. Contract + examples: [`skills/shaderfx-effects`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills/shaderfx-effects/SKILL.md) or `load_skill shaderfx-effects` |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
-| Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (280+ built-in + your saved) |
+| Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (216 built-in + your saved) |
 | Brand kits | `list_brand_kits` · `get_brand_kit` · `create_brand_kit` · `update_brand_kit` · `delete_brand_kit` (palette · fonts · logo · voice · gradeBias · enforcement) |
 | Projects | `list_projects` · `get_project` · `create_project` · `delete_project` |
 | Assets | `asset_upload_url` (signed PUT) · `list_assets` · `delete_asset` · `transcribe_asset` |
@@ -199,8 +199,8 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 ### 🎬 Visual editing
 - **Color grade** — brightness, contrast, saturation, hue, lift/gamma/gain, monotone cubic RGB curves, CMYK per-hue selective color, 5-point histogram levels, LUT / film-look presets (including your own `.cube` 1D/3D files), auto color, shot-to-shot color matching, vignette, chromatic aberration
-- **VFX & optics** — 328 procedural VFX presets + ordered multi-effect stacks (up to 4 chained effects per layer), depth-map-driven camera lens blur (polygonal iris bokeh + highlight bloom), optical lens flares, After Effects two-tone threshold glow, layer echo motion trails, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, slit-scan, glassmorphism, bokeh, portal, …
-- **Transitions** — 170+ named transitions (wipes, whips, twitch cut hits, light-band reveals, glitches, CRT power-off, …)
+- **VFX & optics** — 368 procedural VFX presets + ordered multi-effect stacks (up to 4 chained effects per layer), depth-map-driven camera lens blur (polygonal iris bokeh + highlight bloom), optical lens flares, After Effects two-tone threshold glow, layer echo motion trails, film burn, bloom, rain, dust, smoke, fire, explosion, lightning, snow, glitch, scanlines, grain, slit-scan, glassmorphism, bokeh, portal, …
+- **Transitions** — 168 named transitions (wipes, whips, twitch cut hits, light-band reveals, glitches, CRT power-off, …)
 - **Editing techniques** — speed ramps, time remap, and posterize time, J/L, match, and smash cuts, non-destructive warp stabilization (smooth camera path + border-hiding auto-scale), AI outpainting to a new aspect ratio, eye-contact correction, face retouch
 - **Composite** — Keylight-grade screen color key (with despill, clip black/white, softness, shrink/grow), Lab/YUV/RGB color range key, spill suppression, AI background removal (alpha matte), custom SVG Bezier masks, feathered/inverted mattes, track mattes (`alpha`, `inv_alpha`, `luma`, `inv_luma`), and universal behind-subject occlusion
 - **Blend & opacity** — all 29 After Effects blend modes (multiply, screen, overlay, color dodge / burn, classic dodge / burn, linear burn / light, vivid / pin light, hard mix, difference, exclusion, subtract, divide, hue / saturation / color / luminosity, additive) + per-layer & group opacity
@@ -221,7 +221,7 @@ The full toolset behind the prompt. Everything below is reachable from natural l
 
 ### 💬 Captions & text
 - **Generate** — auto-captions from the transcript
-- **Style** — 280+ built-in templates (Hormozi, Spotlight, Karaoke, phrase lockups, two-line podcast looks, …), or an AI director that picks/generates one at runtime
+- **Style** — 216 built-in templates (Hormozi, Spotlight, Karaoke, phrase lockups, two-line podcast looks, …), or an AI director that picks/generates one at runtime
 - **Scripts** — Latin, Indic, Arabic, Cyrillic, and Greek text
 - **Animate** — per-word animations (typewriter, slide, fade, scale, rotate, bounce, flip, swing, elastic, blur, glitch, wave — each with a matching exit)
 - **Typography** — crisp scalable glyphs (MSDF), stroke / outline, drop shadow, gradient fill, background pill / box, per-word karaoke fill + underline
