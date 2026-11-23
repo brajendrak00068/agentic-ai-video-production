@@ -776,7 +776,7 @@ export default definePluginEntry({
           catalog: {
             type: 'string',
             enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes', 'properties', 'animatable'],
-            description: 'Optional catalog filter: "captions" (280+ caption templates), "vfx" (328+ GPU effects), "transitions" (170+ transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
+            description: 'Optional catalog filter: "captions" (216 caption templates), "vfx" (368 GPU effects), "transitions" (168 transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
           },
           category: { type: 'string', description: 'Optional domain/category filter.' },
           limit: { type: 'number', description: 'Max actions to return.' },

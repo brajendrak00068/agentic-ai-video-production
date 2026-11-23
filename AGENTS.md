@@ -6,11 +6,11 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 `levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
-## Tools (43 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
+## Tools (39 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
 
 The surface supports **two complementary execution modes** plus typed management & polling:
 - **Mode A — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
-- **Mode B — Universal Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`, plus `update_layer`, `delete_layer`, `trim_layer`, `apply_transition`):** Drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
+- **Mode B — Universal Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`):** Drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
 
 ### Mode A: Goal Delegation (1 + 2 variants)
 
@@ -20,7 +20,7 @@ The surface supports **two complementary execution modes** plus typed management
 | `autonomous_edit_streaming` (SSE — emits per-step progress notifications) | Yes | Yes |
 | `queue_edit` (fire-and-forget; returns `taskId` for `check_task_status`) | Yes | Yes |
 
-### Mode B: Universal Direct Canonical Suite (8) + Layer Shortcuts (4)
+### Mode B: Universal Direct Canonical Suite (8)
 
 | Tool | What it does |
 |---|---|
@@ -32,10 +32,6 @@ The surface supports **two complementary execution modes** plus typed management
 | `search_skills` | Search 100+ production craft skills (`SKILL.md` playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) |
 | `load_skill` | Load the full craft playbook (`SKILL.md`) and bundled resource list for one or more skill IDs |
 | `read_skill_resource` | Read a bundled reference or template file belonging to a production skill |
-| `update_layer` | Shortcut: set static properties on one layer (`x`, `y`, `scale`, `opacity`, `volume`, `visible`, `z_index`, …) |
-| `delete_layer` | Shortcut: delete one or more layers; `close_gap: true` ripples the timeline closed |
-| `trim_layer` | Shortcut: shorten a layer (`edge` + `seconds`, or `start_time` + `end_time`) |
-| `apply_transition` | Shortcut: put a named transition (~170 names: `fade`, `whip_pan`, `glitch`, …) between two adjacent clips |
 
 ### ShaderFX — your own GPU effects (4)
 
@@ -70,7 +66,7 @@ A generation step (music, B-roll, images) that is still running when its call en
 
 ### Caption templates (5)
 
-`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 280+ built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
+`list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template`. 216 built-in templates (e.g. hormozi, mrbeast, viral-pop, karaoke, neon-pop, subtitle-bar, spotlight) plus your saved templates; call `list_caption_templates` for the exact ids.
 
 ### Brand kits (5)
 

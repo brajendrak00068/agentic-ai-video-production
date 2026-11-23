@@ -1,6 +1,6 @@
 ---
 name: viral-clips-generator
-description: "Extract viral clips, podcast highlights, UGC ads, and faceless videos from long recordings (Opus Clip / CapCut alternative): trim video, cut video, merge clips, 9:16 reframe, and 280+ kinetic captions."
+description: "Extract viral clips, podcast highlights, UGC ads, and faceless videos from long recordings (Opus Clip / CapCut alternative): trim video, cut video, merge clips, 9:16 reframe, and 216 kinetic captions."
 version: 1.0.7
 author: brajendrak00068
 license: MIT

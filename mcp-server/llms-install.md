@@ -8,7 +8,7 @@ One primary edit tool, `autonomous_edit`: send a natural-language description of
 the video you want and it plans, edits, verifies on the rendered frames, and
 exports the finished result (viral clips, captions, 9:16 reframe, 2D and 3D
 motion graphics, chroma key, motion tracking, B-roll, voiceover, music and sound
-effects, multi-platform export). No timeline. 43 tools in total: the high-level edit tool (`autonomous_edit` + streaming + queue), the universal direct canonical suite (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` unlocking all 195 canonical actions, 28 read tools, 100+ craft skills, and GPU screenshot inspection), four deterministic layer shortcuts (`update_layer`, `delete_layer`, `trim_layer`, `apply_transition`), job status, brand kits, projects, assets, and caption-template tools.
+effects, multi-platform export). No timeline. 39 tools in total: the high-level edit tool (`autonomous_edit` + streaming + queue), the universal direct canonical suite (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` unlocking all 195 canonical actions, 28 read tools, 100+ craft skills, and GPU screenshot inspection), job status, brand kits, projects, assets, and caption-template tools.
 
 ## Install
 No global install needed — run via npx:
@@ -65,7 +65,7 @@ omit the header and sign in to Levea in the browser; otherwise send the API key:
 
 ## Verify
 Call the `editor_health` tool — it should report the backend as healthy. `tools/list`
-should return 43 tools.
+should return 39 tools.
 
 ## Notes for the agent
 - Never print or log `LEVEA_API_KEY`.

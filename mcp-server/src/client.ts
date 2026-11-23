@@ -313,8 +313,7 @@ export async function execute(edit: EditRequestBody, hostSignal?: AbortSignal): 
 }
 
 /**
- * Run a deterministic or universal canonical tool (update_layer, delete_layer,
- * trim_layer, apply_transition, search_tools, get_action_schema, execute_action,
+ * Run a universal canonical tool (search_tools, get_action_schema, execute_action,
  * execute_batch, render_preview, or any canonical action / read tool) via
  * /v1/execute without invoking the autonomous_edit planner.
  *

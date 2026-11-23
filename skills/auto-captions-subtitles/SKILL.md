@@ -1,6 +1,6 @@
 ---
 name: auto-captions-subtitles
-description: "Generate word-by-word animated captions, Hormozi captions, karaoke subtitles, SRT/VTT transcripts, translated subtitles, and lip-synced dubbing (280+ templates, 字幕). Use when adding captions, subtitles, Hormozi/MrBeast styles, karaoke text, translating video, or dubbing."
+description: "Generate word-by-word animated captions, Hormozi captions, karaoke subtitles, SRT/VTT transcripts, translated subtitles, and lip-synced dubbing (216 templates, 字幕). Use when adding captions, subtitles, Hormozi/MrBeast styles, karaoke text, translating video, or dubbing."
 version: 1.0.8
 author: brajendrak00068
 license: MIT
@@ -65,7 +65,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 ## Capabilities
 
 - Speech-to-text word timing alignment on the active timeline.
-- 280+ caption templates including Hormozi, Spotlight, karaoke, word-pill, phrase lockups, and two-line podcast looks.
+- 216 caption templates including Hormozi, Spotlight, karaoke, word-pill, phrase lockups, and two-line podcast looks.
 - Animated word entrances and burn-aways; Latin, Indic, Arabic, Cyrillic, and Greek text.
 - Safe-zone placement that avoids covering faces and lower-third graphics.
 - Multi-language subtitle translation.

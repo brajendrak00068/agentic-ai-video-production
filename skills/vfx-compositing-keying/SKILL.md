@@ -1,6 +1,6 @@
 ---
 name: vfx-compositing-keying
-description: "Composite video layers with green screen chroma key (Keylight spill suppression), AI background removal without green screen, rotoscoping, color grading, .cube 3D LUTs, depth bokeh camera lens blur, glow, face blur, watermark removal, Bezier masks, and 328 GPU VFX."
+description: "Composite video layers with green screen chroma key (Keylight spill suppression), AI background removal without green screen, rotoscoping, color grading, .cube 3D LUTs, depth bokeh camera lens blur, glow, face blur, watermark removal, Bezier masks, and 368 GPU VFX."
 version: 1.0.3
 author: brajendrak00068
 license: MIT
@@ -22,7 +22,7 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## When to use
 
-- Keying out green or blue screens with Keylight-style screen color key, Lab/YUV/RGB color range keying, and spill suppression, or isolating subjects without a green screen using AI alpha mattes.
+- Keying out green or blue screens with Keylight-style screen color key, Lab/YUV/RGB color range keying, and spill suppression, or isolating subjects without a green screen using AI person mattes.
 - Applying optical camera effects on footage: depth-map-driven camera lens blur with polygonal iris bokeh, optical clip lens flares, and After Effects two-tone threshold glow.
 - Stacking up to four ordered procedural effects on a single layer, applying custom SVG Bezier mask paths, feathered/inverted mattes, track mattes, or placing titles and graphics behind the foreground subject.
 - Performing per-clip precision color work: monotone cubic RGB curves, CMYK per-hue selective color, 5-point histogram levels, and custom `.cube` 3D LUT files.
@@ -68,7 +68,7 @@ Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP
 - Keylight-grade screen color key (gain, balance, clip black/white, despill, softness, shrink/grow, preblur), color range key (Lab/YUV/RGB box + fuzziness), spill suppression (standard/ultra), and AI alpha-matte background replacement.
 - Physical optics: camera lens blur (polygonal iris bokeh with highlight bloom and auto-estimated depth-map focal plane), optical lens flares (keyframable light source and prime/zoom lens presets), and After Effects two-tone threshold glow.
 - Precision color finishing: monotone cubic curves (master/R/G/B), CMYK per-range selective color (reds through blacks), 5-point levels, custom `.cube` 1D/3D LUTs, and 50+ cinematic color looks.
-- Layer compositing: 328 procedural VFX presets, ordered multi-effect stacks (up to 4 chained effects per layer), SVG Bezier masks, feathered/inverted mattes, track mattes, universal behind-subject occlusion, and all 29 After Effects blend modes.
+- Layer compositing: 368 procedural VFX presets, ordered multi-effect stacks (up to 4 chained effects per layer), SVG Bezier masks, feathered/inverted mattes, track mattes, universal behind-subject occlusion, and all 29 After Effects blend modes.
 
 ## Response fields
 

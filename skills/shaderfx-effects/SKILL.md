@@ -10,7 +10,7 @@ license: MIT
 
 ShaderFX lets an agent write a small WGSL function, `fx(c: FxCtx) -> vec4<f32>`, and run it on the GPU as part of a Levea edit. The server wraps it in a harness (bindings, helpers, output handling), validates it with naga before anything is saved or rendered, and the WebGPU preview and the Vulkan export compile the same wrapped shader with the same bindings, so what `render_preview` shows is what the export renders.
 
-Use a built-in effect first when one fits: `search_tools` with `catalog: "vfx"` (328+ GPU effects) or `catalog: "transitions"` (~170). Write a ShaderFX effect when the look you need does not exist, when it has to read the footage in a specific way, or when you want a reusable house effect with its own parameters.
+Use a built-in effect first when one fits: `search_tools` with `catalog: "vfx"` (368 GPU effects) or `catalog: "transitions"` (168). Write a ShaderFX effect when the look you need does not exist, when it has to read the footage in a specific way, or when you want a reusable house effect with its own parameters.
 
 ## Setup
 
