@@ -8,24 +8,46 @@ One primary edit tool, `autonomous_edit`: send a natural-language description of
 the video you want and it plans, edits, verifies on the rendered frames, and
 exports the finished result (viral clips, captions, 9:16 reframe, 2D and 3D
 motion graphics, chroma key, motion tracking, B-roll, voiceover, music and sound
-effects, multi-platform export). No timeline. 39 tools in total: the high-level edit tool (`autonomous_edit` + streaming + queue), the universal direct canonical suite (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` unlocking all 195 canonical actions, 28 read tools, 100+ craft skills, and GPU screenshot inspection), job status, brand kits, projects, assets, and caption-template tools.
+effects, multi-platform export). No timeline. Alongside it: `queue_edit` for long
+edits, the direct canonical suite (`search_tools`, `get_action_schema`,
+`execute_action`, `execute_batch`, `render_preview`, `search_skills`,
+`load_skill`, `read_skill_resource`) for agents that drive the edit themselves,
+plus job status, brand kits, projects, assets, and caption-template tools.
 
-## Install
-No global install needed — run via npx:
+## Default: hosted endpoint (OAuth, nothing to install)
+Connect to the hosted Streamable HTTP endpoint. The client signs the user in to
+Levea with OAuth on first connect; no API key, no local process.
 
-```bash
-npx -y levea-mcp-server
+```
+https://api.livecore.ai/api/v1/misc/mcp
 ```
 
-## Required environment variables
+- Claude Code: `claude mcp add --transport http levea https://api.livecore.ai/api/v1/misc/mcp`
+- Claude Desktop / Claude.ai: Settings → Connectors → Add custom connector → the URL above (or install the `.mcpb` bundle)
+- Cursor (`~/.cursor/mcp.json`):
+  ```json
+  {"mcpServers":{"levea":{"url":"https://api.livecore.ai/api/v1/misc/mcp"}}}
+  ```
+- Windsurf (`mcp_config.json`):
+  ```json
+  {"mcpServers":{"levea":{"serverUrl":"https://api.livecore.ai/api/v1/misc/mcp"}}}
+  ```
+- Cline (`cline_mcp_settings.json`):
+  ```json
+  {"mcpServers":{"levea":{"type":"streamableHttp","url":"https://api.livecore.ai/api/v1/misc/mcp"}}}
+  ```
+
+## Fallback: local stdio server (clients without remote-MCP support)
+Only when the client cannot connect to a URL. Runs via npx (the package has no
+dependencies; Node 18+) and needs an API key:
+
 | Var | Required | Value |
 |---|---|---|
-| `LEVEA_API_URL` | yes | `https://api.livecore.ai` (host only — no path) |
-| `LEVEA_API_KEY` | yes | Create one at https://livecore.ai/?openclaw=1&utm_source=cline&utm_medium=mcp-server&utm_campaign=levea-mcp-server |
+| `LEVEA_API_KEY` | yes (for edits) | Create one at https://livecore.ai/?openclaw=1&utm_source=cline&utm_medium=mcp-server&utm_campaign=levea-mcp-server |
+| `LEVEA_API_URL` | no | Defaults to `https://api.livecore.ai` (host only — no path) |
 
 > Legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` are still accepted as a silent fallback.
 
-## MCP client config (stdio)
 ```json
 {
   "mcpServers": {
@@ -33,7 +55,6 @@ npx -y levea-mcp-server
       "command": "npx",
       "args": ["-y", "levea-mcp-server"],
       "env": {
-        "LEVEA_API_URL": "https://api.livecore.ai",
         "LEVEA_API_KEY": "<your-key-from-livecore.ai>"
       }
     }
@@ -41,33 +62,15 @@ npx -y levea-mcp-server
 }
 ```
 
-## Hosted alternative (no local process)
-Clients that support remote MCP servers can connect directly to the hosted
-Streamable HTTP endpoint instead of running npx. Clients with OAuth support can
-omit the header and sign in to Levea in the browser; otherwise send the API key:
-
-```json
-{
-  "mcpServers": {
-    "levea": {
-      "type": "streamable-http",
-      "url": "https://api.livecore.ai/api/v1/misc/mcp",
-      "headers": { "Authorization": "Bearer <your-key-from-livecore.ai>" }
-    }
-  }
-}
-```
-
-## One-line client adds
-- Claude Code: `claude mcp add levea -e LEVEA_API_URL=https://api.livecore.ai -e LEVEA_API_KEY=... -- npx -y levea-mcp-server`
-- Claude Code (hosted): `claude mcp add --transport http levea https://api.livecore.ai/api/v1/misc/mcp --header "Authorization: Bearer ..."`
-- OpenClaw: `openclaw mcp add levea --command "npx -y levea-mcp-server" --env LEVEA_API_URL=https://api.livecore.ai --env LEVEA_API_KEY=...`
+- Claude Code (stdio): `claude mcp add levea -e LEVEA_API_KEY=... -- npx -y levea-mcp-server`
+- OpenClaw: `openclaw mcp add levea --command "npx -y levea-mcp-server" --env LEVEA_API_KEY=...`
 
 ## Verify
-Call the `editor_health` tool — it should report the backend as healthy. `tools/list`
-should return 39 tools.
+Call the `editor_health` tool — it should report the backend as healthy.
+`tools/list` returns the Levea tools (`autonomous_edit` first).
 
 ## Notes for the agent
 - Never print or log `LEVEA_API_KEY`.
-- `autonomous_edit` is the primary tool; pass the user's goal as `params.prompt`.
-- Mutating edits auto-export; async generation returns a `jobId` to poll.
+- `autonomous_edit` is the primary tool; pass the user's goal verbatim as `prompt`. For long edits prefer `queue_edit` + `check_task_status`.
+- If a call returns status `running`, follow it with `get_active_task { project_id }`; never re-send the edit.
+- Mutating edits auto-export; async generation returns a `jobId` to poll with `check_job_status`.

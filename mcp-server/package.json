@@ -10,16 +10,16 @@
     "levea-mcp-http-server": "dist/http-server.js"
   },
   "files": [
-    "dist",
-    "src",
+    "dist/*.js",
+    "dist/*.d.ts",
     "server.json",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && esbuild src/server.ts src/editContract.ts --bundle --platform=node --target=node18 --format=cjs --outdir=dist --minify-whitespace --minify-syntax --log-level=warning && esbuild src/index.ts src/http-server.ts --bundle --platform=node --target=node18 --format=cjs --outdir=dist --minify-whitespace --minify-syntax --log-level=warning --external:./server && tsc --emitDeclarationOnly",
     "start": "node dist/index.js",
     "start:http": "node dist/http-server.js",
-    "dev": "tsc --watch",
+    "dev": "tsc --watch --noEmit",
     "publish-sync": "node mcp-publish-sync.js",
     "scan-leaks": "bash ../scripts/scan-leaks.sh README.md server.json src/index.ts src/server.ts src/http.ts src/http-server.ts src/client.ts",
     "prepublishOnly": "node ../scripts/sync-contract.mjs --check && npm run scan-leaks && npm run build",
@@ -187,12 +187,10 @@
   "bugs": {
     "url": "https://github.com/brajendrak00068/agentic-ai-video-production/issues"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
-    "axios": "^1.21.0"
-  },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/node": "^20.0.0",
+    "esbuild": "^0.25.12",
     "typescript": "^5.0.0"
   },
   "engines": {

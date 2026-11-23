@@ -7,27 +7,29 @@
  * over stdio (`index.ts`) or a hosted Streamable HTTP endpoint
  * (`createLeveaMcpServer` + `runWithLeveaConfig`).
  *
- * Architectural posture — **one agentic edit tool, four deterministic nudges,
- * many management tools**:
+ * Architectural posture — **one agentic edit tool, a direct canonical suite,
+ * management tools**:
  *   - `autonomous_edit` is the editing entry point for anything that needs
  *     judgment. The backend planner owns intent decomposition, action
- *     selection, verification, and export. We deliberately do NOT expose
- *     per-capability shims (`add_captions`, `generate_viral_clips`, …) because
- *     they fragment the planner's visibility.
+ *     selection, verification, and export.
+ *   - `search_tools` / `get_action_schema` / `execute_action` / `execute_batch`
+ *     / `render_preview` let a calling agent drive canonical actions itself.
  *   - `create_shader_effect`, `list_shader_effects`, `apply_shader_effect`,
- *     `delete_shader_effect` run the ShaderFX (ABI v2) canonical actions through
+ *     `delete_shader_effect` run the ShaderFX canonical actions through
  *     execute_action: user-written WGSL filters, transitions and generators.
  *   - All OTHER tools are read-only diagnostics or state-management CRUD
- *     (brand kits, projects, assets, caption templates).
+ *     (brand kits, projects, assets, caption templates, skills).
  *
  * Config (env, set via the MCP client's `mcpServers` entry):
- *   LEVEA_API_URL   e.g. https://api.livecore.ai   (required)
- *   LEVEA_API_KEY   from https://livecore.ai/ (required)
+ *   LEVEA_API_URL   default https://api.livecore.ai
+ *   LEVEA_API_KEY   from https://livecore.ai/ (stdio only; the hosted endpoint uses OAuth)
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
+  ErrorCode,
   ListToolsRequestSchema,
+  McpError,
   type Tool,
   type ToolAnnotations,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -61,7 +63,7 @@ import {
   transcribeAsset,
   executeDeterministicTool,
   type ExecuteResult,
-  type SSEEvent,
+  type ProgressFn,
 } from './client';
 
 export { runWithLeveaConfig, type LeveaClientConfig } from './client';
@@ -72,71 +74,113 @@ export const PKG_VERSION: string =
 
 // ───────────────────────────────────────────────────────────────────────────
 // Tool schemas
+//
+// tools/list is read into every calling model's context, so descriptions say
+// what a tool is for and point at search_tools / load_skill for the details
+// (no catalog counts: they drift).
 // ───────────────────────────────────────────────────────────────────────────
+
+type JsonSchema = Record<string, unknown>;
 
 // Input schemas come from the edit contract (see editContract.ts).
 const AUTONOMOUS_EDIT_SCHEMA = editInputSchema('all');
 const QUEUE_EDIT_SCHEMA = editInputSchema('queue');
 
+/**
+ * autonomous_edit_streaming and queue_edit take autonomous_edit's fields; their
+ * copies drop the per-field docs autonomous_edit already carries (fields of
+ * their own keep theirs) to keep tools/list small.
+ */
+function withoutFieldDocs(schema: JsonSchema, keep: ReadonlySet<string> = new Set()): JsonSchema {
+  const props = (schema.properties || {}) as Record<string, JsonSchema>;
+  const documented = (AUTONOMOUS_EDIT_SCHEMA.properties || {}) as Record<string, JsonSchema>;
+  return {
+    ...schema,
+    properties: Object.fromEntries(Object.entries(props).map(([k, v]) => {
+      if (keep.has(k) || !documented[k]) return [k, v];
+      const { description: _d, ...rest } = v;
+      return [k, rest];
+    })),
+  };
+}
+
+// ShaderFX ABI v3 inputs shared by create_shader_effect and apply_shader_effect.
+const SHADER_V3_PROPS: Record<string, JsonSchema> = {
+  textures: {
+    type: 'array',
+    description: '[v3] Up to 4 named textures; read with tex_<name>(uv).',
+    items: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: '[a-z][a-z0-9_]{0,23}' },
+        layer_id: { type: 'string', description: 'Layer rendered alone as the texture.' },
+        asset_url: { type: 'string', description: 'Public png/jpg/webp ≤ 4096².' },
+        space: { type: 'string', enum: ['canvas', 'image'] },
+      },
+      required: ['name'],
+    },
+  },
+  feedback: { type: 'object', description: '[v3] { enabled, warmup_sec?, clear? }: prev(uv) reads the previous output frame.' },
+  data: { type: 'array', items: { type: 'number' }, description: '[v3] Up to 16384 floats for data(i).' },
+  data_url: { type: 'string', description: '[v3] URL of a JSON array or CSV, resolved to floats at apply time.' },
+  geometry: { type: 'object', description: '[v3] { mode: "quads"|"points", count }: instanced particles drawn by fn instance(i, c).' },
+};
+
+// Fields shared by execute_action and execute_batch.
+const DIRECT_COMMON_PROPS: Record<string, JsonSchema> = {
+  project_id: { type: 'string', description: 'Project to edit; reuse the id the first call returned.' },
+  video_url: { type: 'string', description: 'Source video URL to seed a new project (first call only).' },
+  assets: { type: 'array', items: { type: 'object' }, description: 'Media assets to seed a new project (first call only).' },
+  scene: { type: 'object', description: 'Inline scene (advanced; the server keeps the project scene).' },
+  include_scene: { type: 'boolean', description: 'Return the full scene JSON (large).' },
+  idempotency_key: { type: 'string', description: 'Your id for this logical call: a resend returns the first answer instead of applying twice.' },
+  rerun: { type: 'boolean', description: 'Run an identical call again on purpose.' },
+  dry_run: { type: 'boolean', description: 'Only check params (fast); nothing runs.' },
+  allow_unknown_params: { type: 'boolean', description: 'Run despite params an action does not take (they are ignored and listed).' },
+};
+
 const TOOL_DEFS: Tool[] = [
-  // ── Editing — single tool ────────────────────────────────────────────────
+  // ── Editing ──────────────────────────────────────────────────────────────
   {
     name: 'autonomous_edit',
     description:
-      'PRIMARY EDIT TOOL. Run a natural-language video edit end-to-end. The backend agent plans, executes, verifies, and exports. Accepts anything from a one-liner ("generate 3 viral clips with captions and export") to a multi-paragraph creative brief. Returns the final mp4 URL synchronously when an export is queued. For long renders you may prefer queue_edit + check_job_status.',
-    inputSchema: AUTONOMOUS_EDIT_SCHEMA as unknown as Tool['inputSchema'],
+      'PRIMARY EDIT TOOL. Runs a natural-language video edit end-to-end: Levea\'s editing agent plans, edits, checks the rendered frames and exports. Send the user\'s brief verbatim, from one line to a multi-paragraph creative brief. Waits up to 5 min, but a full edit can take 10-20 min: prefer queue_edit for long edits. The first progress notification names the project_id; if the wait ends first the result is status "running" — follow it with get_active_task, never re-send the edit.',
+    inputSchema: AUTONOMOUS_EDIT_SCHEMA as Tool['inputSchema'],
   },
   {
     name: 'autonomous_edit_streaming',
     description:
-      'Same as autonomous_edit but consumes the SSE event stream from the backend. Returns the final terminal result; per-step events (status, thinking, tool_call, tool_result, background_job_completed) are emitted as MCP progress notifications when the client supports them. Use for long-running briefs where users expect live progress.',
-    inputSchema: AUTONOMOUS_EDIT_SCHEMA as unknown as Tool['inputSchema'],
+      'autonomous_edit with live progress: same parameters (documented on autonomous_edit), per-step MCP progress notifications, waits up to 30 min. Returns the final result.',
+    inputSchema: withoutFieldDocs(AUTONOMOUS_EDIT_SCHEMA) as Tool['inputSchema'],
   },
   {
     name: 'queue_edit',
     description:
-      'Fire-and-forget async path. Returns immediately with a `taskId`. Use when the edit may exceed the MCP request timeout (long viral-clip generation, multi-format export). Poll with check_task_status or get_active_task.',
-    inputSchema: QUEUE_EDIT_SCHEMA as unknown as Tool['inputSchema'],
+      'Preferred for long edits: queues an autonomous edit and returns a taskId at once, so no client timeout applies. Same fields as autonomous_edit (documented there) plus platforms / autoExport. Poll check_task_status { task_id } or get_active_task { project_id }.',
+    inputSchema: withoutFieldDocs(QUEUE_EDIT_SCHEMA, new Set(['prompt'])) as Tool['inputSchema'],
   },
 
-  // ── ShaderFX (ABI v2) — your own GPU effects, transitions and generators ──
+  // ── ShaderFX — your own GPU effects, transitions and generators ──────────
   // Thin wrappers over execute_action with the matching canonical action
-  // (CREATE/LIST/APPLY/DELETE_SHADER_EFFECT). The author contract (fx(c: FxCtx),
-  // helpers, output modes, params manifest) is in the shaderfx-effects skill.
+  // (CREATE/LIST/APPLY/DELETE_SHADER_EFFECT). The author contract is in the
+  // shaderfx-effects skill.
   {
     name: 'create_shader_effect',
     description:
-      'Save a reusable ShaderFX (ABI v2 / v3) effect to your effect library. source is WGSL that defines fn fx(c: FxCtx) -> vec4<f32> returning straight (non-premultiplied) rgba; FxCtx = { uv (0..1 canvas, top-left), px, res (render-target px), time = local_time (seconds since the effect layer started), progress (transition: 0→1 across the overlap; else time / layer length), intensity, frame (v3) }. Predefined helpers: src(uv), backdrop(uv), clip_a(uv), clip_b(uv), param(i), param_color(i), hash2, noise2, fbm, luma, rotate2, plus a named accessor per manifest param (P_strength() …; float → f32, vec2/vec3 → vec2/vec3<f32>, color → vec4<f32>, bool → f32 0/1). The server wraps and validates it (naga) before storing: on failure nothing is saved and errors come back as [{ line, column, message }] in YOUR source lines — fix and resend. Returns effect_id and the param table (name, type, slot, accessor). overwrite: true replaces your effect of the same name. Source ≤ 24 KB (v3: 48 KB); keep loops bounded. v3 (auto when used): textures, feedback, multi-pass, data, geometry (instanced particles / sprites). Full contract + worked examples: load_skill shaderfx-effects.',
+      'Save a reusable ShaderFX effect: WGSL defining fn fx(c: FxCtx) -> vec4<f32> (straight rgba). Validated before saving; errors come back as [{ line, column, message }] in your source lines. Returns effect_id and the param table. FxCtx, helpers, manifest and v3 (textures, feedback, passes, data, particles) with examples: load_skill shaderfx-effects.',
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Effect name (shown in list_shader_effects).' },
-        source: { type: 'string', description: 'Author WGSL defining fn fx(c: FxCtx) -> vec4<f32> (plus any helper fns of your own). No bindings, no @fragment.' },
+        name: { type: 'string', description: 'Effect name.' },
+        source: { type: 'string', description: 'WGSL with fn fx(c: FxCtx) -> vec4<f32> (no bindings, no @fragment). ≤ 24 KB (v3: 48 KB).' },
         manifest: {
           type: 'object',
-          description: 'Effect manifest: { abi: 2, kind: "filter" | "transition" | "generator", output: "add" | "normal" | "replace", params: [{ name, type: "float" | "vec2" | "vec3" | "color" | "bool", min?, max?, default }] }. Slots: float/bool 1, vec2 2, vec3/color 4 (vec3/color start on a 4-slot boundary); total ≤ 32. kind defaults to filter, output to normal. Leave abi out: the server picks v3 automatically when a v3 field is present (an explicit abi: 3 is rejected). ABI v3 adds passes: [{ name, scale?: 1 | 0.5 | 0.25 }] (≤ 4; source defines fn pass_<name>(c), read with buf_<name>(uv)), textures: [{ name }] (≤ 4; tex_<name>(uv)), feedback: { enabled, warmup_sec?, clear? } (prev(uv)), geometry: { mode: "quads" | "points", count } (source defines fn instance(i, c) -> FxInstance and optional fn shade(p, c)).',
+          description: '{ kind: "filter"|"transition"|"generator", output: "add"|"normal"|"replace", params: [{ name, type: float|vec2|vec3|color|bool, min?, max?, default }] }; v3 adds passes / textures / feedback / geometry. Leave abi out.',
         },
-        description: { type: 'string', description: 'Optional one-line description.' },
-        textures: {
-          type: 'array',
-          description: '[ABI v3] Up to 4 named textures: [{ name, layer_id | asset_url, space?: "canvas" | "image" }]. layer_id = that layer rendered alone (canvas space by default); asset_url = a public png/jpg/webp ≤ 4096² (image space by default, e.g. sprite sheets). Read with tex_<name>(uv), tex_size_<name>().',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Texture name, [a-z][a-z0-9_]{0,23}.' },
-              layer_id: { type: 'string', description: 'Layer whose picture is the texture.' },
-              asset_url: { type: 'string', description: 'Public image URL.' },
-              space: { type: 'string', enum: ['canvas', 'image'], description: 'Sampling space (default canvas for layer_id, image for asset_url).' },
-            },
-            required: ['name'],
-          },
-        },
-        feedback: { type: 'object', description: '[ABI v3] { enabled: true, warmup_sec?: 0..4 (default 1), clear?: [r, g, b, a] }: prev(uv) reads this layer\'s previous output frame (trails, echoes). Previews re-render warmup_sec before the frame. { enabled: false } turns a saved effect\'s feedback off.' },
-        data: { type: 'array', items: { type: 'number' }, description: '[ABI v3] Up to 16384 floats for data(i), data_len(), data_vec2(i), data_vec4(i) (charts, per-instance state, lookup tables).' },
-        data_url: { type: 'string', description: '[ABI v3] Public http(s) / gs:// URL of a JSON array (or { data: [...] }) or CSV, resolved to floats at apply time (inline data wins).' },
-        geometry: { type: 'object', description: '[ABI v3] { mode: "quads" (default) | "points", count: integer 1..65536 }: draw count instanced quads; the source defines fn instance(i: u32, c: FxCtx) -> FxInstance (pos canvas uv, size px, rotation rad, color, uv_rect, alive <= 0 culls) and optionally fn shade(p: FxPixel, c: FxCtx); no fx needed. Default shade: soft round point x color, or the first texture through uv_rect x color.' },
-        is_public: { type: 'boolean', description: 'Share the effect publicly (default false).' },
-        overwrite: { type: 'boolean', description: 'Replace your existing effect with the same name.' },
+        description: { type: 'string', description: 'One-line description.' },
+        ...SHADER_V3_PROPS,
+        is_public: { type: 'boolean', description: 'Share publicly (default false).' },
+        overwrite: { type: 'boolean', description: 'Replace your effect with the same name.' },
         project_id: { type: 'string', description: 'Optional project context.' },
       },
       required: ['name', 'source', 'manifest'],
@@ -144,11 +188,11 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'list_shader_effects',
-    description: 'List the ShaderFX effects in your library (id, name, description, kind, output, params). Pass an id to apply_shader_effect.',
+    description: 'List the ShaderFX effects in your library (id, name, kind, output, params). Pass an id to apply_shader_effect.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Optional name / description filter.' },
+        query: { type: 'string', description: 'Name / description filter.' },
         include_public: { type: 'boolean', description: 'Also list public effects.' },
         limit: { type: 'number', description: 'Max effects to return.' },
         project_id: { type: 'string', description: 'Optional project context.' },
@@ -159,56 +203,36 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'apply_shader_effect',
     description:
-      'Put a ShaderFX (ABI v2) effect on a project, committed immediately. Either a saved effect (effect_id) or inline source + manifest (validated first; errors come back with line/column). kind (optional: request, else manifest, else inferred from the layer ids) "filter": target_layer_id = the layer whose picture src() reads (omit = everything composited below); window = start_time/end_time, else the target\'s, else the whole timeline. "transition": from_layer_id (clip A) + to_layer_id (clip B); progress runs 0→1 across their overlap. Clips meeting at a cut get a duration_sec overlap (default 0.8 s) laid on media handles, program length unchanged; SHADER_FX_NO_HANDLES if neither clip has media beyond the cut (overlap them first or shorten duration_sec). "generator": paints on its own. params = values by manifest name; param_keyframes animates them. v3 inputs: textures, feedback, data / data_url, geometry. Then check with render_preview before export.',
+      'Put a ShaderFX effect on a project (committed at once): a saved effect_id, or inline source + manifest. "filter": target_layer_id (omit = everything below), window start_time / end_time. "transition": from_layer_id + to_layer_id, overlap duration_sec (default 0.8) on media handles. "generator": paints on its own. params by manifest name; param_keyframes animates them. Check with render_preview. Details: load_skill shaderfx-effects.',
     inputSchema: {
       type: 'object',
       properties: {
         project_id: { type: 'string', description: 'Project whose committed scene is edited.' },
-        effect_id: { type: 'string', description: 'Saved effect id (from create_shader_effect / list_shader_effects).' },
-        source: { type: 'string', description: 'Inline author WGSL (alternative to effect_id; needs manifest).' },
-        manifest: { type: 'object', description: 'Inline manifest (with source); may declare v3 passes / textures / feedback / geometry.' },
-        kind: { type: 'string', enum: ['filter', 'transition', 'generator'], description: 'Effect kind; match the manifest kind.' },
-        target_layer_id: { type: 'string', description: '[filter] Layer whose picture is src(); omit for the composited backdrop.' },
-        from_layer_id: { type: 'string', description: '[transition] Outgoing clip A.' },
-        to_layer_id: { type: 'string', description: '[transition] Incoming clip B.' },
-        params: { type: 'object', description: 'Param values by manifest name, e.g. { "strength": 0.8, "tint": "#ffcc66", "direction": [1, 0] }. Unknown names are errors; floats clamp to min/max.' },
-        textures: {
-          type: 'array',
-          description: '[ABI v3] Up to 4 named textures: [{ name, layer_id | asset_url, space?: "canvas" | "image" }]. layer_id = that layer rendered alone (canvas space by default); asset_url = a public png/jpg/webp ≤ 4096² (image space by default, e.g. sprite sheets). Read with tex_<name>(uv), tex_size_<name>().',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Texture name, [a-z][a-z0-9_]{0,23}.' },
-              layer_id: { type: 'string', description: 'Layer whose picture is the texture.' },
-              asset_url: { type: 'string', description: 'Public image URL.' },
-              space: { type: 'string', enum: ['canvas', 'image'], description: 'Sampling space (default canvas for layer_id, image for asset_url).' },
-            },
-            required: ['name'],
-          },
-        },
-        feedback: { type: 'object', description: '[ABI v3] { enabled: true, warmup_sec?: 0..4 (default 1), clear?: [r, g, b, a] }: prev(uv) reads this layer\'s previous output frame (trails, echoes). Previews re-render warmup_sec before the frame. { enabled: false } turns a saved effect\'s feedback off.' },
-        data: { type: 'array', items: { type: 'number' }, description: '[ABI v3] Up to 16384 floats for data(i), data_len(), data_vec2(i), data_vec4(i) (charts, per-instance state, lookup tables).' },
-        data_url: { type: 'string', description: '[ABI v3] Public http(s) / gs:// URL of a JSON array (or { data: [...] }) or CSV, resolved to floats at apply time (inline data wins).' },
-        geometry: { type: 'object', description: '[ABI v3] { mode: "quads" (default) | "points", count: integer 1..65536 }: draw count instanced quads; the source defines fn instance(i: u32, c: FxCtx) -> FxInstance (pos canvas uv, size px, rotation rad, color, uv_rect, alive <= 0 culls) and optionally fn shade(p: FxPixel, c: FxCtx); no fx needed. Default shade: soft round point x color, or the first texture through uv_rect x color.' },
-        data_columns: { type: 'array', items: { type: 'string' }, description: '[ABI v3] CSV data_url only: columns to read, as header names or 0-based indexes ("3"), row by row in this order.' },
-        param_keyframes: {
-          type: 'object',
-          description: 'Animate params: { "<param name>": [{ "time": <timeline seconds>, "value": <param type>, "easing"?: "ease_out" }, ...] } with at least 2 keyframes each. vec/color keyframe per component; bool steps.',
-        },
-        start_time: { type: 'number', description: '[filter/generator] Timeline seconds the effect starts (ignored for transitions).' },
-        end_time: { type: 'number', description: '[filter/generator] Timeline seconds the effect ends (ignored for transitions).' },
-        duration_sec: { type: 'number', description: '[transition] Overlap length in seconds (default 0.8, at most half the shorter clip).' },
-        easing: { type: 'string', description: '[transition] Easing of progress (default linear), e.g. ease_in_out.' },
+        effect_id: { type: 'string', description: 'Saved effect id.' },
+        source: { type: 'string', description: 'Inline WGSL (with manifest), instead of effect_id.' },
+        manifest: { type: 'object', description: 'Inline manifest (with source).' },
+        kind: { type: 'string', enum: ['filter', 'transition', 'generator'] },
+        target_layer_id: { type: 'string', description: '[filter] Layer whose picture src() reads.' },
+        from_layer_id: { type: 'string', description: '[transition] Outgoing clip.' },
+        to_layer_id: { type: 'string', description: '[transition] Incoming clip.' },
+        params: { type: 'object', description: 'Param values by manifest name, e.g. { "strength": 0.8 }.' },
+        ...SHADER_V3_PROPS,
+        data_columns: { type: 'array', items: { type: 'string' }, description: '[v3] CSV data_url columns (names or 0-based indexes).' },
+        param_keyframes: { type: 'object', description: '{ "<param>": [{ time, value, easing? }, …] } (≥ 2 keyframes each).' },
+        start_time: { type: 'number', description: '[filter/generator] Timeline start (s).' },
+        end_time: { type: 'number', description: '[filter/generator] Timeline end (s).' },
+        duration_sec: { type: 'number', description: '[transition] Overlap length (default 0.8).' },
+        easing: { type: 'string', description: '[transition] Easing of progress, e.g. ease_in_out.' },
         output: { type: 'string', enum: ['add', 'normal', 'replace'], description: 'Override the manifest output mode.' },
-        intensity: { type: 'number', description: 'c.intensity for the layer (default 1).' },
-        opacity: { type: 'number', description: 'Layer opacity 0..1 (default 1).' },
+        intensity: { type: 'number', description: 'c.intensity (default 1).' },
+        opacity: { type: 'number', description: 'Layer opacity 0..1.' },
       },
       required: ['project_id'],
     },
   },
   {
     name: 'delete_shader_effect',
-    description: 'Delete a saved ShaderFX effect from your library. Layers that already use it keep their own copy of the shader.',
+    description: 'Delete a saved ShaderFX effect. Layers already using it keep their own copy.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -222,7 +246,7 @@ const TOOL_DEFS: Tool[] = [
   // ── Job / task polling ───────────────────────────────────────────────────
   {
     name: 'check_job_status',
-    description: 'Poll an export / async job by jobId (numeric). Supports wait:true to block until terminal.',
+    description: 'Poll an export / async job by jobId (numeric). wait: true blocks until it finishes (progress notifications while it renders).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -234,16 +258,16 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'check_task_status',
-    description: 'Poll a queued edit task by taskId (returned by queue_edit), or a direct tool call that answered status "running" (taskId "dc_…" from execute_action / execute_batch / render_preview: waits up to ~25 s for it, and its result is that call\'s full response once status is completed / failed). Direct calls already wait for their own result, so you rarely need this. Separate from job_id (exports).',
+    description: 'Poll a queued edit by taskId (from queue_edit), or a direct call that answered status "running" (taskId "dc_…": waits up to ~25 s; its result is that call\'s full response once finished). Exports use check_job_status.',
     inputSchema: {
       type: 'object',
-      properties: { task_id: { type: 'string', description: 'Task id from queue_edit, or a "dc_…" id from a direct call still running.' } },
+      properties: { task_id: { type: 'string', description: 'Task id from queue_edit, or a "dc_…" id.' } },
       required: ['task_id'],
     },
   },
   {
     name: 'get_active_task',
-    description: 'For a given project, return the currently-running edit task (if any). Useful for reconnecting MCP clients.',
+    description: 'The edit currently running on a project, if any. Use it to follow an edit whose call returned status "running" or whose client stopped waiting.',
     inputSchema: {
       type: 'object',
       properties: { project_id: { type: 'string', description: 'Project id.' } },
@@ -254,17 +278,17 @@ const TOOL_DEFS: Tool[] = [
   // ── Caption templates ────────────────────────────────────────────────────
   {
     name: 'list_caption_templates',
-    description: 'List the user\'s caption templates (builtin + saved). Returns slugs, display names, and style summaries.',
+    description: 'List caption templates (builtin + your saved ones): slugs, names, style summaries.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
   {
     name: 'apply_caption_template',
-    description: 'Apply a caption template to a scene synchronously (without going through autonomous_edit).',
+    description: 'Apply a caption template to a project directly (without autonomous_edit).',
     inputSchema: {
       type: 'object',
       properties: {
         template_id: { type: 'string', description: 'Template slug / id from list_caption_templates.' },
-        project_id: { type: 'string', description: 'Project / scene id to apply to.' },
+        project_id: { type: 'string', description: 'Project to apply to.' },
         scene: { type: 'object', description: 'Inline scene (alternative to project_id).' },
         mode: { type: 'string', enum: ['add', 'recreate', 'style', 'translate', 'clear', 'remove_fillers'] },
       },
@@ -273,12 +297,12 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'save_caption_template',
-    description: 'Save a new caption template definition the user can re-apply later.',
+    description: 'Save a new caption template you can re-apply later.',
     inputSchema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Display name.' },
-        style: { type: 'object', description: 'Style payload (font, color, position, animation, etc.).' },
+        style: { type: 'object', description: 'Style (font, color, position, animation, …).' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Optional tags.' },
       },
       required: ['name', 'style'],
@@ -286,7 +310,7 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'save_current_caption_template',
-    description: 'Snapshot the caption styling currently applied to a project / scene as a reusable template.',
+    description: 'Save the caption styling currently on a project as a reusable template.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -299,7 +323,7 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'delete_caption_template',
-    description: 'Delete a user-saved caption template by id.',
+    description: 'Delete one of your saved caption templates by id.',
     inputSchema: {
       type: 'object',
       properties: { template_id: { type: 'string' } },
@@ -310,7 +334,7 @@ const TOOL_DEFS: Tool[] = [
   // ── Brand kits ───────────────────────────────────────────────────────────
   {
     name: 'list_brand_kits',
-    description: 'List the user\'s brand profiles (palette, fonts, logo, voice, gradeBias). Returns ids you pass to autonomous_edit\'s brandId / projectBrandId.',
+    description: 'List your brand profiles (palette, fonts, logo, voice, gradeBias); pass an id as autonomous_edit brandId / projectBrandId.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -324,7 +348,7 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'create_brand_kit',
-    description: 'Create a brand profile. Fields: name, palette {primary,secondary,accent,neutral,extras[]}, fonts {primary,secondary}, gradeBias (warm/cool/neutral/vivid/muted), forbiddenColors[], logoAssetUrl, voiceTone, enforcement (soft|hard).',
+    description: 'Create a brand profile: name, palette {primary,secondary,accent,neutral,extras[]}, fonts {primary,secondary}, gradeBias, forbiddenColors[], logoAssetUrl, voiceTone, enforcement (soft|hard).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -342,7 +366,7 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'update_brand_kit',
-    description: 'Update an existing brand profile by id. Body has the same shape as create_brand_kit.',
+    description: 'Update a brand profile by id (same fields as create_brand_kit).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -372,24 +396,24 @@ const TOOL_DEFS: Tool[] = [
   // ── Projects ─────────────────────────────────────────────────────────────
   {
     name: 'list_projects',
-    description: 'List the user\'s projects.',
+    description: 'List your projects.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
   {
     name: 'get_project',
-    description: 'Fetch one project\'s record by id (name, revision, dates) with a short layer index (id, type, role, name, start_time, end_time). The full scene JSON is several MB: pass include_scene: true only if you really need it. To read the edit, execute_action timeline_view is the compact whole-timeline view.',
+    description: 'One project\'s record (name, revision, dates) with a short layer index. include_scene: true returns the full scene JSON (several MB); execute_action timeline_view is the compact view of the edit.',
     inputSchema: {
       type: 'object',
       properties: {
         project_id: { type: 'string' },
-        include_scene: { type: 'boolean', description: 'true returns the full scene JSON (several MB) instead of the layer index.' },
+        include_scene: { type: 'boolean', description: 'Return the full scene JSON instead of the layer index.' },
       },
       required: ['project_id'],
     },
   },
   {
     name: 'create_project',
-    description: 'Create a new project. Optional initial brandId.',
+    description: 'Create a new project, optionally with a brandId.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -413,12 +437,12 @@ const TOOL_DEFS: Tool[] = [
   // ── Assets ───────────────────────────────────────────────────────────────
   {
     name: 'asset_upload_url',
-    description: 'Get a signed upload URL for a local file (so users do not have to host video / image / audio elsewhere before passing video_url to autonomous_edit). Body: { fileName, fileType?, contentType?, projectId? }. Returns { uploadUrl, fileUrl }; PUT the file bytes to uploadUrl, then pass fileUrl to autonomous_edit as video_url / in assets[].',
+    description: 'Signed upload URL for a local file. Returns { uploadUrl, fileUrl }: PUT the bytes to uploadUrl, then pass fileUrl as video_url / in assets[].',
     inputSchema: {
       type: 'object',
       properties: {
         fileName: { type: 'string' },
-        fileType: { type: 'string', description: 'video | image | audio (heuristic from extension if omitted).' },
+        fileType: { type: 'string', description: 'video | image | audio (from the extension if omitted).' },
         contentType: { type: 'string', description: 'MIME type, e.g. video/mp4.' },
         projectId: { type: 'string', description: 'Optional project to associate the asset with.' },
       },
@@ -427,19 +451,19 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'list_assets',
-    description: 'List the user\'s uploaded assets. Optional projectId filter.',
+    description: 'List your uploaded assets, optionally by projectId / fileType.',
     inputSchema: {
       type: 'object',
       properties: {
         projectId: { type: 'string' },
-        fileType: { type: 'string', description: 'Optional filter: video|image|audio.' },
+        fileType: { type: 'string', description: 'video | image | audio.' },
       },
       required: [],
     },
   },
   {
     name: 'delete_asset',
-    description: 'Delete an asset by file name (the path returned by asset_upload_url).',
+    description: 'Delete an asset by file name (the path asset_upload_url returned).',
     inputSchema: {
       type: 'object',
       properties: { fileName: { type: 'string' } },
@@ -448,15 +472,15 @@ const TOOL_DEFS: Tool[] = [
   },
   {
     name: 'transcribe_asset',
-    description: 'Transcribe an existing asset (cached after the first call). By default returns a compact answer: language, duration_sec, word_count, speakers, transcript_id and one page of sentence lines "[start s–end s] [speaker] text" in source seconds. detail "words" returns words with only text / start / end / speaker, paged with offset / limit; detail "full" returns the raw transcription record (very large).',
+    description: 'Transcribe an asset (cached). Default: language, duration, speakers, transcript_id and one page of timed sentence lines. detail "words": paged word timings; "full": the raw record (very large).',
     inputSchema: {
       type: 'object',
       properties: {
         fileName: { type: 'string', description: 'Asset path.' },
-        language: { type: 'string', description: 'Optional ASR language hint.' },
-        detail: { type: 'string', enum: ['lines', 'words', 'full'], description: 'lines (default): sentence lines with start / end times. words: word-level text / start / end / speaker, paged. full: the raw transcription record (very large; avoid).' },
-        offset: { type: 'integer', minimum: 0, description: 'First line (detail lines) or word (detail words) to return: next_offset from the previous page.' },
-        limit: { type: 'integer', minimum: 1, description: 'Max lines / words in this page (words: default 500, max 1000). A page is also capped at about 12k tokens.' },
+        language: { type: 'string', description: 'ASR language hint.' },
+        detail: { type: 'string', enum: ['lines', 'words', 'full'] },
+        offset: { type: 'integer', minimum: 0, description: 'next_offset from the previous page.' },
+        limit: { type: 'integer', minimum: 1, description: 'Max lines / words per page (words: default 500, max 1000).' },
       },
       required: ['fileName'],
     },
@@ -465,29 +489,29 @@ const TOOL_DEFS: Tool[] = [
   // ── Diagnostics ──────────────────────────────────────────────────────────
   {
     name: 'editor_health',
-    description: 'Connectivity diagnostic against LEVEA_API_URL. Unauthenticated.',
+    description: 'Connectivity check against the Levea API (unauthenticated).',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
 
-  // ── Direct Canonical Tool Suite (Mode B: Bypass autonomous_edit) ─────────
+  // ── Direct canonical suite (drive the editor yourself) ───────────────────
   {
     name: 'search_tools',
     description:
-      'Search every directly callable editing action, the read/inspection tools, AND preset catalogs (216 caption templates, 368 GPU VFX effects, 168 transitions, color LUTs, title cards, fonts, blend modes) by keyword, category, or catalog filter. With a query, matching actions come back WITH their parameter specs (required params end in "*"), so you usually do not need get_action_schema. Also returns the editorialPlaybook (fastest call pattern + NLE order). Call once with no query to see the whole surface.',
+      'Search the directly callable editing actions, read/inspection tools and preset catalogs (caption templates, GPU VFX, transitions, color LUTs, title cards, fonts, blend modes). With a query, matching actions come back with their parameter specs (required params end in "*"). Also returns the editorialPlaybook (fastest call pattern, NLE order, pro workflow). No query = the whole surface.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Optional search keyword (e.g. "karaoke", "hormozi", "lens_blur", "whip_pan", "teal_orange", "chromakey").' },
+        query: { type: 'string', description: 'Keyword, e.g. "karaoke", "whip_pan", "teal_orange", "chromakey".' },
         catalog: {
           type: 'string',
           enum: ['all', 'actions', 'captions', 'vfx', 'transitions', 'color_presets', 'title_cards', 'fonts', 'blend_modes', 'properties', 'animatable'],
-          description: 'Optional catalog filter: "captions" (216 caption templates), "vfx" (368 GPU effects), "transitions" (168 transitions), "color_presets" (LUTs), "title_cards", "fonts", "blend_modes", "properties", "animatable", "actions", or "all" (default).',
+          description: 'Catalog filter (default all).',
         },
-        category: { type: 'string', description: 'Optional domain/category filter.' },
-        limit: { type: 'number', description: 'Max actions to return (default: all matches; preset catalogs default to 50).' },
-        include_schemas: { type: 'boolean', description: 'Force parameter specs on (true) or off (false). Default: on when 25 or fewer actions match.' },
-        offset: { type: 'number', description: 'Page through a long result: pass the nextOffset a previous answer returned (answers stay under ~10k tokens).' },
-        detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): one-line descriptions. "full": full action descriptions (pages sooner).' },
+        category: { type: 'string', description: 'Domain / category filter.' },
+        limit: { type: 'number', description: 'Max results (preset catalogs default to 50).' },
+        include_schemas: { type: 'boolean', description: 'Force parameter specs on / off (default on for ≤ 25 matches).' },
+        offset: { type: 'number', description: 'nextOffset from a previous page.' },
+        detail: { type: 'string', enum: ['summary', 'full'], description: 'summary (default) or full action descriptions.' },
       },
       required: [],
     },
@@ -495,20 +519,19 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'get_action_schema',
     description:
-      'Fetch the full JSON inputSchema, parameter constraints, and description for any canonical editor action (e.g. COLOR_GRADE, TRIM_LAYER, GENERATE_CAPTIONS, PLAN_MOTION_GRAPHICS, RENDER_PREVIEW, EXPORT_VIDEO) or read tool (e.g. list_layers, query_transcript, inspect_layer).',
+      'Full input schema and constraints of canonical actions (e.g. COLOR_GRADE, TRIM_LAYER, GENERATE_CAPTIONS, EXPORT_VIDEO) or read tools (e.g. query_transcript, inspect_layer).',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', description: 'Canonical action name or read tool name.' },
-        actions: { type: 'array', items: { type: 'string' }, description: 'Several action names at once (up to 40) — one round trip instead of many. They share one answer budget (~10k tokens): small schemas come whole, larger ones summarised (listed in `compacted`; schemaDetail.paramsOmitted names the rest).' },
-        params: {
-          oneOf: [
-            { type: 'array', items: { type: 'string' } },
-            { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } },
-          ],
-          description: 'Only these parameters, in full (nested schemas, every enum value): ["name", ...], or { "ACTION": ["name", ...] } per action with actions: [...]. Use it for the parameters a summarised schema lists in schemaDetail.paramsOmitted.',
+        action: { type: 'string', description: 'Action or read tool name.' },
+        actions: { type: 'array', items: { type: 'string' }, description: 'Several names at once (up to 40); large schemas are summarised (see `compacted`, schemaDetail.paramsOmitted).' },
+        params: { type: 'array', items: { type: 'string' }, description: 'Only these parameters, in full (nested schemas, every enum value).' },
+        params_by_action: {
+          type: 'object',
+          additionalProperties: { type: 'array', items: { type: 'string' } },
+          description: 'Per-action parameter lists with actions: [...], e.g. { "COLOR_GRADE": ["lut"] }.',
         },
-        detail: { type: 'string', enum: ['summary', 'full'], description: '"summary" (default): a very large schema is compacted to stay under ~10k tokens. "full": the whole schema as stored (CREATE_LAYER / UPDATE_LAYER are 200-380 KB).' },
+        detail: { type: 'string', enum: ['summary', 'full'], description: 'summary (default, ≤ ~10k tokens) or the whole stored schema.' },
       },
       required: [],
     },
@@ -516,21 +539,13 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_action',
     description:
-      'Execute any single canonical editor action (all 195 actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed. Parameters are checked before anything runs (INVALID_PARAMS lists every problem with suggestions); dry_run: true checks without running. For several edits use execute_batch.',
+      'Run one canonical editor action or read tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, shot_timeline, measure_audio, measure_picture, …) on a project. Pass video_url or assets on the first call to seed a project. Params accept references (@last, @primary, @all:<kind>, @end-3 …). Params are checked first (INVALID_PARAMS with suggestions). Several edits: execute_batch.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', description: 'Canonical action name (e.g. REGISTER_REMOTE_ASSET, SET_SOURCE_RANGE, TRIM_LAYER, REMOVE_SILENCES, CONFIGURE_CANVAS, VERTICAL_REFRAME, COLOR_GRADE, APPLY_VFX, TITLE_CARD, PLAN_MOTION_GRAPHICS, GENERATE_CAPTIONS, STYLE_CAPTIONS, CLEAN_AUDIO, GENERATE_VOICEOVER, GENERATE_MUSIC, ADD_SFX, AUTO_DUCK, RENDER_PREVIEW, EXPORT_VIDEO) or read tool name (e.g. list_layers, query_transcript).' },
-        action_params: { type: 'object', description: 'Parameters for the canonical action (see get_action_schema).' },
-        project_id: { type: 'string', description: 'Project id for state persistence across calls.' },
-        video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
-        assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
-        scene: { type: 'object', description: 'Optional inline scene.' },
-        include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
-        idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
-        rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
-        dry_run: { type: 'boolean', description: 'true: check every step\'s parameters against its schema (unknown names, enum values, types, ranges) in under a second and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it.' },
-        allow_unknown_params: { type: 'boolean', description: 'true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs.' },
+        action: { type: 'string', description: 'Canonical action (e.g. TRIM_LAYER, VERTICAL_REFRAME, COLOR_GRADE, GENERATE_CAPTIONS, EXPORT_VIDEO) or read tool name.' },
+        action_params: { type: 'object', description: 'The action\'s parameters (search_tools / get_action_schema).' },
+        ...DIRECT_COMMON_PROPS,
       },
       required: ['action'],
     },
@@ -538,13 +553,13 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_batch',
     description:
-      'Execute an ordered array of canonical actions and/or read tools in one round trip without autonomous_edit — the fastest way to edit. Pro path for any edit that picks or reorders content (shorts, highlights, recuts): 1) seed once (video_url / assets; reuse the returned project_id on every later call) and read source_map — the WHOLE source in one reply (timed sentence lines per ~1-min section + measured loudness, pauses, speaker turns, shots), not page one of the transcript; 2) PLAN_EDITORIAL_CUT — a story plan: hook with a specific promise in the first 3 s, setup, a payoff that resolves the hook, ending (optionally HOOK_CANDIDATES to rank rendered openings); 3) ASSEMBLE_PICTURE_EDIT from that plan; 4) finishing batch (reframe, captions, B-roll via bin_search inserts so cutaways show the words being said, music + AUTO_DUCK, SFX, grade) — send it with dry_run: true first, then the same batch without it; 5) VERIFY_EDIT depth "editorial" — a critic that watches and hears the render and returns fixes for hook, payoff, arc, pacing, B-roll fit, captions, mix; apply them; 6) EXPORT_VIDEO (its polish gate fixes safe craft issues and returns a polish report). Surgical tweaks (one caption colour, one trim) skip straight to the batch. History: UNDO / REDO step one version; restore_version { revision } or { label } jumps to a saved version or checkpoint (undoable, no confirmation); name versions with checkpoint { label }; try alternatives with fork_variant / compare_variants / promote_variant (pass variant beside project_id to edit a variant). The whole batch is validated first: an unknown, non-callable or unconfirmed destructive action (destructive ones need confirm_destructive: true), and any parameter an action does not take or a value outside its enum / type / range (INVALID_PARAMS), rejects it before anything runs, listing every problem with did-you-mean suggestions; declared aliases are corrected and reported in corrected_params. Exact names: get_action_schema (several actions in one call). Up to 25 steps; atomic: if a step fails while running nothing is committed (allow_partial: true keeps the steps that succeeded). The response has a receipt per step. After the edits the server runs structural passes only (safe zones, timeline reconciliation) — never creative additions — and commits the scene to project_id. Results are unverified: check them with render_preview. EXPORT_VIDEO as the last step masters loudness automatically if MASTER_AUDIO was not called. Answers stay under ~10k tokens: a long read output in a batch is paged (its receipt names the start / offset that continues) and replyBudget lists anything shortened. query_transcript returns timed sentence lines (detail: "words" for per-word times); timeline_view is compact on a busy timeline (detail: "full" for every field).',
+      'Run an ordered list of canonical actions and/or read tools (≤ 25 steps) in one round trip — the fastest way to edit. The whole batch is validated before anything runs (unknown actions, bad params → INVALID_PARAMS with suggestions; destructive actions need confirm_destructive: true) and is atomic unless allow_partial. One receipt per step. Results are unverified: check with render_preview before EXPORT_VIDEO. Pro workflow (source_map → PLAN_EDITORIAL_CUT → ASSEMBLE_PICTURE_EDIT → finishing → VERIFY_EDIT → EXPORT_VIDEO), history (UNDO, restore_version, checkpoint, fork_variant): search_tools editorialPlaybook.',
     inputSchema: {
       type: 'object',
       properties: {
         actions: {
           type: 'array',
-          description: 'Ordered list of { action, params } steps to execute.',
+          description: 'Ordered { action, params } steps.',
           items: {
             type: 'object',
             properties: {
@@ -554,17 +569,12 @@ const TOOL_DEFS: Tool[] = [
             required: ['action'],
           },
         },
-        project_id: { type: 'string', description: 'Project id for state persistence across calls.' },
-        video_url: { type: 'string', description: 'Optional source video URL to seed a new project.' },
-        assets: { type: 'array', items: { type: 'object' }, description: 'Optional media assets to seed a new project.' },
-        scene: { type: 'object', description: 'Optional inline scene.' },
-        include_scene: { type: 'boolean', description: 'If true, include the full raw scene JSON in the response (omitted by default in favor of liveLayers).' },
-        idempotency_key: { type: 'string', description: 'Optional: your own id for this logical call. Resending with the same key returns the first answer instead of applying the edit twice (a resend of a call that answered "running" is deduplicated even without one).' },
-        rerun: { type: 'boolean', description: 'true runs an identical call again on purpose instead of returning the earlier answer.' },
-        dry_run: { type: 'boolean', description: 'true: check every step\'s parameters against its schema (unknown names, enum values, types, ranges) in under a second and return valid / problems / corrected_params; nothing runs or is committed. Send the same call without dry_run to run it.' },
-        allow_unknown_params: { type: 'boolean', description: 'true runs the call even with parameters an action does not take (they are ignored and listed). Default false: any parameter problem refuses the call with INVALID_PARAMS before anything runs.' },
-        allow_partial: { description: 'false (default): atomic. true: commit every step that succeeded. "until_failure": commit the steps before the first failure.' },
-        confirm_destructive: { type: 'boolean', description: 'Required true for destructive actions (CLEAR, DELETE_LAYER on many layers, …).' },
+        ...DIRECT_COMMON_PROPS,
+        allow_partial: {
+          anyOf: [{ type: 'boolean' }, { type: 'string', enum: ['until_failure'] }],
+          description: 'false (default): atomic. true: commit every step that succeeded. "until_failure": commit the steps before the first failure.',
+        },
+        confirm_destructive: { type: 'boolean', description: 'Required true for destructive actions (CLEAR, bulk DELETE_LAYER, …).' },
       },
       required: ['actions'],
     },
@@ -572,19 +582,15 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'render_preview',
     description:
-      'Render real GPU-composited JPEG screenshots of the live project timeline at specified timestamps (and optional normalized 0..1 region crop) — the Levea equivalent of ffmpeg frame extraction, showing all video layers, captions, title cards, color grades, masks, and VFX shaders. Returns native MCP image blocks so you can visually inspect the frames before calling EXPORT_VIDEO.',
+      'Render GPU-composited JPEG frames of the live timeline at given timestamps (optional 0..1 region crop): every layer, caption, title, grade and effect. Returns MCP image blocks to inspect before EXPORT_VIDEO.',
     inputSchema: {
       type: 'object',
       properties: {
-        project_id: { type: 'string', description: 'Project id to render.' },
-        timestamps: {
-          type: 'array',
-          items: { type: 'number' },
-          description: 'Timeline timestamps in seconds to capture (e.g. [1.0, 5.0, 12.0]).',
-        },
+        project_id: { type: 'string', description: 'Project to render.' },
+        timestamps: { type: 'array', items: { type: 'number' }, description: 'Timeline seconds, e.g. [1, 5, 12].' },
         region: {
           type: 'object',
-          description: 'Optional normalized zoom region { x, y, width, height } in 0..1 coordinates.',
+          description: 'Zoom region in 0..1 coordinates.',
           properties: {
             x: { type: 'number' },
             y: { type: 'number' },
@@ -592,7 +598,7 @@ const TOOL_DEFS: Tool[] = [
             height: { type: 'number' },
           },
         },
-        scene: { type: 'object', description: 'Optional inline scene.' },
+        scene: { type: 'object', description: 'Inline scene (advanced).' },
       },
       required: [],
     },
@@ -600,40 +606,38 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'search_skills',
     description:
-      'Search Levea production craft skills (SKILL.md playbooks across editing, color grading, captions, audio mixing, motion graphics, VFX, documentary, podcast, and social shorts) by keyword or category. Your own saved skills (save_skill) are listed first with source "user"; mine: true lists only yours.',
+      'Search Levea craft playbooks (SKILL.md: editing, color, captions, audio mixing, motion graphics, VFX, documentary, podcast, social shorts). Your own saved skills come first (source "user"); mine: true lists only yours.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Search keyword (e.g. "color", "caption", "podcast", "montage", "motion").' },
-        mine: { type: 'boolean', description: 'Only your own saved skills (save_skill).' },
-        category: { type: 'string', description: 'Optional category filter.' },
-        limit: { type: 'number', description: 'Max skills to return (default 20).' },
+        query: { type: 'string', description: 'Keyword, e.g. "color", "podcast", "motion".' },
+        mine: { type: 'boolean', description: 'Only your own saved skills.' },
+        category: { type: 'string', description: 'Category filter.' },
+        limit: { type: 'number', description: 'Max skills (default 20).' },
       },
       required: [],
     },
   },
   {
     name: 'load_skill',
-    description:
-      'Load the full craft playbook (SKILL.md) and bundled resource list for one or more skill IDs returned by search_skills.',
+    description: 'Load the full playbook (SKILL.md) and resource list of one or more skills from search_skills.',
     inputSchema: {
       type: 'object',
       properties: {
-        skill_id: { type: 'string', description: 'Skill ID to load (e.g. "color-grading-finishing", "caption-typography").' },
-        skill_ids: { type: 'array', items: { type: 'string' }, description: 'Optional array of skill IDs to load.' },
+        skill_id: { type: 'string', description: 'Skill id, e.g. "color-grading-finishing".' },
+        skill_ids: { type: 'array', items: { type: 'string' }, description: 'Several skill ids.' },
       },
       required: [],
     },
   },
   {
     name: 'read_skill_resource',
-    description:
-      'Read a bundled reference or template file (e.g. "references/..." or "templates/...") belonging to a production skill.',
+    description: 'Read a bundled reference or template file ("references/…", "templates/…") of a skill.',
     inputSchema: {
       type: 'object',
       properties: {
-        skill_id: { type: 'string', description: 'Skill ID that owns the resource.' },
-        resource: { type: 'string', description: 'Relative path of the resource inside the skill.' },
+        skill_id: { type: 'string', description: 'Skill that owns the resource.' },
+        resource: { type: 'string', description: 'Relative path inside the skill.' },
       },
       required: ['resource'],
     },
@@ -641,22 +645,22 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'save_skill',
     description:
-      'Save (or update) one of your own SKILL.md playbooks on your Levea account, so the editor edits the way you do: your house style, a client\'s rules, how you pace and caption. It is kept as "user/<slug>" and works like a built-in skill: search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` — or on every edit when its frontmatter says apply: always. Frontmatter: name, description, tags, categories, actions (canonical action names), apply: always, and the style edits default to where the request sets none: brand_id, caption_template, style_reference_url. Pass skill_md (the text) or, with the local npx server, path (a SKILL.md file or the folder holding it; its text files such as references/*.md are uploaded as resources). Limits: 50 skills, 48k-character playbook, 12 resources / 128k characters.',
+      'Save (or update) your own SKILL.md playbook as "user/<slug>" so the editor edits your way. search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` (or always, with frontmatter apply: always). Frontmatter: name, description, tags, categories, actions, apply, brand_id, caption_template, style_reference_url. Pass skill_md, or with the local npx server a path. Limits: 50 skills, 48k-character playbook, 12 resources.',
     inputSchema: {
       type: 'object',
       properties: {
-        skill_md: { type: 'string', description: 'The whole SKILL.md: YAML frontmatter (name, description, …) then the playbook in markdown.' },
-        path: { type: 'string', description: 'Local npx server only: path to a SKILL.md file, or to the folder that holds SKILL.md (its other text files are uploaded as resources).' },
+        skill_md: { type: 'string', description: 'The whole SKILL.md (YAML frontmatter, then markdown).' },
+        path: { type: 'string', description: 'Local npx server only: a SKILL.md file or its folder (other text files upload as resources).' },
         resources: { type: 'object', description: 'Bundled text files, { "references/look.md": "…" }.', additionalProperties: { type: 'string' } },
-        skill_id: { type: 'string', description: 'Slug to save under (default: the frontmatter name).' },
-        apply_by_default: { type: 'boolean', description: 'Apply this skill to every autonomous_edit you run (overrides frontmatter apply).' },
+        skill_id: { type: 'string', description: 'Slug to save under (default: frontmatter name).' },
+        apply_by_default: { type: 'boolean', description: 'Apply to every autonomous_edit (overrides frontmatter).' },
       },
       required: [],
     },
   },
   {
     name: 'delete_skill',
-    description: 'Delete one of your own saved skills ("user/<slug>").',
+    description: 'Delete one of your saved skills ("user/<slug>").',
     inputSchema: {
       type: 'object',
       properties: {
@@ -733,11 +737,47 @@ const TOOL_ANNOTATIONS = {
   delete_skill: destructive('Delete your own skill'),
 } satisfies Record<ToolName, ToolAnnotations>;
 
-export const TOOLS: Tool[] = TOOL_DEFS.map((tool) => {
+/**
+ * Strict-client schema hygiene (Gemini, OpenAI strict mode): every free-form
+ * object says so (additionalProperties: true) and every array has items.
+ * Works on a copy: the contract's field schemas are shared objects.
+ */
+function strictSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(strictSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (k === 'properties' && v && typeof v === 'object') {
+      out[k] = Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([pk, pv]) => [pk, strictSchema(pv)]));
+    } else if (k === 'items' || k === 'additionalProperties' || k === 'anyOf') {
+      out[k] = strictSchema(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  if (out.type === 'object' && out.properties === undefined && out.additionalProperties === undefined) out.additionalProperties = true;
+  if (out.type === 'array' && out.items === undefined) out.items = {};
+  return out;
+}
+
+/** A tool as listed over MCP (name, description, inputSchema, title, annotations). */
+export interface LeveaTool {
+  name: string;
+  title?: string;
+  description?: string;
+  inputSchema: { type: 'object'; properties?: Record<string, unknown>; required?: string[]; [k: string]: unknown };
+  annotations?: Record<string, unknown>;
+  [k: string]: unknown;
+}
+
+export const TOOLS: LeveaTool[] = TOOL_DEFS.map((tool) => {
   const annotations = (TOOL_ANNOTATIONS as Record<string, ToolAnnotations>)[tool.name];
   if (!annotations) throw new Error(`Missing annotations for MCP tool "${tool.name}"`);
-  return { ...tool, title: annotations.title, annotations };
+  return { ...tool, inputSchema: strictSchema(tool.inputSchema) as LeveaTool['inputSchema'], title: annotations.title, annotations };
 });
+
+/** Registered tool names: anything else is refused (never forwarded to the backend). */
+const TOOL_NAMES: ReadonlySet<string> = new Set(TOOLS.map((t) => t.name));
 
 // ───────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -753,6 +793,8 @@ function summarizeExec(r: ExecuteResult): string {
   const lines = [`${head} ${r.message || r.reply || (r.success ? 'Done' : 'Failed')}`];
   if (r.videoUrl) lines.push(`📹 ${r.videoUrl}`);
   if (r.jobId !== undefined) lines.push(`🆔 job ${r.jobId}`);
+  const pid = r.projectId || r.project_id;
+  if (pid) lines.push(`project_id: ${pid}`);
   if (r.status) lines.push(`status: ${r.status}`);
   return lines.join('\n');
 }
@@ -771,47 +813,61 @@ function isFailure(structured: unknown): boolean {
   const outcome = String(r.type ?? r.raw?.type ?? '');
   return !NON_ERROR_OUTCOMES.has(outcome);
 }
-// Characters of the structured result carried as text (see resultContent).
-const STRUCTURED_TEXT_MAX_CHARS = 60_000;
 
-/**
- * The text blocks a tool result carries: the one-line summary, then the full
- * structured result as JSON. Many clients (Claude.ai connectors among them)
- * hand the model only the text content, so a result whose data lived only in
- * `structuredContent` reached the model as "✅ projects: 9 item(s)" with no
- * ids, no upload URL and no list. The MCP spec asks a tool that returns
- * structured content to also return it serialized in a text block. Bounded:
- * an over-long result says how much was cut and that the full object is in
- * structuredContent.
- */
 type McpContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string };
 
+/** A result small enough to carry whole in the text block. */
+const TEXT_DATA_MAX_CHARS = 6_000;
+/** Never repeated in the text block (images ride as image blocks; scenes are MBs; raw is a legacy alias). */
+const NOT_IN_TEXT: ReadonlySet<string> = new Set(['base64', 'dataUrl', 'frameImages', 'mcpContent', 'scene', 'raw']);
+
+/** A depth- and length-bounded copy for the text block: ids, statuses, URLs and messages survive; bulk does not. */
+function compactForText(v: unknown, depth: number): unknown {
+  if (typeof v === 'string') return v.length > 400 ? `${v.slice(0, 400)}… (${v.length} chars)` : v;
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) {
+    if (depth >= 3) return `[${v.length} items]`;
+    const head = v.slice(0, 12).map((x) => compactForText(x, depth + 1));
+    return v.length > 12 ? [...head, `… ${v.length - 12} more`] : head;
+  }
+  if (depth >= 3) return '{…}';
+  const o: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (NOT_IN_TEXT.has(k)) continue;
+    o[k] = compactForText(x, depth + 1);
+  }
+  return o;
+}
+
+/**
+ * The content blocks of a tool result: the one-line summary, then the result
+ * data as compact JSON for clients that hand the model only text (Claude.ai
+ * connectors among them). structuredContent always carries the complete
+ * result; the text copy is whole only when small, otherwise a bounded digest
+ * (ids, status, URLs, messages, errors) that says where the rest is.
+ * workingMemory (needed to approve a plan) is always kept whole.
+ */
 function resultContent(text: string, structured: unknown): McpContentBlock[] {
   const blocks: McpContentBlock[] = [{ type: 'text', text }];
   if (structured === undefined || structured === null) return blocks;
-  const rawObj = (structured as any)?.raw ?? structured;
-  const mcpBlocks = Array.isArray(rawObj?.mcpContent) ? rawObj.mcpContent : [];
-  let json: string;
+  const obj = structured as Record<string, any>;
+  const mcpBlocks: any[] = Array.isArray(obj?.mcpContent) ? obj.mcpContent : [];
+  let json: string | undefined;
   try {
-    json = JSON.stringify(structured, (k, v) => {
-      if ((k === 'base64' || k === 'dataUrl' || k === 'frameImages' || k === 'mcpContent') && mcpBlocks.length > 0) {
-        return '[omitted from text block — attached as MCP image block]';
-      }
-      return v;
-    }, 2);
-  } catch (err) {
-    blocks.push({ type: 'text', text: `(result data could not be serialized as text: ${err instanceof Error ? err.message : String(err)}; it is in structuredContent)` });
-    return blocks;
-  }
-  if (json !== undefined) {
-    if (json.length > STRUCTURED_TEXT_MAX_CHARS) {
-      const cut = json.length - STRUCTURED_TEXT_MAX_CHARS;
-      json = `${json.slice(0, STRUCTURED_TEXT_MAX_CHARS)}\n… (${cut} more characters cut; the full result is in structuredContent)`;
+    json = JSON.stringify(structured, (k, v) => (NOT_IN_TEXT.has(k) ? undefined : v));
+    if (json !== undefined && json.length > TEXT_DATA_MAX_CHARS) {
+      const digest = compactForText(structured, 0) as Record<string, unknown>;
+      if (obj && typeof obj === 'object' && obj.workingMemory !== undefined) digest.workingMemory = obj.workingMemory;
+      let d = JSON.stringify(digest);
+      if (d.length > TEXT_DATA_MAX_CHARS * 2 && obj.workingMemory === undefined) d = `${d.slice(0, TEXT_DATA_MAX_CHARS * 2)}…`;
+      json = `${d}\n(digest of a ${json.length}-character result; the complete result is in structuredContent)`;
     }
-    blocks.push({ type: 'text', text: json });
+  } catch (err) {
+    json = `(result data could not be serialized as text: ${err instanceof Error ? err.message : String(err)}; it is in structuredContent)`;
   }
+  if (json !== undefined) blocks.push({ type: 'text', text: json });
   for (const blk of mcpBlocks) {
     if (blk && blk.type === 'image' && typeof blk.data === 'string' && blk.data.length > 0) {
       blocks.push({
@@ -916,6 +972,8 @@ function summarizeAny(label: string, data: unknown): string {
 
 interface DispatchCtx {
   notifyProgress?: (progress: number, total?: number, message?: string) => Promise<void>;
+  /** One progress line (counter kept per call); undefined when the request has no progressToken. */
+  progress?: ProgressFn;
   /** The host's cancel signal: aborts the upstream request when the client goes away. */
   signal?: AbortSignal;
   /** The local stdio binary only: save_skill may read a SKILL.md from the user's disk (never on the hosted endpoint). */
@@ -969,41 +1027,34 @@ const SHADER_FX_ACTIONS = {
   delete_shader_effect: 'DELETE_SHADER_EFFECT',
 } as const;
 
-/** Events kept on a streaming result (the last ones, heartbeats excluded). */
-const MAX_STREAM_EVENTS = 50;
-
 async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchCtx) {
   switch (name) {
     case 'autonomous_edit': {
       if (!str(a.prompt)) return fail('❌ `prompt` is required for autonomous_edit.');
-      const r = await execute(buildEditBody(a, 'all'), ctx.signal);
+      const r = await execute(buildEditBody(a, 'all'), ctx.signal, ctx.progress);
       return ok(summarizeExec(r), r);
     }
 
     case 'autonomous_edit_streaming': {
       if (!str(a.prompt)) return fail('❌ `prompt` is required for autonomous_edit_streaming.');
-      const events: SSEEvent[] = [];
-      let stepN = 0;
+      let eventCount = 0;
+      const t0 = Date.now();
       const r = await executeStreaming(buildEditBody(a, 'all'), (ev) => {
-        const dataObj = (typeof ev.data === 'object' ? ev.data : { raw: ev.data }) as Record<string, unknown>;
+        const dataObj = (typeof ev.data === 'object' ? ev.data : { text: ev.data }) as Record<string, unknown>;
         const typeStr = String(ev.event || dataObj.type || 'event');
-        if (typeStr !== 'heartbeat') {
-          events.push(ev);
-          if (events.length > MAX_STREAM_EVENTS) events.shift();
+        if (typeStr === 'heartbeat') {
+          ctx.progress?.(`still working (${Math.round((Date.now() - t0) / 1000)} s elapsed)`);
+          return;
         }
-        // Emit progress notifications to the MCP client (when supported).
+        eventCount++;
         const msg =
           (dataObj.message as string | undefined) ||
           (dataObj.phase as string | undefined) ||
           (dataObj.summary as string | undefined) ||
           typeStr;
-        if (ctx.notifyProgress && typeStr !== 'heartbeat') {
-          stepN++;
-          // Fire-and-forget; ignore failures (e.g. client doesn't honor notifications).
-          ctx.notifyProgress(stepN, undefined, `${typeStr}: ${msg}`).catch(() => undefined);
-        }
-      }, ctx.signal);
-      return ok(summarizeExec(r), { ...r, events });
+        ctx.progress?.(`${typeStr}: ${msg}`);
+      }, ctx.signal, ctx.progress);
+      return ok(summarizeExec(r), { ...r, eventCount });
     }
 
     case 'queue_edit': {
@@ -1025,6 +1076,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
         pid,
         { action, action_params: actionParams, ...(pid ? { project_id: pid } : {}) },
         ctx.signal,
+        ctx.progress,
       )) as Record<string, unknown>;
       const head = r.success === false
         ? `❌ ${name} failed: ${r.error || r.message || 'unknown'}`
@@ -1035,7 +1087,9 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     case 'check_job_status': {
       const id = str(a.job_id);
       if (!id) return fail('❌ `job_id` is required.');
-      const job = a.wait === true ? await waitForJob(id) : await getJobStatus(id);
+      const job = a.wait === true
+        ? await waitForJob(id, { signal: ctx.signal, onProgress: ctx.progress })
+        : await getJobStatus(id, ctx.signal);
       return ok(
         `${job.success ? '🔎' : '❌'} job ${job.jobId}: ${job.status} (${job.progress}%) ${job.message}${polishLine(job as unknown as Record<string, unknown>)}`,
         job
@@ -1045,7 +1099,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     case 'check_task_status': {
       const id = str(a.task_id);
       if (!id) return fail('❌ `task_id` is required.');
-      const r = await getTaskStatus(id, id.startsWith('dc_'));
+      const r = await getTaskStatus(id, id.startsWith('dc_'), ctx.signal);
       return ok(summarizeAny(`task ${id}`, r), r);
     }
 
@@ -1221,7 +1275,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
         }
       }
       if (!str(body.skill_md)) return fail('❌ `skill_md` (the SKILL.md text) or `path` is required.');
-      const r = (await executeDeterministicTool('save_skill', undefined, body, ctx.signal)) as Record<string, unknown>;
+      const r = (await executeDeterministicTool('save_skill', undefined, body, ctx.signal, ctx.progress)) as Record<string, unknown>;
       return ok(directHead('save_skill', r, 'saved'), r);
     }
 
@@ -1230,20 +1284,28 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     case 'execute_action':
     case 'execute_batch': {
       const pid = str(a.project_id) || str(a.projectId);
-      const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
+      let args = a;
+      // get_action_schema: per-action param lists travel to the backend as `params` (its map form).
+      if (name === 'get_action_schema' && a.params_by_action && typeof a.params_by_action === 'object') {
+        const { params_by_action, ...rest } = a;
+        args = { ...rest, params: params_by_action };
+      }
+      const r = (await executeDeterministicTool(name, pid, args, ctx.signal, ctx.progress)) as Record<string, unknown>;
       return ok(directHead(name, r, 'completed'), r);
     }
 
     case 'render_preview': {
       const pid = str(a.project_id) || str(a.projectId);
-      const r = (await executeDeterministicTool('RENDER_PREVIEW', pid, a, ctx.signal)) as Record<string, unknown>;
+      const r = (await executeDeterministicTool('RENDER_PREVIEW', pid, a, ctx.signal, ctx.progress)) as Record<string, unknown>;
       return ok(directHead('render_preview', r, 'rendered preview frames'), r);
     }
 
     default: {
-      // Allow calling any of the 195 canonical actions or 28 read tools directly by name.
+      // Registered tools without a case of their own (search_skills, load_skill,
+      // read_skill_resource, delete_skill) run as direct tools of the same name.
+      // Unregistered names never reach here (refused in the CallTool handler).
       const pid = str(a.project_id) || str(a.projectId);
-      const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
+      const r = (await executeDeterministicTool(name, pid, a, ctx.signal, ctx.progress)) as Record<string, unknown>;
       return ok(directHead(name, r, 'completed'), r);
     }
   }
@@ -1321,16 +1383,28 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   'The user\'s own style: save_skill uploads their SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists theirs first; autonomous_edit / queue_edit apply it via skills: ["user/<slug>"], or on every edit when it says apply: always. In your own loop, load_skill it and follow it.',
 ].join('\n');
 
-export function createLeveaMcpServer(opts: { localFiles?: boolean } = {}): Server {
+/** The MCP server createLeveaMcpServer returns (an SDK `Server`; typed structurally so the package's .d.ts needs no SDK install). */
+export interface LeveaMcpServer {
+  connect(transport: unknown): Promise<void>;
+  close(): Promise<void>;
+}
+
+export function createLeveaMcpServer(opts: { localFiles?: boolean } = {}): LeveaMcpServer {
   const server = new Server(
     { name: 'levea-mcp-server', version: PKG_VERSION },
     { capabilities: { tools: {} }, instructions: LEVEA_MCP_INSTRUCTIONS }
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS as Tool[] }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req: any, extra: any) => {
     const name = req.params.name;
+    if (typeof name !== 'string' || !TOOL_NAMES.has(name)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Unknown tool "${String(name)}". tools/list has the ${TOOLS.length} Levea tools; run a canonical action with execute_action { action: "${String(name)}" } (search_tools lists them).`,
+      );
+    }
     const args = (req.params.arguments || {}) as Record<string, unknown>;
     const progressToken = req.params._meta?.progressToken;
     const ctx: DispatchCtx = {
@@ -1348,6 +1422,12 @@ export function createLeveaMcpServer(opts: { localFiles?: boolean } = {}): Serve
       signal: extra?.signal,
       ...(opts.localFiles ? { localFiles: true } : {}),
     };
+    if (ctx.notifyProgress) {
+      // MCP progress must increase on every notification: one counter per call.
+      let n = 0;
+      const notify = ctx.notifyProgress;
+      ctx.progress = (message: string) => { n++; void notify(n, undefined, message).catch(() => undefined); };
+    }
     try {
       return await dispatch(name, args, ctx);
     } catch (err) {
@@ -1360,3 +1440,9 @@ export function createLeveaMcpServer(opts: { localFiles?: boolean } = {}): Serve
 }
 
 export { handleLeveaMcpHttpRequest } from './http';
+
+/** Serve a Levea MCP server over stdin/stdout (the `levea-mcp-server` binary). */
+export async function connectStdio(server: LeveaMcpServer): Promise<void> {
+  const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
+  await server.connect(new StdioServerTransport());
+}

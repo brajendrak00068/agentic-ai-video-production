@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.brajendrak00068/levea-mcp-server",
-  "title": "Levea — Autonomous AI Video Editor (39 Tools, 216 Caption Templates, OAuth 2.1)",
+  "title": "Levea — Autonomous AI Video Editor (hosted OAuth or npx)",
   "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export.",
   "websiteUrl": "https://livecore.ai",
   "status": "active",
@@ -15,7 +15,9 @@
     {
       "src": "https://raw.githubusercontent.com/brajendrak00068/agentic-ai-video-production/main/mcp-server/icon-512.png",
       "mimeType": "image/png",
-      "sizes": ["512x512"]
+      "sizes": [
+        "512x512"
+      ]
     }
   ],
   "packages": [
@@ -36,8 +38,8 @@
         },
         {
           "name": "LEVEA_API_KEY",
-          "description": "Levea API key. Generate one at https://livecore.ai/?openclaw=1&utm_source=mcp-registry&utm_medium=mcp-server&utm_campaign=levea-mcp-server",
-          "isRequired": true,
+          "description": "Levea API key, only for this local stdio package (clients that cannot use the hosted endpoint https://api.livecore.ai/api/v1/misc/mcp, which signs in with OAuth and needs no key). Tools list without it; edits need it. Generate one at https://livecore.ai/?openclaw=1&utm_source=mcp-registry&utm_medium=mcp-server&utm_campaign=levea-mcp-server",
+          "isRequired": false,
           "format": "string",
           "isSecret": true
         }

@@ -4,14 +4,23 @@
  * from LEVEA_API_URL / LEVEA_API_KEY in the MCP client's env config.
  * Tool surface lives in ./server (shared with the hosted HTTP endpoint).
  */
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createLeveaMcpServer, PKG_VERSION, TOOLS } from './server';
+import * as nodeModule from 'module';
+
+// Node ≥ 22.1 caches the compiled bundle on disk, so every later `npx` start
+// skips parsing it again. No-op (and harmless) on older Node.
+try {
+  (nodeModule as unknown as { enableCompileCache?: () => unknown }).enableCompileCache?.();
+} catch { /* ignore */ }
+
+// ./server is kept external by the bundler: dist/index.js is a few lines over
+// dist/server.js. Required after the compile cache is on.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { connectStdio, createLeveaMcpServer, PKG_VERSION, TOOLS } = require('./server') as typeof import('./server');
 
 async function main() {
   // The stdio binary runs on the user's machine: save_skill { path } may read their local SKILL.md.
   const server = createLeveaMcpServer({ localFiles: true });
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await connectStdio(server);
   process.stderr.write(
     `levea-mcp-server ${PKG_VERSION} ready (${TOOLS.length} tools)\n`
   );

@@ -42,11 +42,31 @@ Levea goes further across the whole workflow: it runs **2D and 3D motion graphic
 
 ## Quickstart
 
-The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server)** MCP server — one server, every MCP client (Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, Hermes), one tool surface, one backend contract, so nothing drifts per platform.
+The default way to connect is the **hosted MCP endpoint** — nothing to install, no API key: your client signs you in to Levea with OAuth the first time it connects.
 
-**1. Get an API key** — sign up at **[livecore.ai](https://livecore.ai/?openclaw=1&utm_source=npm&utm_medium=mcp-server&utm_campaign=levea-mcp-server)** and generate a Levea API key.
+```
+https://api.livecore.ai/api/v1/misc/mcp
+```
 
-**2. Add the MCP server** — the same `npx` line works for every MCP client:
+**1. Add Levea to your client** (pick yours):
+
+| Client | How (hosted, OAuth — default) |
+|---|---|
+| Claude Code | `claude mcp add --transport http levea https://api.livecore.ai/api/v1/misc/mcp` |
+| Claude Desktop / Claude.ai | Settings → Connectors → Add custom connector → `https://api.livecore.ai/api/v1/misc/mcp` (or install the `.mcpb` bundle) |
+| Cursor | `{"mcpServers":{"levea":{"url":"https://api.livecore.ai/api/v1/misc/mcp"}}}` in `~/.cursor/mcp.json` |
+| Windsurf | `{"mcpServers":{"levea":{"serverUrl":"https://api.livecore.ai/api/v1/misc/mcp"}}}` in `mcp_config.json` |
+| Cline | `{"mcpServers":{"levea":{"type":"streamableHttp","url":"https://api.livecore.ai/api/v1/misc/mcp"}}}` |
+| OpenClaw | The ClawHub plugin `openclaw-ai-video-editor` (chat-native), or the stdio fallback below |
+| Hermes | Register the hosted URL as a remote MCP server in your Hermes config, or the stdio fallback below |
+
+**2. Sign in** — the client opens the Levea sign-in page once (free account at **[livecore.ai](https://livecore.ai/?openclaw=1&utm_source=npm&utm_medium=mcp-server&utm_campaign=levea-mcp-server)**).
+
+**3. Use it** — say to your AI: *"Use the levea tool to generate 5 viral clips from this video, add captions, reframe vertical."* The agent picks the tool, fills the prompt; the editor plans → executes → exports. A full edit takes minutes, not seconds: long edits are best sent with `queue_edit`; see [Safety & limits](#safety--limits).
+
+### Fallback: local stdio server (`npx`) — for clients without remote-MCP support
+
+Only needed when your client cannot connect to a URL. It runs this package locally (no dependencies to install; Node 18+) and needs an API key from [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=npm&utm_medium=mcp-server&utm_campaign=levea-mcp-server):
 
 ```jsonc
 {
@@ -55,7 +75,6 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
       "command": "npx",
       "args": ["-y", "levea-mcp-server"],
       "env": {
-        "LEVEA_API_URL": "https://api.livecore.ai",
         "LEVEA_API_KEY": "your-key-from-livecore.ai"
       }
     }
@@ -63,22 +82,15 @@ The portable interface is the **[`levea-mcp-server`](https://www.npmjs.com/packa
 }
 ```
 
-**3. Use it** — say to your AI: *"Use the levea tool to generate 5 viral clips from this video, add captions, reframe vertical."* The agent picks the tool, fills the prompt; the editor plans → executes → exports. A full edit takes minutes, not seconds; see [Safety & limits](#safety--limits) for long edits.
-
-### Per-client setup
-
-| Client | How |
+| Client (stdio fallback) | How |
 |---|---|
-| Claude Desktop / Cursor / Cline | Add the `levea` block above to `mcpServers` — see the [`levea-mcp-server`](https://www.npmjs.com/package/levea-mcp-server) docs |
-| Claude Code | `claude mcp add levea -e LEVEA_API_URL=https://api.livecore.ai -e LEVEA_API_KEY=... -- npx -y levea-mcp-server` |
-| OpenClaw | The ClawHub plugin `openclaw-ai-video-editor` (chat-native) **or** `openclaw mcp add levea --command "npx -y levea-mcp-server" --env LEVEA_API_URL=https://api.livecore.ai --env LEVEA_API_KEY=...` |
-| Hermes | Register `levea-mcp-server` as an MCP server in your Hermes config |
+| Claude Code | `claude mcp add levea -e LEVEA_API_KEY=... -- npx -y levea-mcp-server` |
+| OpenClaw | `openclaw mcp add levea --command "npx -y levea-mcp-server" --env LEVEA_API_KEY=...` |
+| Any `mcpServers` client | the block above |
 
-> **This package on npm:** `npx -y levea-mcp-server` — no global install needed.
+`LEVEA_API_URL` defaults to `https://api.livecore.ai`; set it only to point elsewhere.
 
-### Hosted endpoint — no install
-
-Clients that connect to a remote MCP server by URL (Smithery, Claude / ChatGPT connectors, Cursor remote servers, Grok Bot) can skip `npx` entirely:
+### Hosted endpoint details
 
 ```
 URL:    https://api.livecore.ai/api/v1/misc/mcp      (Streamable HTTP, stateless)
@@ -106,12 +118,12 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 
 | Host | Use |
 |---|---|
-| **https://api.livecore.ai** | Functional API. Set as `LEVEA_API_URL`. The client appends `/api/v1/misc/openclaw/v1/execute` automatically — never put a full path here. |
+| **https://api.livecore.ai** | Functional API (the stdio server's default `LEVEA_API_URL`). The client appends `/api/v1/misc/openclaw/v1/execute` automatically — never put a full path here. |
 | **https://livecore.ai** | API-key portal (UI). Get your key here. Do **not** use as `LEVEA_API_URL`. |
 
-> Env vars are `LEVEA_API_URL` / `LEVEA_API_KEY`.
+> Env vars (stdio fallback only) are `LEVEA_API_URL` / `LEVEA_API_KEY`.
 
-### Tools the AI sees (39 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
+### Tools the AI sees
 
 **Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's autonomous editing agent (**Mode A: `autonomous_edit`**) or drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ editing craft skills** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
 

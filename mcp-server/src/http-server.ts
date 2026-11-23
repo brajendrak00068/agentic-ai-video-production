@@ -21,9 +21,8 @@
  * Never log request headers or bodies: they carry user API keys and prompts.
  */
 import * as http from 'http';
-import { handleLeveaMcpHttpRequest } from './http';
-import type { LeveaClientConfig } from './client';
-import { PKG_VERSION, TOOLS } from './server';
+// One import of ./server (kept external by the bundler): one copy of the tools and the client.
+import { handleLeveaMcpHttpRequest, PKG_VERSION, TOOLS, type LeveaClientConfig } from './server';
 
 function envNum(name: string, fallback: number): number {
   const n = Number(process.env[name]);
