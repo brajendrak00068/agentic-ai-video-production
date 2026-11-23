@@ -47,7 +47,7 @@ Levea solves the hardest problem in AI video production: **turning raw long-form
 
 ---
 
-## 3. All 43 Annotated MCP Tools (Mode A + Mode B)
+## 3. All 39 Annotated MCP Tools (Mode A + Mode B)
 
 Levea exposes **39 tools** over Model Context Protocol (`https://api.livecore.ai/api/v1/misc/mcp` and `npx -y levea-mcp-server`):
 
