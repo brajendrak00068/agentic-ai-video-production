@@ -1,7 +1,7 @@
 ---
 name: multicam-podcast-video-editor
 description: "Edit podcasts, interviews, and multi-camera recordings (播客): waveform audio sync, active-speaker camera switching, split-screen layouts, podcast clips, and Descript/Opus Clip style transcript editing."
-version: 1.0.7
+version: 1.0.8
 author: brajendrak00068
 license: MIT
 ---

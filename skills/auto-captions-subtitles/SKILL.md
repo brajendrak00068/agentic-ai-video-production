@@ -1,7 +1,7 @@
 ---
 name: auto-captions-subtitles
 description: "Generate word-by-word animated captions, Hormozi captions, karaoke subtitles, SRT/VTT transcripts, translated subtitles, and lip-synced dubbing (216 templates, 字幕). Use when adding captions, subtitles, Hormozi/MrBeast styles, karaoke text, translating video, or dubbing."
-version: 1.0.8
+version: 1.0.9
 author: brajendrak00068
 license: MIT
 ---

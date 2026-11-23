@@ -11,8 +11,8 @@ else is paste-ready.
 
 | Requirement | Status |
 |---|---|
-| MCP server (37 tools) | ✅ Published: npm `levea-mcp-server`, registry `io.github.brajendrak00068/levea-mcp-server` |
-| Hosted Streamable HTTP transport (multi-tenant, per-request auth) | ✅ In production via misc-service `src/routes/mcp.routes.ts` (serves this package's 37 tools); `levea-mcp-http-server` binary added for self-host parity |
+| MCP server (39 tools) | ✅ Published: npm `levea-mcp-server`, registry `io.github.brajendrak00068/levea-mcp-server` |
+| Hosted Streamable HTTP transport (multi-tenant, per-request auth) | ✅ In production via misc-service `src/routes/mcp.routes.ts` (serves this package's 39 tools); `levea-mcp-http-server` binary added for self-host parity |
 | **Public hosted endpoint** | ✅ **LIVE** — `https://api.livecore.ai/api/v1/misc/mcp` (Streamable HTTP; OAuth 2.1 + API-key Bearer; RFC 9728 challenge verified 2026-11-05) |
 | OAuth 2.1 | ✅ Built-in authorization server (`McpOAuthService.ts`), scope `levea`; read-only-scope note in §5 |
 | Backend API | ✅ Live: `https://api.livecore.ai/api/v1/misc/openclaw/v1/*` |
@@ -29,7 +29,7 @@ else is paste-ready.
 ## 1. Endpoint — already live (no deployment needed)
 
 The hosted MCP endpoint runs in production today (misc-service `src/routes/mcp.routes.ts`,
-serving this package's 37 tools — no forked tool list):
+serving this package's 39 tools — no forked tool list):
 
 ```
 POST https://api.livecore.ai/api/v1/misc/mcp   (Streamable HTTP, stateless)

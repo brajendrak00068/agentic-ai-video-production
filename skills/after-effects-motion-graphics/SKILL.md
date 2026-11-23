@@ -1,7 +1,7 @@
 ---
 name: after-effects-motion-graphics
 description: "Create After Effects-style motion graphics: title cards, lower thirds, kinetic typography, 3D extruded bevelled titles, shape layers with Trim Paths and Repeaters, Bezier motion paths, and animated charts."
-version: 1.0.2
+version: 1.0.3
 author: brajendrak00068
 license: MIT
 ---
