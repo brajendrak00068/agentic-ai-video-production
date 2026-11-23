@@ -1,6 +1,6 @@
 ---
 name: levea-ai-video-editor
-description: "AI video editor and autonomous MCP video editing agent (37 tools, 280+ animated caption templates, 189+ actions) — replaces raw ffmpeg/MoviePy scripts for creative edits. Use when the user wants to edit a video, cut silences, generate viral clips for TikTok, Reels, or YouTube Shorts, reframe 16:9 to 9:16 vertical, add word-by-word captions or subtitles, edit multicam podcasts, insert B-roll, motion graphics, VFX, chroma key, color grading, voiceover, music, or export MP4."
+description: "AI video editor and autonomous MCP video editing agent (43 tools, 280+ animated caption templates, 195 actions) — replaces raw ffmpeg/MoviePy scripts for creative edits. Use when the user wants to edit a video, cut silences, generate viral clips for TikTok, Reels, or YouTube Shorts, reframe 16:9 to 9:16 vertical, add word-by-word captions or subtitles, edit multicam podcasts, insert B-roll, motion graphics, VFX, chroma key, color grading, voiceover, music, or export MP4."
 version: 1.0.39
 author: brajendrak00068
 license: MIT
@@ -40,7 +40,7 @@ Levea is a **superset**: it runs **2D and 3D motion graphics** *inside* a cloud 
 ## Tool interface (Mode A: Goal Delegation vs. Mode B: Direct Canonical Tools & Craft Skills)
 
 - **Mode A — Goal Delegation (`autonomous_edit` / `ai-video-editor`):** Send the user's natural-language brief in `prompt`; Levea's autonomous editing agent inspects the footage, executes actions iteratively, verifies rendered frames, and exports.
-- **Mode B — Direct Canonical Tool Control (`search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** Bypass `autonomous_edit` and drive any of the **189+ canonical actions** and **13 read/inspection tools** (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, …) directly on `project_id`. Always execute in the 5-phase NLE order: (1) Inspect → (2) Structure & Cuts → (3) Visuals & Overlays → (4) Audio Mix → (5) Call `render_preview` to inspect real GPU-composited JPEG screenshots (like `ffmpeg` frame grabs), fix any visual issue, then call `EXPORT_VIDEO`.
+- **Mode B — Direct Canonical Tool Control (`search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** Bypass `autonomous_edit` and drive any of the **195 canonical actions** and **28 read/inspection tools** (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, …) directly on `project_id`. Always execute in the 5-phase NLE order: (1) Inspect → (2) Structure & Cuts → (3) Visuals & Overlays → (4) Audio Mix → (5) Call `render_preview` to inspect real GPU-composited JPEG screenshots (like `ffmpeg` frame grabs), fix any visual issue, then call `EXPORT_VIDEO`.
 - **Craft Skills & Custom User Skills (`search_skills` → `load_skill` → `read_skill_resource`):** Search and load any of Levea's **100+ built-in production craft `SKILL.md` playbooks** on demand, or combine them with custom user `SKILL.md` files (in `.claude/skills/`, `.cursor/skills/`, `~/.openclaw/skills/`, or `~/.hermes/skills/`) that define a channel's `brandId`, `captionTemplatePreset`, `style_reference_url`, and house-style step sequence.
 
 ### Tool parameters

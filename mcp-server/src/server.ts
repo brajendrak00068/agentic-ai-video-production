@@ -590,7 +590,7 @@ const TOOL_DEFS: Tool[] = [
   {
     name: 'execute_action',
     description:
-      'Execute any single canonical editor action (all 189+ actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed. Parameters are checked before anything runs (INVALID_PARAMS lists every problem with suggestions); dry_run: true checks without running. For several edits use execute_batch.',
+      'Execute any single canonical editor action (all 195 actions) or read/inspection tool (timeline_view, list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project. Params accept references (@last, @primary, @all:<kind>, @end-3 …) so no id lookups are needed. Parameters are checked before anything runs (INVALID_PARAMS lists every problem with suggestions); dry_run: true checks without running. For several edits use execute_batch.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1334,7 +1334,7 @@ async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchC
     }
 
     default: {
-      // Allow calling any of the 189+ canonical actions or 13 read tools directly by name.
+      // Allow calling any of the 195 canonical actions or 28 read tools directly by name.
       const pid = str(a.project_id) || str(a.projectId);
       const r = (await executeDeterministicTool(name, pid, a, ctx.signal)) as Record<string, unknown>;
       return ok(directHead(name, r, 'completed'), r);

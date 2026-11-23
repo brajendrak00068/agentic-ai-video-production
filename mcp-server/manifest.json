@@ -2067,7 +2067,7 @@
         }
       },
       "search_tools": {
-        "description": "Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook.",
+        "description": "Search all 195 canonical video editing actions, 28 read/inspection tools, AND canonical preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -2196,7 +2196,7 @@
         }
       },
       "execute_action": {
-        "description": "Execute any single canonical editor action (all 189+ actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project.",
+        "description": "Execute any single canonical editor action (all 195 actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -2742,7 +2742,7 @@
     },
     {
       "name": "search_tools",
-      "description": "Search all 189+ canonical video editing actions, 13 read/inspection tools, AND canonical preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook."
+      "description": "Search all 195 canonical video editing actions, 28 read/inspection tools, AND canonical preset catalogs (280+ caption templates, 328+ GPU VFX effects, 170+ transitions, 50+ color grade LUTs, 59 title cards, fonts, blend modes) by keyword, category, or catalog filter. Returns matching actions, catalog presets, and the 5-phase NLE editorialPlaybook."
     },
     {
       "name": "get_action_schema",
@@ -2750,7 +2750,7 @@
     },
     {
       "name": "execute_action",
-      "description": "Execute any single canonical editor action (all 189+ actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project."
+      "description": "Execute any single canonical editor action (all 195 actions) or read/inspection tool (list_layers, inspect_layer, query_transcript, list_sources, search_shots, shot_timeline, read_source_transcript, measure_audio, measure_picture, measure_color) directly on a project scene without autonomous_edit. Pass video_url or assets on the first call to bootstrap a new project."
     },
     {
       "name": "execute_batch",
