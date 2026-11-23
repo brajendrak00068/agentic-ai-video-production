@@ -48,6 +48,18 @@ Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that re
 
 `check_job_status` (export jobs by numeric id), `check_task_status` (queued edits by taskId), `get_active_task` (currently-running edit for a project).
 
+### History, checkpoints & variants (direct tools, via `execute_action` / `execute_batch`)
+
+Every committed call is a saved version, so you can always go back:
+- **`UNDO` / `REDO`** step back or forward **one** version. Versions you undo past are kept as an "abandoned redo branch" after a new edit; `list_versions` shows them and `restore_version { revision }` brings one back.
+- **`restore_version { revision }` or `{ label }`** jumps to any saved version or checkpoint. It is itself a new version (UNDO reverses it), so no confirmation is needed. `scene_diff { from_revision, to_revision }` compares two versions.
+- **`checkpoint { label }`** names the current version (e.g. "rough cut v1"). Automatic checkpoints: `auto: after assemble`, `auto: after first finishing`, `auto: before export`. Checkpoints outlive the 100-version cap (30 kept; oldest automatic ones go first).
+- **Variants: try alternatives side by side.** `fork_variant { label }` copies the scene into a sibling branch; send later calls with `variant: "<id or label>"` beside `project_id` to edit it (the main scene and the editor UI are untouched). `list_variants`, `compare_variants { a, b, judge: true }` (layer diff, plus a rendered pairwise judgement of which edit is better), `promote_variant { variant }` (makes it the main scene; undoable), `delete_variant { variant, confirm_destructive: true }`.
+
+### Late generation jobs (`APPLY_PENDING`)
+
+A generation step (music, B-roll, images) that is still running when its call ends returns `pendingJobs`. Attach them later with `execute_action APPLY_PENDING { task_ids: [...], wait_for_completion: true }` (only jobs you launched on that project; a result whose scene a restore / undo moved off is not applied). A job's result is applied once: if the launching call already landed it, a later APPLY_PENDING reports nothing to do.
+
 ### Your own skills (2)
 
 `save_skill` (`skill_md` or, with the local stdio server, `path`; stored as `user/<slug>`), `delete_skill`. `search_skills` lists them first; `autonomous_edit` / `queue_edit` apply them via `skills`, or always with frontmatter `apply: always`.
