@@ -164,6 +164,8 @@ const DIRECT_COMMON_PROPS: Record<string, JsonSchema> = {
   project_id: { type: 'string', description: 'Project to edit; reuse the id the first call returned.' },
   video_url: { type: 'string', description: 'Source video URL to seed a new project (first call only).' },
   assets: { type: 'array', items: { type: 'object' }, description: 'Media assets to seed a new project (first call only).' },
+  new_project: { type: 'boolean', description: 'With video_url / assets and no project_id: always create a new project, even if this source is already being edited in one (otherwise refused with SEED_DUPLICATE_PROJECT).' },
+  variant: { type: 'string', description: 'Edit / read a variant (fork_variant id or label) of project_id instead of its main scene.' },
   ...FILES_PROP,
   scene: { type: 'object', description: 'Inline scene (advanced; the server keeps the project scene).' },
   include_scene: { type: 'boolean', description: 'Return the full scene JSON (large).' },
@@ -621,6 +623,7 @@ const TOOL_DEFS: Tool[] = [
       type: 'object',
       properties: {
         project_id: { type: 'string', description: 'Project to render.' },
+        variant: { type: 'string', description: 'Render a variant (fork_variant id or label) of project_id instead of its main scene.' },
         timestamps: { type: 'array', items: { type: 'number' }, description: 'Timeline seconds, e.g. [1, 5, 12].' },
         region: {
           type: 'object',
