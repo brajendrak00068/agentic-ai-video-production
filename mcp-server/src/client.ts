@@ -3,6 +3,7 @@ import * as https from 'https';
 import { URL } from 'url';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
+import { isIP } from 'net';
 
 /**
  * Thin HTTP client for the Levea editor backend.
@@ -1057,3 +1058,218 @@ export const deleteAsset = (fileName: string): Promise<unknown> =>
 
 export const transcribeAsset = (body: Record<string, unknown>): Promise<unknown> =>
   callJson('transcribeAsset', 'POST', '/assets/transcribe', { body });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Chat-attached files (ChatGPT `openai/fileParams`)
+// ───────────────────────────────────────────────────────────────────────────
+
+/** A file the chat host passes to a tool: a temporary download URL plus its id (and maybe name / MIME type). */
+export interface HostFile {
+  download_url: string;
+  file_id?: string;
+  mime_type?: string;
+  file_name?: string;
+}
+
+export interface ImportedFile {
+  url: string;
+  kind: 'video' | 'audio' | 'image';
+  name: string;
+  mimeType?: string;
+  /** true when the bytes now live in Levea storage; false = the host's own (expiring) URL is passed on as-is. */
+  copied: boolean;
+  note?: string;
+}
+
+const IMPORT_MAX_REDIRECTS = 5;
+const IMPORT_IDLE_TIMEOUT_MS = 120_000;
+/** A download without Content-Length is held in memory to learn its size (signed PUTs need it); larger ones are passed on by URL. */
+const IMPORT_MAX_BUFFER_BYTES = 1024 * 1024 * 1024;
+
+const VIDEO_EXT = new Set(['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'mpg', 'mpeg', '3gp', 'mts', 'm2ts', 'wmv', 'flv']);
+const AUDIO_EXT = new Set(['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'flac', 'opus', 'weba']);
+const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'heic', 'heif', 'avif', 'tif', 'tiff', 'svg']);
+
+/** video / audio / image from the MIME type, else the file extension; video when nothing says otherwise. */
+export function hostFileKind(mime: string | undefined, name: string | undefined): 'video' | 'audio' | 'image' {
+  const m = (mime || '').toLowerCase();
+  if (m.startsWith('video/')) return 'video';
+  if (m.startsWith('audio/')) return 'audio';
+  if (m.startsWith('image/')) return 'image';
+  const ext = (name || '').toLowerCase().split('?')[0].split('.').pop() || '';
+  if (AUDIO_EXT.has(ext)) return 'audio';
+  if (IMAGE_EXT.has(ext)) return 'image';
+  if (VIDEO_EXT.has(ext)) return 'video';
+  return 'video';
+}
+
+/** Private, loopback, link-local, CGNAT and other non-public addresses (the hosted server must never fetch these). */
+function isNonPublicAddress(address: string, family: number): boolean {
+  if (family === 6) {
+    const a = address.toLowerCase();
+    if (a === '::' || a === '::1') return true;
+    if (a.startsWith('::ffff:')) return isNonPublicAddress(a.slice(7), 4);
+    return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(a);
+  }
+  const p = address.split('.').map(Number);
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n))) return true;
+  const [a, b] = p;
+  return a === 0 || a === 10 || a === 127 || a >= 224
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 198 && (b === 18 || b === 19));
+}
+
+/** DNS lookup that refuses non-public addresses at connect time (no rebinding window). */
+function publicOnlyLookup(hostname: string, options: any, callback: any): void {
+  import('dns').then((dns) => {
+    dns.lookup(hostname, { ...options, all: true }, (err: NodeJS.ErrnoException | null, addresses: any) => {
+      if (err) return callback(err);
+      const list = (Array.isArray(addresses) ? addresses : [{ address: addresses, family: options?.family || 4 }]) as { address: string; family: number }[];
+      const bad = list.find((x) => isNonPublicAddress(x.address, x.family));
+      if (bad || list.length === 0) return callback(new RequestError(`refusing to fetch ${hostname}: not a public address`, 'EADDRNOTPUBLIC'));
+      if (options?.all) return callback(null, list);
+      return callback(null, list[0].address, list[0].family);
+    });
+  }, callback);
+}
+
+/** GET a public https URL (following redirects); resolves with the open response stream. */
+function openDownload(rawUrl: string, signal: AbortSignal | undefined, hops = 0): Promise<http.IncomingMessage> {
+  return new Promise((resolve, reject) => {
+    let u: URL;
+    try { u = new URL(rawUrl); } catch { reject(new RequestError('download_url is not a valid URL', 'EINVALIDURL')); return; }
+    if (u.protocol !== 'https:') { reject(new RequestError('download_url must be https', 'EINVALIDURL')); return; }
+    // An IP-literal host skips DNS (and so publicOnlyLookup): check it here.
+    const literal = u.hostname.replace(/^\[|\]$/g, '');
+    const family = isIP(literal);
+    if (family && isNonPublicAddress(literal, family)) {
+      reject(new RequestError(`refusing to fetch ${u.hostname}: not a public address`, 'EADDRNOTPUBLIC'));
+      return;
+    }
+    if (signal?.aborted) { reject(new RequestError('The request was aborted', 'ABORT_ERR')); return; }
+    const req = https.get(u, { lookup: publicOnlyLookup as any, headers: { Accept: '*/*', 'User-Agent': clientHeader() } }, (res) => {
+      const status = res.statusCode || 0;
+      if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume();
+        if (hops >= IMPORT_MAX_REDIRECTS) { reject(new RequestError('too many redirects', 'EREDIRECT')); return; }
+        openDownload(new URL(res.headers.location, u).toString(), signal, hops + 1).then(resolve, reject);
+        return;
+      }
+      if (status !== 200) { res.resume(); reject(new RequestError(`download failed: HTTP ${status}`, 'EDOWNLOAD')); return; }
+      resolve(res);
+    });
+    req.setTimeout(IMPORT_IDLE_TIMEOUT_MS, () => req.destroy(new RequestError('download timed out', 'ETIMEDOUT')));
+    req.on('error', reject);
+    signal?.addEventListener('abort', () => req.destroy(new RequestError('The request was aborted', 'ABORT_ERR')), { once: true });
+  });
+}
+
+function readAll(res: http.IncomingMessage, cap: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let n = 0;
+    res.on('data', (c: Buffer) => {
+      n += c.length;
+      if (n > cap) { res.destroy(new RequestError('file too large to buffer', 'ETOOLARGE')); return; }
+      chunks.push(c);
+    });
+    res.on('end', () => resolve(Buffer.concat(chunks)));
+    res.on('error', reject);
+  });
+}
+
+/** PUT a body (stream or buffer) to a signed upload URL with the exact headers it was signed for. */
+function putSigned(uploadUrl: string, headers: Record<string, string>, body: http.IncomingMessage | Buffer, size: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(uploadUrl);
+    const transport = u.protocol === 'https:' ? https : http;
+    const req = transport.request(u, { method: 'PUT', headers: { ...headers, 'Content-Length': String(size) } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => {
+        const status = res.statusCode || 0;
+        if (status >= 200 && status < 300) resolve();
+        else reject(new RequestError(`upload failed: HTTP ${status} ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`, 'EUPLOAD'));
+      });
+      res.on('error', reject);
+    });
+    req.setTimeout(IMPORT_IDLE_TIMEOUT_MS, () => req.destroy(new RequestError('upload timed out', 'ETIMEDOUT')));
+    req.on('error', reject);
+    signal?.addEventListener('abort', () => req.destroy(new RequestError('The request was aborted', 'ABORT_ERR')), { once: true });
+    if (Buffer.isBuffer(body)) req.end(body);
+    else {
+      body.on('error', (e) => req.destroy(e));
+      body.pipe(req);
+    }
+  });
+}
+
+function fileNameFor(f: HostFile, kind: string, mime: string | undefined): string {
+  const given = (f.file_name || '').trim();
+  if (given) return given;
+  const sub = (mime || '').split('/')[1]?.split(';')[0];
+  const ext = sub && /^[a-z0-9.+-]{1,12}$/i.test(sub) ? sub.replace('quicktime', 'mov') : (kind === 'image' ? 'png' : kind === 'audio' ? 'mp3' : 'mp4');
+  return `${kind}-${(f.file_id || randomUUID()).replace(/[^A-Za-z0-9_-]/g, '').slice(-24)}.${ext}`;
+}
+
+/**
+ * Copy a chat-attached file (ChatGPT passes { download_url, file_id }) into the
+ * user's Levea asset storage, so the edit reads a stable URL instead of a
+ * short-lived host link. Never throws: if the copy cannot be made, the host's
+ * own URL is passed on (the backend fetches public URLs itself) with a note.
+ */
+export async function importHostFile(f: HostFile, signal?: AbortSignal): Promise<ImportedFile> {
+  const declaredMime = typeof f.mime_type === 'string' && f.mime_type.trim() ? f.mime_type.trim() : undefined;
+  const fallbackKind = hostFileKind(declaredMime, f.file_name);
+  const passOn = (note: string): ImportedFile => ({
+    url: f.download_url,
+    kind: fallbackKind,
+    name: fileNameFor(f, fallbackKind, declaredMime),
+    ...(declaredMime ? { mimeType: declaredMime } : {}),
+    copied: false,
+    note,
+  });
+  let res: http.IncomingMessage;
+  try {
+    res = await openDownload(f.download_url, signal);
+  } catch (err) {
+    if ((err as RequestError)?.code === 'ABORT_ERR') throw err;
+    // A non-public / non-https URL is never passed on either: the backend must not be pointed at it.
+    if ((err as RequestError)?.code === 'EADDRNOTPUBLIC' || (err as RequestError)?.code === 'EINVALIDURL') {
+      throw new Error(`The attached file's download_url was refused (${(err as Error).message}).`);
+    }
+    return passOn(`could not download the file to copy it (${(err as Error).message}); passing the original link`);
+  }
+  const headerMime = String(res.headers['content-type'] || '').split(';')[0].trim();
+  const mime = declaredMime || (headerMime && headerMime !== 'application/octet-stream' ? headerMime : undefined);
+  const kind = hostFileKind(mime, f.file_name);
+  const name = fileNameFor(f, kind, mime);
+  try {
+    let body: http.IncomingMessage | Buffer = res;
+    let size = Number(res.headers['content-length']);
+    if (!Number.isSafeInteger(size) || size <= 0 || res.headers['content-encoding']) {
+      body = await readAll(res, IMPORT_MAX_BUFFER_BYTES);
+      size = body.length;
+    }
+    const contentType = mime || (kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : 'video/mp4');
+    const signed = await assetUploadUrl({ fileName: name, fileType: kind, contentType, fileSize: size }) as Record<string, unknown>;
+    const uploadUrl = typeof signed.uploadUrl === 'string' ? signed.uploadUrl : (typeof signed.signedUrl === 'string' ? signed.signedUrl : '');
+    const fileUrl = typeof signed.fileUrl === 'string' ? signed.fileUrl : (typeof signed.publicUrl === 'string' ? signed.publicUrl : '');
+    if (signed.success === false || !uploadUrl || !fileUrl || (signed.uploadType && signed.uploadType !== 'signed_put')) {
+      if (!Buffer.isBuffer(body)) res.destroy();
+      return passOn(`Levea storage did not return a signed upload (${String(signed.error || signed.uploadType || 'no url')}); passing the original link`);
+    }
+    const required = (signed.requiredHeaders && typeof signed.requiredHeaders === 'object' ? signed.requiredHeaders : {}) as Record<string, string>;
+    const headers: Record<string, string> = { 'Content-Type': contentType };
+    for (const [k, v] of Object.entries(required)) if (k.toLowerCase() !== 'content-length') headers[k] = String(v);
+    await putSigned(uploadUrl, headers, body, size, signal);
+    return { url: fileUrl, kind, name, mimeType: contentType, copied: true };
+  } catch (err) {
+    res.destroy();
+    if ((err as RequestError)?.code === 'ABORT_ERR') throw err;
+    return passOn(`copying the file into Levea failed (${(err as Error).message}); passing the original link`);
+  }
+}

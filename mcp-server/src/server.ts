@@ -35,6 +35,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { buildEditBody, editInputSchema } from './editContract';
 import {
+  importHostFile,
+  type HostFile,
   execute,
   executeStreaming,
   getJobStatus,
@@ -126,11 +128,43 @@ const SHADER_V3_PROPS: Record<string, JsonSchema> = {
   geometry: { type: 'object', description: '[v3] { mode: "quads"|"points", count }: instanced particles drawn by fn instance(i, c).' },
 };
 
+// Files attached in the chat. ChatGPT cannot PUT bytes to asset_upload_url, so
+// it passes attachments through `openai/fileParams` as { download_url, file_id }
+// (Apps SDK: every file object declares all four properties and requires only
+// download_url + file_id). The server copies each into Levea storage and seeds
+// the project with it (first video → video_url, the rest → assets).
+const HOST_FILE_SCHEMA: JsonSchema = {
+  type: 'object',
+  properties: {
+    download_url: { type: 'string' },
+    file_id: { type: 'string' },
+    mime_type: { type: 'string' },
+    file_name: { type: 'string' },
+  },
+  required: ['download_url', 'file_id'],
+  additionalProperties: false,
+};
+const FILES_PROP: Record<string, JsonSchema> = {
+  files: {
+    type: 'array',
+    items: HOST_FILE_SCHEMA,
+    description: 'Video / audio / image files the user attached in this chat (ChatGPT fills this in). They are copied into Levea; the first video seeds the project (unless video_url is set), the rest become assets. Use this instead of asset_upload_url when the user uploaded the file to the chat.',
+  },
+};
+/** Tools that take chat-attached files (`openai/fileParams`). */
+const FILE_PARAM_TOOLS = new Set(['autonomous_edit', 'autonomous_edit_streaming', 'queue_edit', 'execute_action', 'execute_batch']);
+
+/** The tool's input schema with the `files` field added. */
+function withFiles(schema: Record<string, unknown>): Record<string, unknown> {
+  return { ...schema, properties: { ...((schema.properties as Record<string, unknown>) || {}), ...FILES_PROP } };
+}
+
 // Fields shared by execute_action and execute_batch.
 const DIRECT_COMMON_PROPS: Record<string, JsonSchema> = {
   project_id: { type: 'string', description: 'Project to edit; reuse the id the first call returned.' },
   video_url: { type: 'string', description: 'Source video URL to seed a new project (first call only).' },
   assets: { type: 'array', items: { type: 'object' }, description: 'Media assets to seed a new project (first call only).' },
+  ...FILES_PROP,
   scene: { type: 'object', description: 'Inline scene (advanced; the server keeps the project scene).' },
   include_scene: { type: 'boolean', description: 'Return the full scene JSON (large).' },
   idempotency_key: { type: 'string', description: 'Your id for this logical call: a resend returns the first answer instead of applying twice.' },
@@ -145,19 +179,19 @@ const TOOL_DEFS: Tool[] = [
     name: 'autonomous_edit',
     description:
       'PRIMARY EDIT TOOL. Runs a natural-language video edit end-to-end: Levea\'s editing agent plans, edits, checks the rendered frames and exports. Send the user\'s brief verbatim, from one line to a multi-paragraph creative brief. Waits up to 5 min, but a full edit can take 10-20 min: prefer queue_edit for long edits. The first progress notification names the project_id; if the wait ends first the result is status "running" — follow it with get_active_task, never re-send the edit.',
-    inputSchema: AUTONOMOUS_EDIT_SCHEMA as Tool['inputSchema'],
+    inputSchema: withFiles(AUTONOMOUS_EDIT_SCHEMA) as Tool['inputSchema'],
   },
   {
     name: 'autonomous_edit_streaming',
     description:
       'autonomous_edit with live progress: same parameters (documented on autonomous_edit), per-step MCP progress notifications, waits up to 30 min. Returns the final result.',
-    inputSchema: withoutFieldDocs(AUTONOMOUS_EDIT_SCHEMA) as Tool['inputSchema'],
+    inputSchema: withFiles(withoutFieldDocs(AUTONOMOUS_EDIT_SCHEMA)) as Tool['inputSchema'],
   },
   {
     name: 'queue_edit',
     description:
       'Preferred for long edits: queues an autonomous edit and returns a taskId at once, so no client timeout applies. Same fields as autonomous_edit (documented there) plus platforms / autoExport. Poll check_task_status { task_id } or get_active_task { project_id }.',
-    inputSchema: withoutFieldDocs(QUEUE_EDIT_SCHEMA, new Set(['prompt'])) as Tool['inputSchema'],
+    inputSchema: withFiles(withoutFieldDocs(QUEUE_EDIT_SCHEMA, new Set(['prompt']))) as Tool['inputSchema'],
   },
 
   // ── ShaderFX — your own GPU effects, transitions and generators ──────────
@@ -437,7 +471,7 @@ const TOOL_DEFS: Tool[] = [
   // ── Assets ───────────────────────────────────────────────────────────────
   {
     name: 'asset_upload_url',
-    description: 'Signed upload URL for a local file. Returns { uploadUrl, fileUrl }: PUT the bytes to uploadUrl, then pass fileUrl as video_url / in assets[].',
+    description: 'Signed upload URL for a file on the caller\'s own disk. Returns { uploadUrl, fileUrl }: PUT the bytes to uploadUrl, then pass fileUrl as video_url / in assets[]. A file the user attached in a chat (ChatGPT) needs no upload: pass it in `files` on autonomous_edit / queue_edit / execute_batch / execute_action.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -773,7 +807,13 @@ export interface LeveaTool {
 export const TOOLS: LeveaTool[] = TOOL_DEFS.map((tool) => {
   const annotations = (TOOL_ANNOTATIONS as Record<string, ToolAnnotations>)[tool.name];
   if (!annotations) throw new Error(`Missing annotations for MCP tool "${tool.name}"`);
-  return { ...tool, inputSchema: strictSchema(tool.inputSchema) as LeveaTool['inputSchema'], title: annotations.title, annotations };
+  return {
+    ...tool,
+    inputSchema: strictSchema(tool.inputSchema) as LeveaTool['inputSchema'],
+    title: annotations.title,
+    annotations,
+    ...(FILE_PARAM_TOOLS.has(tool.name) ? { _meta: { 'openai/fileParams': ['files'] } } : {}),
+  };
 });
 
 /** Registered tool names: anything else is refused (never forwarded to the backend). */
@@ -1027,7 +1067,39 @@ const SHADER_FX_ACTIONS = {
   delete_shader_effect: 'DELETE_SHADER_EFFECT',
 } as const;
 
-async function dispatch(name: string, a: Record<string, unknown>, ctx: DispatchCtx) {
+/**
+ * Chat-attached files (`files`) → the inputs the backend reads: each file is
+ * copied into Levea storage; the first video seeds the project as video_url
+ * (unless one was given), every other file joins assets[]. `files` itself is
+ * never forwarded.
+ */
+async function resolveHostFiles(a: Record<string, unknown>, ctx: DispatchCtx): Promise<Record<string, unknown>> {
+  if (!('files' in a)) return a;
+  const { files, ...rest } = a;
+  const list = (Array.isArray(files) ? files : files ? [files] : []).filter(
+    (f): f is HostFile => !!f && typeof f === 'object' && typeof (f as HostFile).download_url === 'string' && (f as HostFile).download_url.trim() !== '',
+  );
+  if (list.length === 0) return rest;
+  ctx.progress?.(`copying ${list.length} attached file(s) into Levea`);
+  const imported = [];
+  for (const f of list) imported.push(await importHostFile(f, ctx.signal));
+  const out: Record<string, unknown> = { ...rest };
+  const assets = Array.isArray(rest.assets) ? [...(rest.assets as unknown[])] : [];
+  for (const file of imported) {
+    if (file.kind === 'video' && !str(out.video_url)) {
+      out.video_url = file.url;
+      continue;
+    }
+    assets.push({ url: file.url, type: file.kind, ...(file.mimeType ? { mimeType: file.mimeType } : {}) });
+  }
+  if (assets.length > 0) out.assets = assets;
+  const notes = imported.filter((f) => f.note).map((f) => `${f.name}: ${f.note}`);
+  if (notes.length > 0) ctx.progress?.(notes.join('; '));
+  return out;
+}
+
+async function dispatch(name: string, input: Record<string, unknown>, ctx: DispatchCtx) {
+  const a = FILE_PARAM_TOOLS.has(name) ? await resolveHostFiles(input, ctx) : input;
   switch (name) {
     case 'autonomous_edit': {
       if (!str(a.prompt)) return fail('❌ `prompt` is required for autonomous_edit.');

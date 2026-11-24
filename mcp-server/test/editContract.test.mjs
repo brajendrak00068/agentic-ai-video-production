@@ -31,7 +31,8 @@ test('queue_edit does not forward fields the /queue-edit route ignores', () => {
 test('edit tools expose exactly the contract fields', () => {
   const byName = Object.fromEntries(TOOLS.map((t) => [t.name, t.inputSchema]));
   for (const [tool, surface] of [['autonomous_edit', 'all'], ['autonomous_edit_streaming', 'all'], ['queue_edit', 'queue']]) {
-    assert.deepEqual(Object.keys(byName[tool].properties).sort(), Object.keys(editInputSchema(surface).properties).sort(), tool);
+    // + `files` (chat-attached files, MCP-only: resolved into video_url / assets before the body is built).
+    assert.deepEqual(Object.keys(byName[tool].properties).sort(), [...Object.keys(editInputSchema(surface).properties), 'files'].sort(), tool);
   }
 });
 
