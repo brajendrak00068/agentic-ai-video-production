@@ -5,7 +5,7 @@
   "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export.",
   "websiteUrl": "https://livecore.ai",
   "status": "active",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "repository": {
     "url": "https://github.com/brajendrak00068/agentic-ai-video-production",
     "source": "github",
@@ -24,7 +24,7 @@
     {
       "registryType": "npm",
       "identifier": "levea-mcp-server",
-      "version": "0.7.4",
+      "version": "0.7.5",
       "transport": {
         "type": "stdio"
       },
