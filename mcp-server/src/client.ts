@@ -554,9 +554,12 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 /** "step 2 of 5 (COLOR_GRADE)" from a running direct call's progressDetail, else ''. */
 function stepWhere(d: Record<string, unknown>): string {
-  const pd = d.progressDetail as { stepsDone?: number; stepsTotal?: number; currentAction?: string } | undefined;
-  if (!pd || !pd.stepsTotal) return '';
-  return `, step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}`;
+  const pd = d.progressDetail as { stepsDone?: number; stepsTotal?: number; currentAction?: string; heartbeat?: string } | undefined;
+  if (!pd) return '';
+  // Before the first step the source is being ingested (download, probe,
+  // transcript): the server's latest note is the only progress there is.
+  if (!pd.stepsTotal) return pd.heartbeat ? `, ingesting the source: ${pd.heartbeat}` : '';
+  return `, step ${Math.min(pd.stepsTotal, (pd.stepsDone ?? 0) + 1)} of ${pd.stepsTotal}${pd.currentAction ? ` (${pd.currentAction})` : ''}${pd.heartbeat ? ` — ${pd.heartbeat}` : ''}`;
 }
 
 /**
