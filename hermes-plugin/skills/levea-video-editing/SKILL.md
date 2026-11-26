@@ -8,9 +8,9 @@ license: MIT
 
 # Levea Video Editing
 
-Levea supports two editing modes plus on-demand craft skills:
-- **Mode A — Goal Delegation (`levea_video_edit`):** Send the complete user intent as one natural-language `prompt`; Levea's autonomous editing agent inspects, executes, verifies, repairs, and exports.
-- **Mode B — Direct Canonical Tools (`levea_search_tools` → `levea_get_action_schema` → `levea_execute_action` / `levea_execute_batch` → `levea_render_preview` → `EXPORT_VIDEO`):** Drive any of the 195 canonical actions and 28 read tools directly on `project_id`, inspect GPU-composited JPEG screenshots via `levea_render_preview`, and export without invoking the planner.
+Levea supports two editing harnesses plus on-demand craft skills:
+- **Levea Harness — Goal Delegation (`levea_video_edit`):** Send the complete user intent as one natural-language `prompt`; Levea's autonomous editing agent inspects, executes, verifies, repairs, and exports.
+- **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`levea_search_tools` → `levea_get_action_schema` → `levea_execute_action` / `levea_execute_batch` → `levea_render_preview` → `EXPORT_VIDEO`):** Drive any of the 195 canonical actions and 28 read tools directly on `project_id`, inspect GPU-composited JPEG screenshots via `levea_render_preview`, and export without invoking the planner.
 - **Skills (`levea_search_skills` → `levea_load_skill` → `levea_read_skill_resource`):** Search and load any of Levea's 100+ built-in production craft `SKILL.md` playbooks on demand, or combine them with custom user skills in `~/.hermes/skills/`.
 
 ## When to use
