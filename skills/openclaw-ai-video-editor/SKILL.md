@@ -30,12 +30,12 @@ Levea goes further across the whole workflow: it runs **2D and 3D motion graphic
 ## Setup & Authentication
 
 1. Generate a free API key at `https://www.livecore.ai/?openclaw=1` and set `LEVEA_API_KEY` in your environment or OpenClaw plugin config (`LEVEA_API_URL` defaults to `https://api.livecore.ai`).
-2. Ensure the OpenClaw plugin (`openclaw plugins install openclaw-ai-video-editor`) or MCP server (`npx -y levea-mcp-server`) is installed so the `ai-video-editor` / `autonomous_edit` tool is registered.
+2. Ensure the OpenClaw plugin (`openclaw plugins install openclaw-ai-video-editor`) or MCP server (`npx -y levea-mcp-server`) is installed so the `ai-video-editor` tool (OpenClaw) or the direct tools (MCP server; its `autonomous_edit` tool needs `LEVEA_ENABLE_AUTONOMOUS=1`) are registered.
 
 ## Tool interface (Levea Harness (`autonomous_edit`) vs. Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`))
 
-- **Levea Harness — Goal Delegation (`autonomous_edit` / `ai-video-editor`):** Send the user's natural-language brief in `prompt`; Levea's autonomous editing agent inspects the footage, executes actions iteratively, verifies rendered frames, and exports.
-- **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** Bypass `autonomous_edit` and drive any of the **195 canonical actions** and **28 read/inspection tools** directly on `project_id`. Always execute in the 5-phase NLE order: (1) Inspect → (2) Structure & Cuts → (3) Visuals & Overlays → (4) Audio Mix → (5) Call `render_preview` to inspect real GPU-composited JPEG screenshots, fix any visual issue, then call `EXPORT_VIDEO`.
+- **Levea Harness — Goal Delegation (`autonomous_edit` / `ai-video-editor`):** Send the user's natural-language brief in `prompt`; Levea's autonomous editing agent inspects the footage, executes actions iteratively, verifies rendered frames, and exports. On the MCP server this harness is opt-in: `autonomous_edit` is listed only with `LEVEA_ENABLE_AUTONOMOUS=1`; the OpenClaw `ai-video-editor` tool keeps it.
+- **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools` → `get_action_schema` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`):** The MCP server's default: drive any of the **195 canonical actions** and **28 read/inspection tools** directly on `project_id`. Always execute in the 5-phase NLE order: (1) Inspect → (2) Structure & Cuts → (3) Visuals & Overlays → (4) Audio Mix → (5) Call `render_preview` to inspect real GPU-composited JPEG screenshots, fix any visual issue, then call `EXPORT_VIDEO`.
 - **Craft Skills & Custom User Skills (`search_skills` → `load_skill` → `read_skill_resource`):** Search and load any of Levea's **100+ built-in production craft `SKILL.md` playbooks** on demand, or combine them with custom user `SKILL.md` files that define a channel's `brandId`, `captionTemplatePreset`, `style_reference_url`, and house-style step sequence.
 
 ### Tool parameters

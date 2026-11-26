@@ -7,6 +7,9 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 
+// The autonomous tools are listed only with LEVEA_ENABLE_AUTONOMOUS (opt-in since 0.8.0).
+const AUTONOMOUS_ON = { LEVEA_ENABLE_AUTONOMOUS: '1' };
+
 function backend(handler) {
   const server = http.createServer(handler);
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
@@ -44,7 +47,7 @@ test('a streamed error event is a tool error, and the call ends without waiting 
     res.write('data: {"type":"error","message":"boom"}\n\n');
     setInterval(() => res.write(': ping\n\n'), 100).unref(); // never ends, like the real error path
   });
-  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'autonomous_edit_streaming', { prompt: 'x' });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'autonomous_edit_streaming', { prompt: 'x' }, AUTONOMOUS_ON);
   server.closeAllConnections(); server.close();
   assert.equal(r.isError, true);
   assert.equal(r.structuredContent.success, false);
@@ -56,7 +59,7 @@ test('CRLF-framed events and the closing JSON payload are read', async () => {
     res.write('data: {"type":"success","success":true,"message":"event"}\r\n\r\n');
     res.end('{"success":true,"message":"final","videoUrl":"https://v/final.mp4"}');
   });
-  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'autonomous_edit_streaming', { prompt: 'x' });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'autonomous_edit_streaming', { prompt: 'x' }, AUTONOMOUS_ON);
   server.close();
   assert.equal(r.isError ?? false, false);
   assert.equal(r.structuredContent.videoUrl, 'https://v/final.mp4');
@@ -71,7 +74,7 @@ for (const tool of ['autonomous_edit', 'autonomous_edit_streaming']) {
       req.on('close', () => clearInterval(t));
     });
     const r = await callTool(`http://127.0.0.1:${server.address().port}`, tool, { prompt: 'x' },
-      { LEVEA_REQUEST_TIMEOUT_MS: '1500', LEVEA_STREAM_TIMEOUT_MS: '1500' });
+      { ...AUTONOMOUS_ON, LEVEA_REQUEST_TIMEOUT_MS: '1500', LEVEA_STREAM_TIMEOUT_MS: '1500' });
     server.closeAllConnections(); server.close();
     assert.equal(r.isError ?? false, false);
     assert.equal(r.structuredContent.status, 'running');

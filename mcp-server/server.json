@@ -5,7 +5,7 @@
   "description": "Autonomous AI video editor over MCP: viral clips, captions, reframe, chroma key, MP4 export.",
   "websiteUrl": "https://livecore.ai",
   "status": "active",
-  "version": "0.7.7",
+  "version": "0.8.0",
   "repository": {
     "url": "https://github.com/brajendrak00068/agentic-ai-video-production",
     "source": "github",
@@ -24,7 +24,7 @@
     {
       "registryType": "npm",
       "identifier": "levea-mcp-server",
-      "version": "0.7.7",
+      "version": "0.8.0",
       "transport": {
         "type": "stdio"
       },
@@ -42,6 +42,13 @@
           "isRequired": false,
           "format": "string",
           "isSecret": true
+        },
+        {
+          "name": "LEVEA_ENABLE_AUTONOMOUS",
+          "description": "1 lists autonomous_edit, autonomous_edit_streaming, queue_edit and get_active_task (off by default since 0.8.0: the direct tools execute what your agent plans).",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
         }
       ]
     }

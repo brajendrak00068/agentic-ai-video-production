@@ -4,21 +4,13 @@ Guidance for AI agents (Claude, GPT-class models, OpenClaw, Hermes, Cursor, Clin
 
 ## What this is
 
-`levea-mcp-server` exposes the **Levea autonomous video editor** — an editor that is itself an agent — as a small set of MCP tools. Calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end. The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
+`levea-mcp-server` exposes the **Levea video editor** as a small set of MCP tools. By default (since 0.8.0) the calling agent plans the edit, and the direct tools execute each action exactly as given and report what happened. Levea's autonomous mode — an editor that is itself an agent: calling agents delegate goals (a sentence, a creative brief) and the editor plans, executes, verifies, and exports end-to-end — is opt-in (see [Autonomous mode (opt-in)](#autonomous-mode-opt-in)). The MCP server is a thin, stable adapter over the backend contract `POST https://api.livecore.ai/api/v1/misc/openclaw/v1/execute`. No editing logic, shell, filesystem, or raw renderer lives here.
 
 ## Tools
 
-The surface supports **two complementary execution harnesses** plus typed management & polling:
-- **Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`):** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports).
-- **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`):** Drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without invoking `autonomous_edit`, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
-
-### Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`) (1 + 2 variants)
-
-| Tool | Mutates? | Async? |
-|---|---|---|
-| `autonomous_edit` (**primary**) | Yes | Yes — may auto-fire an export job |
-| `autonomous_edit_streaming` (SSE — emits per-step progress notifications) | Yes | Yes |
-| `queue_edit` (fire-and-forget; returns `taskId` for `check_task_status`) | Yes | Yes |
+The surface supports **two complementary execution harnesses** plus typed management & polling. The server lists 35 tools by default and 39 with autonomous mode:
+- **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`) — the default:** Drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ production craft skills (`SKILL.md`)** directly from your own agent loop without Levea's planner, inspect real GPU-composited JPEG screenshots via `render_preview` (like `ffmpeg` frame grabs), and export via `EXPORT_VIDEO`.
+- **Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`) — opt-in:** Delegate a full creative brief to Levea's autonomous editing agent (inspects footage, executes actions iteratively, checks rendered frames, repairs issues, and exports). Listed only with `LEVEA_ENABLE_AUTONOMOUS=1`.
 
 ### Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`) (8)
 
@@ -33,6 +25,22 @@ The surface supports **two complementary execution harnesses** plus typed manage
 | `load_skill` | Load the full craft playbook (`SKILL.md`) and bundled resource list for one or more skill IDs |
 | `read_skill_resource` | Read a bundled reference or template file belonging to a production skill |
 
+### Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`) (1 + 2 variants, opt-in)
+
+| Tool | Mutates? | Async? |
+|---|---|---|
+| `autonomous_edit` (**primary**) | Yes | Yes — may auto-fire an export job |
+| `autonomous_edit_streaming` (SSE — emits per-step progress notifications) | Yes | Yes |
+| `queue_edit` (fire-and-forget; returns `taskId` for `check_task_status`) | Yes | Yes |
+
+### Autonomous mode (opt-in)
+
+Since `levea-mcp-server` 0.8.0, four tools are hidden by default: `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` and `get_active_task`.
+- `LEVEA_ENABLE_AUTONOMOUS=1` (or `true`) in the MCP server's environment lists them again; in Claude Desktop (MCPB) the **Enable autonomous mode** setting does the same. With it the server lists exactly the 0.7.x tools and sends the same instructions.
+- Without it, calling one of them returns a tool error that names the flag, and the `initialize` instructions describe only the direct tools.
+- The hosted endpoint lists the direct tools.
+- The REST API, the web app, and the OpenClaw, Hermes and ChatGPT clients keep autonomous mode.
+
 ### ShaderFX — your own GPU effects (4)
 
 Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that read the footage (`src()`), transitions that read clip A / clip B (`clip_a()` / `clip_b()`), and generators. The server wraps and validates it (errors come back as `{ line, column, message }` in your source); preview and export run the same shader. ABI v3 adds named textures (a layer or an image URL: `tex_<name>()`), feedback (`prev()` for trails), multi-pass (`pass_<name>` / `buf_<name>`, e.g. bloom), a data buffer (`data` / `data_url`: charts, lookup tables) and geometry mode (instanced quads for particles and sprite sheets); `create_shader_effect` / `apply_shader_effect` take `textures`, `feedback`, `data` / `data_url`, `geometry`. Contract, output modes, params manifest and twelve worked examples (six v2, six v3): `load_skill({ skill_id: "shaderfx-effects" })` or [`skills/shaderfx-effects`](./skills/shaderfx-effects/SKILL.md).
@@ -44,9 +52,9 @@ Write WGSL (`fn fx(c: FxCtx) -> vec4<f32>`, ShaderFX ABI v2) for filters that re
 | `apply_shader_effect` | Put an effect (`effect_id`, or inline `source` + `manifest`) on a project as a `filter` (`target_layer_id`), `transition` (`from_layer_id` + `to_layer_id`) or `generator`, with `params`, `param_keyframes` (per-param animation), `start_time` / `end_time`, `output` (`APPLY_SHADER_EFFECT`). Transitions draw across the A/B overlap; clips meeting at a cut get one laid on media handles (`duration_sec`, default 0.8 s), else `SHADER_FX_NO_HANDLES` |
 | `delete_shader_effect` | Delete a saved effect (`DELETE_SHADER_EFFECT`) |
 
-### Job / task polling (3)
+### Job / task polling (2, or 3 with autonomous mode)
 
-`check_job_status` (export jobs by numeric id), `check_task_status` (queued edits by taskId), `get_active_task` (currently-running edit for a project).
+`check_job_status` (export jobs by numeric id), `check_task_status` (a direct call that answered `running`, by its `dc_…` taskId; with autonomous mode, also queued edits by taskId). With autonomous mode: `get_active_task` (currently-running edit for a project).
 
 ### History, checkpoints & variants (direct tools, via `execute_action` / `execute_batch`)
 
@@ -62,7 +70,7 @@ A generation step (music, B-roll, images) that is still running when its call en
 
 ### Your own skills (2)
 
-`save_skill` (`skill_md` or, with the local stdio server, `path`; stored as `user/<slug>`), `delete_skill`. `search_skills` lists them first; `autonomous_edit` / `queue_edit` apply them via `skills`, or always with frontmatter `apply: always`.
+`save_skill` (`skill_md` or, with the local stdio server, `path`; stored as `user/<slug>`), `delete_skill`. `search_skills` lists them first and `load_skill` loads them; with autonomous mode, `autonomous_edit` / `queue_edit` apply them via `skills`, or always with frontmatter `apply: always`.
 
 ### Caption templates (5)
 
@@ -70,7 +78,7 @@ A generation step (music, B-roll, images) that is still running when its call en
 
 ### Brand kits (5)
 
-`list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit`. Palette / fonts / logo / voice / gradeBias / enforcement. Pass returned id as `brandId` or `projectBrandId` on `autonomous_edit` to apply.
+`list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit`. Palette / fonts / logo / voice / gradeBias / enforcement. With autonomous mode, pass returned id as `brandId` or `projectBrandId` on `autonomous_edit` to apply.
 
 ### Projects (4)
 
@@ -82,7 +90,7 @@ A generation step (music, B-roll, images) that is still running when its call en
 
 ### Your skills (2)
 
-`save_skill` (save your own `SKILL.md` folder — `path` from the local npx server, or `skill_md` text — to your account as `user/<slug>`; frontmatter `apply: always`, `brand_id`, `caption_template`, `style_reference_url`), `delete_skill`. Saved skills appear in `search_skills` / `load_skill` / `read_skill_resource`; pass `skills: ["user/<slug>"]` on `autonomous_edit` / `queue_edit`.
+`save_skill` (save your own `SKILL.md` folder — `path` from the local npx server, or `skill_md` text — to your account as `user/<slug>`; frontmatter `apply: always`, `brand_id`, `caption_template`, `style_reference_url`), `delete_skill`. Saved skills appear in `search_skills` / `load_skill` / `read_skill_resource`; with autonomous mode, pass `skills: ["user/<slug>"]` on `autonomous_edit` / `queue_edit`.
 
 ### ShaderFX (4)
 
@@ -100,7 +108,7 @@ Full input schemas are returned by `tools/list` over MCP.
 
 ### When to use Levea Harness (`autonomous_edit`) vs. Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)
 
-- **Use Levea Harness (`autonomous_edit`)** when the user gives a broad or creative goal ("Turn this podcast into 3 viral TikTok clips with Hormozi captions, B-roll, and music"). One call runs Levea's autonomous editing agent + 100+ craft skills end-to-end.
+- **Use Levea Harness (`autonomous_edit`, autonomous mode on)** when the user gives a broad or creative goal ("Turn this podcast into 3 viral TikTok clips with Hormozi captions, B-roll, and music"). One call runs Levea's autonomous editing agent + 100+ craft skills end-to-end.
 - **Use Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)** when your agent wants 100% direct deterministic control, surgical tweaks that apply in about a second, custom timestamp math from local files, or an interactive `observe → edit → render_preview screenshot → adjust → export` loop without invoking our internal planner.
 - **5-Phase NLE Execution Order for Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`):**
   1. **Inspect:** `list_layers`, `query_transcript`, `list_sources`
@@ -117,19 +125,19 @@ Full input schemas are returned by `tools/list` over MCP.
    - Call `read_skill_resource({ skill_id: "...", resource: "references/..." })` to read specific reference tables or templates before executing actions via `execute_action` / `execute_batch`.
 2. **Use or Author Custom `SKILL.md` Playbooks:**
    - Users can install our 12 starter skills (`npx skills add brajendrak00068/agentic-ai-video-production` or `clawhub install levea-ai-video-editor`) or place their own custom `SKILL.md` in `.claude/skills/`, `.cursor/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/`, or `~/.config/opencode/skills/`.
-   - A custom `SKILL.md` can specify a fixed `brandId`, `captionTemplatePreset`, `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Levea Harness (`autonomous_edit`)) or a deterministic `execute_batch` + `render_preview` recipe (Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)), and can call `load_skill` to compose Levea's built-in craft skills with the user's custom rules.
+   - A custom `SKILL.md` can specify a fixed `brandId`, `captionTemplatePreset`, `style_reference_url`, and either a deterministic `execute_batch` + `render_preview` recipe (Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)) or, with autonomous mode on, a house-style `autonomous_edit` prompt template (Levea Harness (`autonomous_edit`)), and can call `load_skill` to compose Levea's built-in craft skills with the user's custom rules.
 3. **Upload a user's skill to their Levea account (`save_skill`)** so Levea's own editing agent follows it too:
-   - `save_skill({ path })` with the local stdio server (reads the `SKILL.md` folder), or `save_skill({ skill_md, resources })` from any client; saved as `user/<slug>`. Frontmatter `apply: always` applies it to every `autonomous_edit` / `queue_edit` of that user; otherwise pass `skills: ["user/<slug>"]`. `brand_id` / `caption_template` / `style_reference_url` in the frontmatter fill whatever the request leaves unset (the request wins).
+   - `save_skill({ path })` with the local stdio server (reads the `SKILL.md` folder), or `save_skill({ skill_md, resources })` from any client; saved as `user/<slug>`. With autonomous mode on, frontmatter `apply: always` applies it to every `autonomous_edit` / `queue_edit` of that user; otherwise pass `skills: ["user/<slug>"]`. `brand_id` / `caption_template` / `style_reference_url` in the frontmatter fill whatever the request leaves unset (the request wins).
    - `search_skills` lists the user's skills first (`mine: true` for only theirs); `load_skill` / `read_skill_resource` take `user/<slug>`; `delete_skill` removes one.
 
 ## How to call it well
 
-1. **Send the user's intent verbatim.** Don't pre-decompose on the calling side. "Make 3 vertical TikTok clips with captions, sync to beat, export" is one `autonomous_edit` call — not four.
-2. **Treat every call as expensive and long-running.** A single `autonomous_edit` can plan + execute many steps and trigger an auto-export. Minutes, not seconds: a full edit with motion graphics, music, and export can take 10–20 minutes. If the client's wait runs out first (5 min for `autonomous_edit`, 30 for `autonomous_edit_streaming`), the result is `status: "running"` with the `project_id`; the edit keeps running, so follow it with `get_active_task` instead of calling again. For full edits, prefer `queue_edit` + `check_task_status`. **Do not retry on transient errors without backoff**; never re-invoke as a substitute for polling.
+1. **Autonomous mode: send the user's intent verbatim.** Don't pre-decompose on the calling side. "Make 3 vertical TikTok clips with captions, sync to beat, export" is one `autonomous_edit` call — not four.
+2. **Autonomous mode: treat every call as expensive and long-running.** A single `autonomous_edit` can plan + execute many steps and trigger an auto-export. Minutes, not seconds: a full edit with motion graphics, music, and export can take 10–20 minutes. If the client's wait runs out first (5 min for `autonomous_edit`, 30 for `autonomous_edit_streaming`), the result is `status: "running"` with the `project_id`; the edit keeps running, so follow it with `get_active_task` instead of calling again. For full edits, prefer `queue_edit` + `check_task_status`. **Do not retry on transient errors without backoff**; never re-invoke as a substitute for polling.
 3. **Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`) long calls wait for themselves.** `execute_action` / `execute_batch` / `render_preview` on slow steps (FACE_RETOUCH, LIPSYNC_VIDEO, generation, DETECT_* on a long source) keep the call open until the result is ready, up to `LEVEA_REQUEST_TIMEOUT_MS`. If one still answers ⏳ `running`, resend the **identical** call to keep waiting (it is never run twice) or call `check_task_status`. Do not change its params or start other edits on the project meanwhile. For a recipe for a common task (source window, exact length, captions, music + ducking, reframe, export with loudness), use `search_tools({ query })`: it returns the matching `editorialPlaybook.workflows`.
-4. **Async / job pattern.** Mutating calls may return a `jobId`. Poll with `check_job_status` (or call with `wait: true` to block until terminal). Never re-invoke `autonomous_edit` to "check progress."
-5. **Plan approval for irreversible work.** When the user's intent is destructive or hard to undo, set `requirePlanApproval: true` in `autonomous_edit` params — the editor stops after planning, returns the plan, waits for confirmation. Resume by re-calling with the returned `workingMemory` and `planDecision: "approve"` (an approval prompt such as `"yes"` also works), optionally with an `editedPlan`.
-6. **Use `editor_health` for connection diagnostics**, not auth diagnostics — it's unauthenticated. A 200 here just means the host is reachable; a bad `LEVEA_API_KEY` will surface on the first `autonomous_edit` call.
+4. **Async / job pattern.** Mutating calls may return a `jobId`. Poll with `check_job_status` (or call with `wait: true` to block until terminal). Never re-invoke an edit to "check progress."
+5. **Autonomous mode: plan approval for irreversible work.** When the user's intent is destructive or hard to undo, set `requirePlanApproval: true` in `autonomous_edit` params — the editor stops after planning, returns the plan, waits for confirmation. Resume by re-calling with the returned `workingMemory` and `planDecision: "approve"` (an approval prompt such as `"yes"` also works), optionally with an `editedPlan`.
+6. **Use `editor_health` for connection diagnostics**, not auth diagnostics — it's unauthenticated. A 200 here just means the host is reachable; a bad `LEVEA_API_KEY` will surface on the first edit call.
 
 ## Response shape
 
@@ -152,7 +160,7 @@ Remote MCP clients (Cursor, Grok Bot, Claude.ai Connectors, ChatGPT) connect dir
 - **Authorization Server Metadata (RFC 8414)**: `https://api.livecore.ai/.well-known/oauth-authorization-server`
 - **Dynamic Client Registration (RFC 7591)**: `https://api.livecore.ai/api/v1/misc/oauth/register`
 
-With OAuth 2.1 (`scope="levea"`), no API key or `LEVEA_API_KEY` variable is needed to list tools or run video edits.
+With OAuth 2.1 (`scope="levea"`), no API key or `LEVEA_API_KEY` variable is needed to list tools or run video edits. The hosted endpoint lists the direct tools.
 
 ### 2. Local stdio MCP (`npx -y levea-mcp-server`) — Bearer API key
 
@@ -165,7 +173,7 @@ Fallback only, for clients that cannot connect to a remote MCP server. It is a l
 
 Backward compat: the legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` names are still read as a silent fallback; use `LEVEA_*`.
 
-Optional: `LEVEA_REQUEST_TIMEOUT_MS` / `LEVEA_STREAM_TIMEOUT_MS` (how long a call waits before returning `running`), `LEVEA_TELEMETRY=off` (turns off the anonymous usage ping: event name, client version, whether a key is set).
+Optional: `LEVEA_ENABLE_AUTONOMOUS=1` (lists the autonomous-mode tools; see [Autonomous mode (opt-in)](#autonomous-mode-opt-in)), `LEVEA_REQUEST_TIMEOUT_MS` / `LEVEA_STREAM_TIMEOUT_MS` (how long a call waits before returning `running`), `LEVEA_TELEMETRY=off` (turns off the anonymous usage ping: event name, client version, whether a key is set).
 
 The client never accepts a *full path* in `LEVEA_API_URL` — set only the host. The path `/api/v1/misc/openclaw/v1/execute` is appended automatically. Do not point at `/api/v1/misc/editor/` (different route, different auth model).
 
@@ -176,20 +184,21 @@ The client never accepts a *full path* in `LEVEA_API_URL` — set only the host.
 | `isError: true` + 401/403 in message | Bad/expired `LEVEA_API_KEY` | Surface to user; tell them to regenerate at livecore.ai. **Do not retry.** |
 | `isError: true` + "is required" | Env var missing | Surface; do not retry. |
 | `isError: true` + 5xx / network | Transient backend | Retry **once** with backoff. Then surface. |
-| `success: true`, `jobId` present | Async work running | Poll `check_job_status` — don't re-invoke `autonomous_edit`. |
+| `success: true`, `jobId` present | Async work running | Poll `check_job_status` — don't re-invoke the edit. |
 | `success: true`, `videoUrl` present | Export landed | Show the URL to the user. Read `verificationReport.status`: only `verified` means the result passed its checks on the rendered frames; mention `qualityNotes`. |
-| `status: "running"` (`type: "still_running"`) | The client stopped waiting; the edit is still running | Call `get_active_task` with the returned `project_id`; never re-invoke the edit. |
-| `status: "awaiting_approval"` | Plan proposed (`requirePlanApproval: true`) | Show the plan; when the user agrees, call again with the returned `workingMemory` and `planDecision: "approve"`. |
+| `status: "running"` with `taskId: "dc_…"` | A direct call is still running on the server | Resend the identical call to keep waiting (it is never run twice) or call `check_task_status` with the taskId. |
+| `status: "running"` (`type: "still_running"`) | Autonomous mode: the client stopped waiting; the edit is still running | Call `get_active_task` with the returned `project_id`; never re-invoke the edit. |
+| `status: "awaiting_approval"` | Autonomous mode: plan proposed (`requirePlanApproval: true`) | Show the plan; when the user agrees, call again with the returned `workingMemory` and `planDecision: "approve"`. |
 
 ## Cost-shaping recommendations
 
-- The editor auto-exports after most mutating calls. If your user is mid-iteration, mention this so they don't get surprise renders.
-- Batch related edits into one `autonomous_edit` brief instead of many sequential calls — the inner planner is far cheaper than N round-trips.
-- For pure inspection ("what's in this scene?", "what does the transcript say?"), phrase it as a read-only intent inside `autonomous_edit` — the planner takes a non-mutating path and won't trigger auto-export.
+- In autonomous mode, the editor auto-exports after most mutating calls. If your user is mid-iteration, mention this so they don't get surprise renders.
+- In autonomous mode, batch related edits into one `autonomous_edit` brief instead of many sequential calls — the inner planner is far cheaper than N round-trips.
+- In autonomous mode, for pure inspection ("what's in this scene?", "what does the transcript say?"), phrase it as a read-only intent inside `autonomous_edit` — the planner takes a non-mutating path and won't trigger auto-export.
 
 ## Safety boundary
 
-Low-level operations (shell, ffmpeg flags, raw timeline JSON, filesystem) are **deliberately not exposed**. The backend allowlists canonical actions server-side; the MCP surface offers one high-level edit tool, four typed single-action edits that run through the same allowlisted operations, plus management and diagnostics. Trust this boundary; do not try to construct paths around it.
+Low-level operations (shell, ffmpeg flags, raw timeline JSON, filesystem) are **deliberately not exposed**. The backend allowlists canonical actions server-side; the MCP surface offers one high-level edit tool (autonomous mode, opt-in), four typed single-action edits that run through the same allowlisted operations, plus management and diagnostics. Trust this boundary; do not try to construct paths around it.
 
 ## Source
 
