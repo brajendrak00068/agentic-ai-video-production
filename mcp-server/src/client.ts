@@ -356,7 +356,7 @@ async function call(
     if (res.status === 401 || res.status === 403) throw authRejected(label, res.status);
     if (res.status >= 500) {
       if (attempt < attempts && !opts.signal?.aborted) { await sleep(1000 + Math.random() * 1000, opts.signal); continue; }
-      throw new Error(`${label} failed (HTTP ${res.status}): ${upstreamMessage(res.data, res.status)}`);
+      throw Object.assign(new Error(`${label} failed (HTTP ${res.status}): ${upstreamMessage(res.data, res.status)}`), { httpStatus: res.status });
     }
     return res;
   }
@@ -753,6 +753,15 @@ export async function executeDeterministicTool(
     return out;
   } catch (err) {
     if (hostSignal?.aborted) return { success: false, status: 'cancelled', error: `Cancelled by the client; ${tool} may still have been applied.`, ...(resolvedProjectId ? { projectId: resolvedProjectId } : {}) };
+    // A gateway 504 is the proxy giving up on the reply, not Levea failing the
+    // call: the call itself can still be running and commit.
+    if ((err as { httpStatus?: unknown })?.httpStatus === 504) {
+      const sec = Math.round((Date.now() - callStart) / 1000);
+      throw new Error(
+        `${label} failed (HTTP 504): a gateway stopped waiting for Levea's answer after ${sec} s. ` +
+          `The call may still be running on Levea and may still commit; an identical resend waits for it and is never applied twice.`,
+      );
+    }
     throw err;
   } finally {
     call_.dispose();

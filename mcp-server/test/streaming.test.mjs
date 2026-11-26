@@ -102,3 +102,58 @@ test('a tool result carries its data as text too, so a client that reads only te
   assert.equal(r.content[0].type, 'text');
   assert.ok(r.content.length >= 2, 'summary and data should be separate text blocks');
 });
+
+test('a finished export link stays whole in the text when the result is digested', async () => {
+  // A presigned link is ~600 chars; cut short it loses its signature and does not open.
+  const link = `https://bucket.example/exports/out_mastered.mp4?X-Amz-Credential=${'c'.repeat(300)}&X-Amz-Signature=${'f'.repeat(64)}`;
+  const server = await backend((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true, taskId: '42', status: 'completed', videoUrl: link,
+      progress: { message: 'x'.repeat(9000), videoUrl: link, clips: [{ url: link }] },
+    }));
+  });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'check_task_status', { task_id: '42' });
+  server.closeAllConnections(); server.close();
+  assert.ok(r.content[0].text.includes(`📹 ${link}`), 'the summary line should carry the whole link');
+  const data = r.content.slice(1).map((c) => c.text).join('\n');
+  assert.ok(data.includes('digest of'), 'the result should have been digested');
+  assert.ok(data.includes(link), 'the digest should keep the link whole');
+});
+
+test('a gateway 504 on a direct call says the call may still be running', async () => {
+  const server = await backend((req, res) => {
+    req.resume();
+    req.on('end', () => { res.writeHead(504, { 'content-type': 'text/html' }); res.end('<html>504 Gateway Time-out</html>'); });
+  });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'execute_action', { project_id: 'p1', action: 'TRIM_LAYER', action_params: {} });
+  server.closeAllConnections(); server.close();
+  assert.equal(r.isError, true);
+  const text = r.content.map((c) => c.text).join('\n');
+  assert.ok(text.includes('HTTP 504'), text);
+  assert.ok(text.includes('may still be running on Levea'), text);
+  assert.ok(text.includes('an identical resend waits for it and is never applied twice'), text);
+});
+
+test('an export step that answered "still rendering" is followed by the job outcome this call waited for', async () => {
+  const server = await backend((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      if (req.method === 'POST') {
+        res.end(JSON.stringify({
+          success: true, status: 'rendering', jobId: '77', action: 'EXPORT_VIDEO', projectId: 'p1',
+          stepReceipts: [{ action: 'EXPORT_VIDEO', success: true, observation: 'Video export still rendering after 30s. Job is in flight.' }],
+        }));
+      } else {
+        res.end(JSON.stringify({ success: true, jobId: '77', status: 'completed', progress: 100, videoUrl: 'https://cdn.example/out.mp4' }));
+      }
+    });
+  });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'execute_action', { project_id: 'p1', action: 'EXPORT_VIDEO', action_params: {} });
+  server.closeAllConnections(); server.close();
+  const text = r.content[0].text;
+  assert.ok(text.includes('✅ EXPORT_VIDEO: Video export still rendering after 30s'), text);
+  assert.ok(text.includes('↳ export job 77: completed after that receipt (this call waited for it)'), text);
+  assert.ok(text.includes('📹 https://cdn.example/out.mp4'), text);
+});

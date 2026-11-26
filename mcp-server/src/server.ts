@@ -283,7 +283,7 @@ const TOOL_DEFS: Tool[] = [
   // ── Job / task polling ───────────────────────────────────────────────────
   {
     name: 'check_job_status',
-    description: 'Poll an export / async job by jobId (numeric). wait: true blocks until it finishes (progress notifications while it renders).',
+    description: 'Poll an export / async job by job_id (the numeric jobId an export returns). wait: true blocks until it finishes (progress notifications while it renders).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -867,9 +867,14 @@ const TEXT_DATA_MAX_CHARS = 6_000;
 /** Never repeated in the text block (images ride as image blocks; scenes are MBs; raw is a legacy alias). */
 const NOT_IN_TEXT: ReadonlySet<string> = new Set(['base64', 'dataUrl', 'frameImages', 'mcpContent', 'scene', 'raw']);
 
+/** An http(s) URL: useless when cut (a signed link loses its signature), so it is never shortened. */
+function isHttpUrl(s: string): boolean {
+  return s.startsWith('https://') || s.startsWith('http://');
+}
+
 /** A depth- and length-bounded copy for the text block: ids, statuses, URLs and messages survive; bulk does not. */
 function compactForText(v: unknown, depth: number): unknown {
-  if (typeof v === 'string') return v.length > 400 ? `${v.slice(0, 400)}… (${v.length} chars)` : v;
+  if (typeof v === 'string') return v.length > 400 && !isHttpUrl(v) ? `${v.slice(0, 400)}… (${v.length} chars)` : v;
   if (v === null || typeof v !== 'object') return v;
   if (Array.isArray(v)) {
     if (depth >= 3) return `[${v.length} items]`;
@@ -1005,7 +1010,10 @@ function summarizeAny(label: string, data: unknown): string {
       Array.isArray((d as any).assets) ? (d as any).assets.length :
       Array.isArray((d as any).data) ? ((d as any).data as unknown[]).length :
       undefined;
-    return count !== undefined ? `✅ ${label}: ${count} item(s)` : `✅ ${label}`;
+    const head = count !== undefined ? `✅ ${label}: ${count} item(s)` : `✅ ${label}`;
+    // The finished video's link, whole, on its own line: the data block after
+    // this summary is a bounded digest for large results.
+    return typeof d.videoUrl === 'string' && d.videoUrl ? `${head}\n📹 ${d.videoUrl}` : head;
   }
   return `✅ ${label}`;
 }
@@ -1458,6 +1466,11 @@ function stepsReport(name: string, r: Record<string, any>, receipts: any[]): str
     const obs = firstLine(s?.observation);
     anyCut = anyCut || obs.cut;
     lines.push(`${s?.success ? '✅' : '❌'} ${String(s?.action ?? 'step')}${s?.failureCode ? ` [${s.failureCode}]` : ''}: ${obs.line}`);
+    // The export step answered while its job was still rendering; this call
+    // then waited for the job (exportJob), so the receipt above is out of date.
+    if (s?.action === 'EXPORT_VIDEO' && r.exportJob && typeof r.status === 'string') {
+      lines.push(`   ↳ export job ${String(r.jobId ?? '')}: ${r.status} after that receipt (this call waited for it)${r.exportError ? ` — ${String(r.exportError)}` : ''}`);
+    }
   }
   if (Array.isArray(r.notRun) && r.notRun.length > 0) {
     lines.push(`⏭ not run: ${r.notRun.map((n: any) => `step ${n?.step} ${n?.action}`).join(', ')}`);
