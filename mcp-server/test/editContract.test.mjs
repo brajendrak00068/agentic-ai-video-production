@@ -57,7 +57,7 @@ test('every edit tool sends every contract field to the backend', async () => {
   const args = (surface) => Object.fromEntries(contract.fields.filter((f) => f.surfaces.includes(surface)).map((f) => [f.name, valueFor(f)]));
   const calls = [['queue_edit', 'queue', 'queue-edit'], ['autonomous_edit', 'all', 'execute']];
   const child = spawn(process.execPath, [new URL('../dist/index.js', import.meta.url).pathname], {
-    env: { ...process.env, LEVEA_API_URL: url, LEVEA_API_KEY: 'test-key-123456' }, stdio: ['pipe', 'pipe', 'ignore'],
+    env: { ...process.env, LEVEA_API_URL: url, LEVEA_API_KEY: 'test-key-123456', LEVEA_ENABLE_AUTONOMOUS: '1' }, stdio: ['pipe', 'pipe', 'ignore'],
   });
   const send = (m) => child.stdin.write(`${JSON.stringify(m)}\n`);
   send({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } });
@@ -85,7 +85,7 @@ async function toolResultFor(responseStatus, responseBody, name, args) {
   });
   await new Promise((r) => backend.listen(0, '127.0.0.1', r));
   const child = spawn(process.execPath, [new URL('../dist/index.js', import.meta.url).pathname], {
-    env: { ...process.env, LEVEA_API_URL: `http://127.0.0.1:${backend.address().port}`, LEVEA_API_KEY: 'test-key-123456' }, stdio: ['pipe', 'pipe', 'ignore'],
+    env: { ...process.env, LEVEA_API_URL: `http://127.0.0.1:${backend.address().port}`, LEVEA_API_KEY: 'test-key-123456', LEVEA_ENABLE_AUTONOMOUS: '1' }, stdio: ['pipe', 'pipe', 'ignore'],
   });
   const send = (m) => child.stdin.write(`${JSON.stringify(m)}\n`);
   send({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } } });

@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "levea-mcp-server",
-  "version": "0.7.7",
+  "version": "0.8.0",
   "description": "MCP server for the Levea autonomous AI video editor — natural-language video editing (viral clips, captions, vertical reframe, chroma key, audio cleanup, motion tracking, B-roll, voiceover, music, MP4 export) for Claude Desktop, Claude Code, Cursor, Cline, OpenClaw, and Hermes.",
   "author": {
     "name": "brajendrak00068"
@@ -16,7 +16,8 @@
       ],
       "env": {
         "LEVEA_API_URL": "${user_config.levea_api_url}",
-        "LEVEA_API_KEY": "${user_config.levea_api_key}"
+        "LEVEA_API_KEY": "${user_config.levea_api_key}",
+        "LEVEA_ENABLE_AUTONOMOUS": "${user_config.enable_autonomous}"
       }
     }
   },
@@ -33,6 +34,12 @@
       "description": "Your Levea API key generated from https://livecore.ai/?openclaw=1&utm_source=claude-desktop&utm_medium=mcpb&utm_campaign=levea-mcp-server (optional for discovery/health, required to execute edits)",
       "default": "",
       "sensitive": true
+    },
+    "enable_autonomous": {
+      "type": "boolean",
+      "title": "Enable autonomous mode",
+      "description": "List autonomous_edit, autonomous_edit_streaming, queue_edit and get_active_task (Levea plans the edit from a prompt). Off by default: the direct tools execute what your agent plans.",
+      "default": false
     }
   },
   "_meta": {
@@ -3019,18 +3026,6 @@
   },
   "tools": [
     {
-      "name": "autonomous_edit",
-      "description": "PRIMARY EDIT TOOL. Runs a natural-language video edit end-to-end: Levea's editing agent plans, edits, checks the rendered frames and exports. Send the user's brief verbatim, from one line to a multi-paragraph creative brief. Waits up to 5 min, but a full edit can take 10-20 min: prefer queue_edit for long edits. The first progress notification names the project_id; if the wait ends first the result is status \"running\" — follow it with get_active_task, never re-send the edit."
-    },
-    {
-      "name": "autonomous_edit_streaming",
-      "description": "autonomous_edit with live progress: same parameters (documented on autonomous_edit), per-step MCP progress notifications, waits up to 30 min. Returns the final result."
-    },
-    {
-      "name": "queue_edit",
-      "description": "Preferred for long edits: queues an autonomous edit and returns a taskId at once, so no client timeout applies. Same fields as autonomous_edit (documented there) plus platforms / autoExport. Poll check_task_status { task_id } or get_active_task { project_id }."
-    },
-    {
       "name": "create_shader_effect",
       "description": "Save a reusable ShaderFX effect: WGSL defining fn fx(c: FxCtx) -> vec4<f32> (straight rgba). Validated before saving; errors come back as [{ line, column, message }] in your source lines. Returns effect_id and the param table. FxCtx, helpers, manifest and v3 (textures, feedback, passes, data, particles) with examples: load_skill shaderfx-effects."
     },
@@ -3048,15 +3043,11 @@
     },
     {
       "name": "check_job_status",
-      "description": "Poll an export / async job by jobId (numeric). wait: true blocks until it finishes (progress notifications while it renders)."
+      "description": "Poll an export / async job by job_id (the numeric jobId an export returns). wait: true blocks until it finishes (progress notifications while it renders)."
     },
     {
       "name": "check_task_status",
-      "description": "Poll a queued edit by taskId (from queue_edit), or a direct call that answered status \"running\" (taskId \"dc_…\": waits up to ~25 s; its result is that call's full response once finished). Exports use check_job_status."
-    },
-    {
-      "name": "get_active_task",
-      "description": "The edit currently running on a project, if any. Use it to follow an edit whose call returned status \"running\" or whose client stopped waiting."
+      "description": "Poll a direct call that answered status \"running\" (taskId \"dc_…\": waits up to ~25 s; its result is that call's full response once finished). Exports use check_job_status."
     },
     {
       "name": "list_caption_templates",
@@ -3064,7 +3055,7 @@
     },
     {
       "name": "apply_caption_template",
-      "description": "Apply a caption template to a project directly (without autonomous_edit)."
+      "description": "Apply a caption template to a project directly."
     },
     {
       "name": "save_caption_template",
@@ -3080,7 +3071,7 @@
     },
     {
       "name": "list_brand_kits",
-      "description": "List your brand profiles (palette, fonts, logo, voice, gradeBias); pass an id as autonomous_edit brandId / projectBrandId."
+      "description": "List your brand profiles (palette, fonts, logo, voice, gradeBias); get_brand_kit returns one."
     },
     {
       "name": "get_brand_kit",
@@ -3116,7 +3107,7 @@
     },
     {
       "name": "asset_upload_url",
-      "description": "Signed upload URL for a local file. Returns { uploadUrl, fileUrl }: PUT the bytes to uploadUrl, then pass fileUrl as video_url / in assets[]."
+      "description": "Signed upload URL for a file on the caller's own disk. Returns { uploadUrl, fileUrl }: PUT the bytes to uploadUrl, then pass fileUrl as video_url / in assets[]. A file the user attached in a chat (ChatGPT) needs no upload: pass it in `files` on execute_batch / execute_action."
     },
     {
       "name": "list_assets",
@@ -3148,7 +3139,7 @@
     },
     {
       "name": "execute_batch",
-      "description": "Run an ordered list of canonical actions and/or read tools (≤ 25 steps) in one round trip — the fastest way to edit. The whole batch is validated before anything runs (unknown actions, bad params → INVALID_PARAMS with suggestions; destructive actions need confirm_destructive: true) and is atomic unless allow_partial. One receipt per step. Results are unverified: check with render_preview before EXPORT_VIDEO. Pro workflow (source_map → PLAN_EDITORIAL_CUT → ASSEMBLE_PICTURE_EDIT → finishing → VERIFY_EDIT → EXPORT_VIDEO), history (UNDO, restore_version, checkpoint, fork_variant): search_tools editorialPlaybook."
+      "description": "Run an ordered list of canonical actions and/or read tools (≤ 25 steps) in one round trip. The whole batch is validated before anything runs (unknown actions, bad params → INVALID_PARAMS with suggestions; destructive actions need confirm_destructive: true) and is atomic unless allow_partial: the first failed step stops it and nothing is saved (BATCH_STEP_FAILED). One receipt per step. A structural finishing pass runs after the steps unless reconcile: false (finishingApplied). Without project_id the result is not saved (persisted: false). Results are unverified: check with render_preview before EXPORT_VIDEO. Pro workflow (source_map → PLAN_EDITORIAL_CUT → ASSEMBLE_PICTURE_EDIT → finishing → VERIFY_EDIT → EXPORT_VIDEO), history (UNDO, restore_version, checkpoint, fork_variant): search_tools editorialPlaybook."
     },
     {
       "name": "render_preview",
@@ -3168,7 +3159,7 @@
     },
     {
       "name": "save_skill",
-      "description": "Save (or update) your own SKILL.md playbook as \"user/<slug>\" so the editor edits your way. search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` (or always, with frontmatter apply: always). Frontmatter: name, description, tags, categories, actions, apply, brand_id, caption_template, style_reference_url. Pass skill_md, or with the local npx server a path. Limits: 50 skills, 48k-character playbook, 12 resources."
+      "description": "Save (or update) your own SKILL.md playbook as \"user/<slug>\". search_skills lists it first and load_skill loads it. Frontmatter: name, description, tags, categories, actions, apply, brand_id, caption_template, style_reference_url. Pass skill_md, or with the local npx server a path. Limits: 50 skills, 48k-character playbook, 12 resources."
     },
     {
       "name": "delete_skill",

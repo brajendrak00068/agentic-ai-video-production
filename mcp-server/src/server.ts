@@ -1516,14 +1516,83 @@ function directResult(name: string, r: Record<string, unknown>, fallback: string
  * fresh instance per HTTP request inside `runWithLeveaConfig`.
  */
 /**
+ * Levea's autonomous mode (Levea plans the edit itself) is opt-in on this
+ * server since 0.8.0: by default the calling agent plans and the direct tools
+ * execute. LEVEA_ENABLE_AUTONOMOUS=1 (or "true", as an MCPB boolean setting
+ * sends it) lists these tools again, exactly as before. The backend, the web
+ * app and the OpenClaw / Hermes / ChatGPT clients keep autonomous mode.
+ */
+export const AUTONOMOUS_FLAG = 'LEVEA_ENABLE_AUTONOMOUS';
+export const AUTONOMOUS_TOOL_NAMES: ReadonlySet<string> = new Set(['autonomous_edit', 'autonomous_edit_streaming', 'queue_edit', 'get_active_task']);
+
+export function autonomousEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = String(env[AUTONOMOUS_FLAG] ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+/** With autonomous mode off, the listed tools that name a hidden tool say the same without it. */
+const DIRECT_ONLY_TEXT: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  check_task_status: [
+    ['Poll a queued edit by taskId (from queue_edit), or a direct call', 'Poll a direct call'],
+    ['Task id from queue_edit, or a "dc_…" id.', 'The "dc_…" taskId of a direct call that answered status "running".'],
+  ],
+  apply_caption_template: [[' (without autonomous_edit)', '']],
+  list_brand_kits: [['; pass an id as autonomous_edit brandId / projectBrandId', '; get_brand_kit returns one']],
+  asset_upload_url: [['on autonomous_edit / queue_edit / execute_batch / execute_action', 'on execute_batch / execute_action']],
+  save_skill: [
+    [
+      ' so the editor edits your way. search_skills lists it first, load_skill loads it, and autonomous_edit / queue_edit apply it when named in `skills` (or always, with frontmatter apply: always).',
+      '. search_skills lists it first and load_skill loads it.',
+    ],
+    ['Apply to every autonomous_edit (overrides frontmatter).', 'Save it with apply: always (overrides frontmatter).'],
+  ],
+};
+
+function withTextEdits(v: unknown, edits: ReadonlyArray<readonly [string, string]>): unknown {
+  if (typeof v === 'string') return edits.reduce((s, [from, to]) => s.split(from).join(to), v);
+  if (Array.isArray(v)) return v.map((x) => withTextEdits(x, edits));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, withTextEdits(x, edits)]));
+  return v;
+}
+
+/** The tools tools/list offers: every tool with autonomous mode on; without it, all but AUTONOMOUS_TOOL_NAMES. */
+export function listedTools(autonomous: boolean): typeof TOOLS {
+  if (autonomous) return TOOLS;
+  return TOOLS
+    .filter((t) => !AUTONOMOUS_TOOL_NAMES.has(t.name))
+    .map((t) => (DIRECT_ONLY_TEXT[t.name] ? withTextEdits(t, DIRECT_ONLY_TEXT[t.name]!) as (typeof TOOLS)[number] : t));
+}
+
+/** The answer to a call of a hidden tool: what it is and the flag that lists it, not "unknown tool". */
+function autonomousOffMessage(name: string): string {
+  return `❌ ${name} is off by default since levea-mcp-server 0.8.0: Levea's autonomous mode (${[...AUTONOMOUS_TOOL_NAMES].join(', ')}) is opt-in on this server. ${AUTONOMOUS_FLAG}=1 in the MCP server's environment turns it on. The direct tools (search_tools, get_action_schema, execute_action, execute_batch, render_preview) are on.`;
+}
+
+/**
  * Sent in the MCP `initialize` result: what the surface is and how it behaves,
  * so every client (Claude, Cursor, Codex, OpenClaw, Hermes, …) knows before its
- * first call. Facts only — the calling agent decides how to edit.
+ * first call. Facts only — the calling agent decides how to edit. Without
+ * autonomous mode it describes only the tools the server lists.
  */
-export const LEVEA_MCP_INSTRUCTIONS = [
-  'Levea is a cloud video editor with two modes:',
-  '- autonomous_edit (also autonomous_edit_streaming, queue_edit): Levea plans and executes an edit from a natural-language prompt. Calling it again does not report progress: an edit that answers status "running" is polled with get_active_task { project_id } (queue_edit: check_task_status { task_id }).',
-  '- Direct tools (execute_action, execute_batch, render_preview, the shader-effect tools): you plan; Levea executes each action exactly as given and reports what happened.',
+export function mcpInstructions(autonomous: boolean): string {
+  return [
+    ...(autonomous
+      ? [
+          'Levea is a cloud video editor with two modes:',
+          '- autonomous_edit (also autonomous_edit_streaming, queue_edit): Levea plans and executes an edit from a natural-language prompt. Calling it again does not report progress: an edit that answers status "running" is polled with get_active_task { project_id } (queue_edit: check_task_status { task_id }).',
+          '- Direct tools (execute_action, execute_batch, render_preview, the shader-effect tools): you plan; Levea executes each action exactly as given and reports what happened.',
+        ]
+      : [
+          'Levea is a cloud video editor. You plan the edit; the direct tools (execute_action, execute_batch, render_preview, the shader-effect tools) execute each action exactly as given and report what happened.',
+        ]),
+    ...SHARED_INSTRUCTIONS,
+    autonomous
+      ? 'The user\'s own skills: save_skill stores a SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists them first; autonomous_edit / queue_edit apply one via skills: ["user/<slug>"], or on every edit when its frontmatter says apply: always; load_skill returns it; delete_skill removes it.'
+      : 'The user\'s own skills: save_skill stores a SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists them first; load_skill returns it; delete_skill removes it.',
+  ].join('\n');
+}
+
+const SHARED_INSTRUCTIONS: readonly string[] = [
   'search_tools lists the canonical actions and read tools; get_action_schema returns an action\'s parameter schema (actions: [..] for several).',
   'State lives in a project. A call that sends video_url / assets without project_id creates a project and returns its projectId; pass project_id on every later call. Any other call without project_id is not saved (persisted: false). The server keeps the project\'s scene: calls with project_id do not send scene back (an inline scene is ignored when the project has one).',
   'execute_batch is validated before anything runs (INVALID_PARAMS lists every problem); destructive actions need confirm_destructive: true. It stops at the first failed step and saves nothing (failureCode BATCH_STEP_FAILED, failedStepIndex), unless allow_partial is set.',
@@ -1533,8 +1602,7 @@ export const LEVEA_MCP_INSTRUCTIONS = [
   'EXPORT_VIDEO masters loudness to a delivery target first when the edit has no MASTER_AUDIO (master_audio: false on the step skips it).',
   'render_preview returns GPU-composited frames of the timeline; the measure_* read tools (measure_audio, measure_picture, measure_color) return measurements.',
   'Craft skills (search_skills, load_skill, read_skill_resource) are optional reference material.',
-  'The user\'s own skills: save_skill stores a SKILL.md (skill_md, or path with the local server) as "user/<slug>"; search_skills lists them first; autonomous_edit / queue_edit apply one via skills: ["user/<slug>"], or on every edit when its frontmatter says apply: always; load_skill returns it; delete_skill removes it.',
-].join('\n');
+];
 
 /** The MCP server createLeveaMcpServer returns (an SDK `Server`; typed structurally so the package's .d.ts needs no SDK install). */
 export interface LeveaMcpServer {
@@ -1543,21 +1611,24 @@ export interface LeveaMcpServer {
 }
 
 export function createLeveaMcpServer(opts: { localFiles?: boolean } = {}): LeveaMcpServer {
+  const autonomous = autonomousEnabled();
+  const tools = listedTools(autonomous);
   const server = new Server(
     { name: 'levea-mcp-server', version: PKG_VERSION },
-    { capabilities: { tools: {} }, instructions: LEVEA_MCP_INSTRUCTIONS }
+    { capabilities: { tools: {} }, instructions: mcpInstructions(autonomous) }
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS as Tool[] }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools as Tool[] }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req: any, extra: any) => {
     const name = req.params.name;
     if (typeof name !== 'string' || !TOOL_NAMES.has(name)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        `Unknown tool "${String(name)}". tools/list has the ${TOOLS.length} Levea tools; run a canonical action with execute_action { action: "${String(name)}" } (search_tools lists them).`,
+        `Unknown tool "${String(name)}". tools/list has the ${tools.length} Levea tools; run a canonical action with execute_action { action: "${String(name)}" } (search_tools lists them).`,
       );
     }
+    if (!autonomous && AUTONOMOUS_TOOL_NAMES.has(name)) return fail(autonomousOffMessage(name));
     const args = (req.params.arguments || {}) as Record<string, unknown>;
     const progressToken = req.params._meta?.progressToken;
     const ctx: DispatchCtx = {
