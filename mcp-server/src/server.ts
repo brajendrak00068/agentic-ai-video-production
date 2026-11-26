@@ -1466,6 +1466,11 @@ function stepsReport(name: string, r: Record<string, any>, receipts: any[]): str
     const obs = firstLine(s?.observation);
     anyCut = anyCut || obs.cut;
     lines.push(`${s?.success ? '✅' : '❌'} ${String(s?.action ?? 'step')}${s?.failureCode ? ` [${s.failureCode}]` : ''}: ${obs.line}`);
+    // The export step answered while its job was still rendering; this call
+    // then waited for the job (exportJob), so the receipt above is out of date.
+    if (s?.action === 'EXPORT_VIDEO' && r.exportJob && typeof r.status === 'string') {
+      lines.push(`   ↳ export job ${String(r.jobId ?? '')}: ${r.status} after that receipt (this call waited for it)${r.exportError ? ` — ${String(r.exportError)}` : ''}`);
+    }
   }
   if (Array.isArray(r.notRun) && r.notRun.length > 0) {
     lines.push(`⏭ not run: ${r.notRun.map((n: any) => `step ${n?.step} ${n?.action}`).join(', ')}`);

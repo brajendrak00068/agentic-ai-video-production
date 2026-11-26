@@ -134,3 +134,26 @@ test('a gateway 504 on a direct call says the call may still be running', async 
   assert.ok(text.includes('may still be running on Levea'), text);
   assert.ok(text.includes('an identical resend waits for it and is never applied twice'), text);
 });
+
+test('an export step that answered "still rendering" is followed by the job outcome this call waited for', async () => {
+  const server = await backend((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      if (req.method === 'POST') {
+        res.end(JSON.stringify({
+          success: true, status: 'rendering', jobId: '77', action: 'EXPORT_VIDEO', projectId: 'p1',
+          stepReceipts: [{ action: 'EXPORT_VIDEO', success: true, observation: 'Video export still rendering after 30s. Job is in flight.' }],
+        }));
+      } else {
+        res.end(JSON.stringify({ success: true, jobId: '77', status: 'completed', progress: 100, videoUrl: 'https://cdn.example/out.mp4' }));
+      }
+    });
+  });
+  const r = await callTool(`http://127.0.0.1:${server.address().port}`, 'execute_action', { project_id: 'p1', action: 'EXPORT_VIDEO', action_params: {} });
+  server.closeAllConnections(); server.close();
+  const text = r.content[0].text;
+  assert.ok(text.includes('✅ EXPORT_VIDEO: Video export still rendering after 30s'), text);
+  assert.ok(text.includes('↳ export job 77: completed after that receipt (this call waited for it)'), text);
+  assert.ok(text.includes('📹 https://cdn.example/out.mp4'), text);
+});
