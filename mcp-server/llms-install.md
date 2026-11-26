@@ -19,7 +19,7 @@ also lists `autonomous_edit` (send a natural-language description of the video
 you want and it plans, edits, verifies on the rendered frames, and exports),
 `autonomous_edit_streaming`, `queue_edit` for long edits, and `get_active_task`
 (39 tools). Without the flag, calling one of them returns an error naming the
-flag. The hosted endpoint lists the direct tools.
+flag. The hosted endpoint moves to this default in a later release; until then it lists all 39 tools.
 
 ## Default: hosted endpoint (OAuth, nothing to install)
 Connect to the hosted Streamable HTTP endpoint. The client signs the user in to

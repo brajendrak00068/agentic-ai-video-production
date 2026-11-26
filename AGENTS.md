@@ -38,7 +38,7 @@ The surface supports **two complementary execution harnesses** plus typed manage
 Since `levea-mcp-server` 0.8.0, four tools are hidden by default: `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` and `get_active_task`.
 - `LEVEA_ENABLE_AUTONOMOUS=1` (or `true`) in the MCP server's environment lists them again; in Claude Desktop (MCPB) the **Enable autonomous mode** setting does the same. With it the server lists exactly the 0.7.x tools and sends the same instructions.
 - Without it, calling one of them returns a tool error that names the flag, and the `initialize` instructions describe only the direct tools.
-- The hosted endpoint lists the direct tools.
+- The hosted endpoint moves to this default in a later release; until then it lists all 39 tools.
 - The REST API, the web app, and the OpenClaw, Hermes and ChatGPT clients keep autonomous mode.
 
 ### ShaderFX — your own GPU effects (4)
@@ -160,7 +160,7 @@ Remote MCP clients (Cursor, Grok Bot, Claude.ai Connectors, ChatGPT) connect dir
 - **Authorization Server Metadata (RFC 8414)**: `https://api.livecore.ai/.well-known/oauth-authorization-server`
 - **Dynamic Client Registration (RFC 7591)**: `https://api.livecore.ai/api/v1/misc/oauth/register`
 
-With OAuth 2.1 (`scope="levea"`), no API key or `LEVEA_API_KEY` variable is needed to list tools or run video edits. The hosted endpoint lists the direct tools.
+With OAuth 2.1 (`scope="levea"`), no API key or `LEVEA_API_KEY` variable is needed to list tools or run video edits. The hosted endpoint moves to this default in a later release; until then it lists all 39 tools.
 
 ### 2. Local stdio MCP (`npx -y levea-mcp-server`) — Bearer API key
 
