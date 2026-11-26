@@ -125,12 +125,12 @@ Every client calls the **same backend**: this MCP server, the hosted endpoint, t
 
 ### Tools the AI sees
 
-**Two complementary editing modes plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's autonomous editing agent (**Mode A: `autonomous_edit`**) or drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ editing craft skills** directly with GPU screenshot inspection (**Mode B: `search_tools` → `execute_action` / `execute_batch` → `render_preview` → `EXPORT_VIDEO`**).
+**Two complementary editing harnesses plus typed state-management and polling** — so any agent can either delegate a full creative brief to Levea's autonomous editing agent (**Levea Harness (`autonomous_edit`)**) or drive any of the **195 canonical actions**, **28 read/inspection tools**, and **100+ editing craft skills** directly with GPU screenshot inspection (**Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)**).
 
 | Group | Tools |
 |---|---|
-| **Mode A: Goal Delegation** (1 entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
-| **Mode B: Universal Direct Canonical Suite** (195 actions, 28 read tools & 100+ skills) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) · `search_skills` · `load_skill` · `read_skill_resource` |
+| **Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`)** (1 entry point, 3 variants) | `autonomous_edit` (primary, JSON) · `autonomous_edit_streaming` (SSE — per-step progress) · `queue_edit` (async fire-and-forget) |
+| **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`)** (195 actions, 28 read tools & 100+ skills) | `search_tools` · `get_action_schema` · `execute_action` · `execute_batch` · `render_preview` (returns real GPU-composited JPEG screenshots as MCP `image` blocks, like `ffmpeg` frame grabs) · `search_skills` · `load_skill` · `read_skill_resource` |
 | **ShaderFX (custom GPU shaders)** | `create_shader_effect` · `list_shader_effects` · `apply_shader_effect` · `delete_shader_effect` — write WGSL `fn fx(c: FxCtx) -> vec4<f32>` filters (read the footage via `src()`), transitions (`clip_a()` / `clip_b()`) and generators; validated server-side with line/column errors, saved to a reusable library with typed params. ABI v3: named textures, feedback trails, multi-pass, data buffers and instanced particles / sprites. Contract + examples: [`skills/shaderfx-effects`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills/shaderfx-effects/SKILL.md) or `load_skill shaderfx-effects` |
 | Job / task polling | `check_job_status` · `check_task_status` · `get_active_task` |
 | Caption templates | `list_caption_templates` · `apply_caption_template` · `save_caption_template` · `save_current_caption_template` · `delete_caption_template` (216 built-in + your saved) |
@@ -144,13 +144,13 @@ Every direct tool call (`execute_action` / `execute_batch`) includes automatic p
 ### How Skills Work & How to Use Your Own Custom Skills (`SKILL.md`)
 
 1. **100+ Built-In Craft Skills (`search_skills` → `load_skill` → `read_skill_resource`):**
-   - In **Mode A (`autonomous_edit`)**, Levea automatically loads the right craft skills for your prompt.
-   - In **Mode B**, your agent can call `search_skills` (e.g. `query: "captions"`, `"color"`, `"podcast"`), call `load_skill` to pull the full `SKILL.md` craft playbook into its context, and call `read_skill_resource` to inspect reference guides or templates before running `execute_action` / `execute_batch`.
+   - In **Levea Harness (`autonomous_edit`)**, Levea automatically loads the right craft skills for your prompt.
+   - In **Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)**, your agent can call `search_skills` (e.g. `query: "captions"`, `"color"`, `"podcast"`), call `load_skill` to pull the full `SKILL.md` craft playbook into its context, and call `read_skill_resource` to inspect reference guides or templates before running `execute_action` / `execute_batch`.
 2. **12 Installable Client Skills (`npx skills add brajendrak00068/agentic-ai-video-production`):**
    - Ready-made `SKILL.md` packages in [`skills/`](https://github.com/brajendrak00068/agentic-ai-video-production/tree/main/skills) (`levea-ai-video-editor`, `viral-clips-generator`, `tiktok-reels-shorts-editor`, `auto-captions-subtitles`, `multicam-podcast-video-editor`, `silence-removal-audio-cleanup`, `ai-b-roll-motion-graphics`, `after-effects-motion-graphics`, `vfx-compositing-keying`, `motion-tracking-stabilization`, `shaderfx-effects`).
 3. **Bring Your Own Custom `SKILL.md`:**
    - Drop a custom `SKILL.md` into `.claude/skills/<name>/SKILL.md` (Claude Code), `.cursor/skills/<name>/SKILL.md` (Cursor), `~/.openclaw/skills/<name>/SKILL.md` (OpenClaw), or `~/.hermes/skills/<name>/SKILL.md` (Hermes).
-   - Encode your channel's `brandId`, `captionTemplatePreset` (e.g. `hormozi`), `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Mode A) or an exact `execute_batch` + `render_preview` action sequence (Mode B). Your agent can even call `load_skill` inside your custom skill to combine Levea's built-in craft rules with your own house rules.
+   - Encode your channel's `brandId`, `captionTemplatePreset` (e.g. `hormozi`), `style_reference_url`, and either a house-style `autonomous_edit` prompt template (Levea Harness (`autonomous_edit`)) or an exact `execute_batch` + `render_preview` action sequence (Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)). Your agent can even call `load_skill` inside your custom skill to combine Levea's built-in craft rules with your own house rules.
 
 4. **Upload Your Skill to Your Levea Account (`save_skill`) — the editor edits in your style:**
    - `save_skill({ path: "~/.claude/skills/my-style" })` (local `npx levea-mcp-server`: reads `SKILL.md` and its text files such as `references/*.md`) or `save_skill({ skill_md: "---\nname: my-style\n…" })` (any client) saves it as `user/my-style`.
@@ -159,7 +159,7 @@ Every direct tool call (`execute_action` / `execute_batch`) includes automatic p
 
 5. **History, checkpoints & variants (direct tools):** every committed call is a saved version. `UNDO` / `REDO` step one version; `restore_version { revision | label }` jumps to any version or checkpoint (undoable, no confirmation); `checkpoint { label }` names one (automatic ones after assemble, after the first finishing pass and before export); `fork_variant` → edit with `variant: "<id>"` → `compare_variants { a, b, judge: true }` → `promote_variant` tries alternatives side by side without touching the main scene. Late generation jobs (`pendingJobs`) attach with `APPLY_PENDING { task_ids, wait_for_completion: true }`.
 
-→ For agent-integration details (Mode A vs. Mode B, custom skills, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
+→ For agent-integration details (Levea Harness vs. Your Agent's Harness, custom skills, the 5-phase NLE Playbook, schemas, async semantics, error handling), see **[AGENTS.md](https://github.com/brajendrak00068/agentic-ai-video-production/blob/main/AGENTS.md)**.
 
 ---
 

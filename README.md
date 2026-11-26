@@ -199,8 +199,8 @@ Levea is built around **Skills (`SKILL.md`)** at three levels — so your agent 
 
 Levea ships with **100+ production craft playbooks** covering short-form hooks, podcast repurposing, documentary montage, color grading & LUT finishing, kinetic caption typography, 2D/3D motion graphics, VFX keying & optics, broadcast audio mastering (`-18 LUFS` ducking), and lip-synced dubbing.
 
-- **In Mode A (`autonomous_edit`):** Levea automatically selects and applies the matching craft skills for your prompt and footage.
-- **In Mode B (Direct Agent Control):** Your agent can search, load, and follow any built-in craft skill directly in its own context window before calling `execute_action` or `execute_batch`:
+- **In Levea Harness (`autonomous_edit`):** Levea automatically selects and applies the matching craft skills for your prompt and footage.
+- **In Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`):** Your agent can search, load, and follow any built-in craft skill directly in its own context window before calling `execute_action` or `execute_batch`:
   1. **`search_skills`** — search all 100+ craft playbooks by keyword or category (e.g. `query: "captions"`, `"color"`, `"podcast"`, `"montage"`).
   2. **`load_skill`** — load the full `SKILL.md` playbook and its bundled resource list for one or more `skill_id`s.
   3. **`read_skill_resource`** — read specific reference tables or templates (`references/...`, `templates/...`) belonging to a skill.
@@ -211,7 +211,7 @@ This repository includes 12 ready-to-install agent skills under [`skills/`](./sk
 
 | Skill | Focus |
 |---|---|
-| [`levea-ai-video-editor`](./skills/levea-ai-video-editor/SKILL.md) | Full end-to-end editing (Mode A & Mode B) |
+| [`levea-ai-video-editor`](./skills/levea-ai-video-editor/SKILL.md) | Full end-to-end editing (Levea Harness & Your Agent's Harness) |
 | [`viral-clips-generator`](./skills/viral-clips-generator/SKILL.md) | Multi-clip viral highlight extraction from long recordings |
 | [`tiktok-reels-shorts-editor`](./skills/tiktok-reels-shorts-editor/SKILL.md) | 16:9 → 9:16 active-speaker vertical reframing & hooks |
 | [`auto-captions-subtitles`](./skills/auto-captions-subtitles/SKILL.md) | 216 word-synced caption templates, translations & dubbing |
@@ -412,8 +412,8 @@ The MCP server (`levea-mcp-server`, 39 tools) exposes **both** high-level goal d
 
 | Group | Tools | Description |
 | --- | --- | --- |
-| **Mode A: Goal Delegation** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Send a natural-language brief; Levea's autonomous editing agent inspects the footage, edits, verifies on rendered frames, and exports. |
-| **Mode B: Universal Direct Canonical Suite (195 Actions, 28 Read Tools & 100+ Skills)** | `search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` | Discover any of the 195 canonical actions, 28 read tools, and 100+ editing craft skills on demand, execute single actions or atomic batches (with automatic safe-zone checks, timeline reconciliation, and async asset completion), and inspect real GPU-composited JPEG screenshots (`render_preview`, like `ffmpeg` frame grabs) without calling `autonomous_edit`. |
+| **Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`)** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Send a natural-language brief; Levea's autonomous editing agent inspects the footage, edits, verifies on rendered frames, and exports. |
+| **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`)** | `search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` | Discover any of the 195 canonical actions, 28 read tools, and 100+ editing craft skills on demand, execute single actions or atomic batches (with automatic safe-zone checks, timeline reconciliation, and async asset completion), and inspect real GPU-composited JPEG screenshots (`render_preview`, like `ffmpeg` frame grabs) without calling `autonomous_edit`. |
 | **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, generation jobs, and the active task of a project. |
 | **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (216 built-in: Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
 | **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, voice tone, and grading rules. |
@@ -424,14 +424,14 @@ The MCP server (`levea-mcp-server`, 39 tools) exposes **both** high-level goal d
 | **ShaderFX** | `create_shader_effect`, `list_shader_effects`, `apply_shader_effect`, `delete_shader_effect` | Write your own WGSL GPU filters, transitions and generators and apply them to layers. |
 | **Diagnostics** | `editor_health` | Unauthenticated connectivity check. |
 
-### When to Use Mode A (`autonomous_edit`) vs. Mode B (`execute_action` / `execute_batch` / `render_preview`)
+### When to Use Levea Harness (`autonomous_edit`) vs. Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`)
 
-| Scenario | Best Mode | Why |
+| Scenario | Best Harness | Why |
 |---|---|---|
-| Broad creative brief / full video from prompt | **Mode A (`autonomous_edit`)** | Autonomous editing agent + 100+ craft skills handle decomposition, pacing, and verification in 1 call |
-| Exact parameter tweak, custom timestamp math, or local-file-driven script | **Mode B (`execute_action` / `execute_batch`)** | Edits apply in about a second with no planner LLM in the loop and deterministic control over all 195 actions (generation, judges and listening/watching reads take longer and use models) |
-| Visual QA loop (like Claude Code `ffmpeg` frame check) | **Mode B (`render_preview` → `execute_action`)** | Returns real GPU-composited JPEG screenshots (`frames[]` + MCP `image` blocks) so your agent can visually verify and nudge layers |
-| Heavy first draft + surgical fine-tuning | **Hybrid (Mode A → Mode B)** | Fast first draft via `autonomous_edit`, instant pixel-level polish via `execute_action` / `render_preview` |
+| Broad creative brief / full video from prompt | **Levea Harness (`autonomous_edit`)** | Autonomous editing agent + 100+ craft skills handle decomposition, pacing, and verification in 1 call |
+| Exact parameter tweak, custom timestamp math, or local-file-driven script | **Your Agent's Harness (`execute_action` / `execute_batch`)** | Edits apply in about a second with no planner LLM in the loop and deterministic control over all 195 actions (generation, judges and listening/watching reads take longer and use models) |
+| Visual QA loop (like Claude Code `ffmpeg` frame check) | **Your Agent's Harness (`render_preview` → `execute_action`)** | Returns real GPU-composited JPEG screenshots (`frames[]` + MCP `image` blocks) so your agent can visually verify and nudge layers |
+| Heavy first draft + surgical fine-tuning | **Hybrid (Levea Harness → Your Agent's Harness)** | Fast first draft via `autonomous_edit`, instant pixel-level polish via `execute_action` / `render_preview` |
 
 Every edit result carries a `verificationReport` (`verified`, `rejected`, `unverified`, or `not_applicable`, plus each requirement that failed its check and what repair tried) and `qualityNotes`.
 

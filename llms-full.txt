@@ -47,16 +47,16 @@ Levea solves the hardest problem in AI video production: **turning raw long-form
 
 ---
 
-## 3. All 39 Annotated MCP Tools (Mode A + Mode B)
+## 3. All 39 Annotated MCP Tools (Levea Harness + Your Agent's Harness)
 
 Levea exposes **39 tools** over Model Context Protocol (`https://api.livecore.ai/api/v1/misc/mcp` and `npx -y levea-mcp-server`):
 
-### Mode A: Goal Delegation (3 Tools)
+### Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`) (3 Tools)
 - `autonomous_edit`: Primary autonomous editing tool. Send the user's natural-language brief (`prompt`), `video_url` or `assets`, optional `captionTemplatePreset`, `style_reference_url`, `brandId`, or `requirePlanApproval: true`. Plans, executes, verifies rendered frames, and exports MP4.
 - `autonomous_edit_streaming`: SSE streaming variant emitting per-step progress events.
 - `queue_edit`: Fire-and-forget async execution returning `taskId` for `check_task_status`.
 
-### Mode B: Universal Direct Canonical Control & Skill Discovery (12 Tools)
+### Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`) (12 Tools)
 - `search_tools`: Search all 195 canonical actions, 28 read tools, and preset catalogs (`captions`, `vfx`, `transitions`, `color_presets`, `title_cards`, `fonts`, `blend_modes`, `properties`, `animatable`).
 - `get_action_schema`: Get full JSON `inputSchema` and parameter constraints for any canonical action or read tool.
 - `execute_action`: Execute any single canonical action (`REMOVE_SILENCES`, `VERTICAL_REFRAME`, `COLOR_GRADE`, `GENERATE_CAPTIONS`, `STYLE_CAPTIONS`, `PLAN_MOTION_GRAPHICS`, `GENERATE_VOICEOVER`, `GENERATE_MUSIC`, `AUTO_DUCK`, `APPLY_VFX`, `EXPORT_VIDEO`) or read tool (`list_layers`, `query_transcript`, `inspect_layer`, `list_sources`, `search_shots`, `shot_timeline`, `read_source_transcript`, `measure_audio`, `measure_picture`, `measure_color`).
