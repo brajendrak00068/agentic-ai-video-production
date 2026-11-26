@@ -136,7 +136,7 @@ Grok Bot can add an MCP server by URL, and the hosted server speaks the exact co
 
 > **"Add the Levea MCP server: `https://api.livecore.ai/api/v1/misc/mcp`"**
 
-(or use **Connect apps → add an MCP server by URL**). A browser opens to sign in to your Levea account — then every Levea tool (`autonomous_edit`, `queue_edit`, direct canonical actions, job polling, caption templates, brand kits, projects, assets) is available to that Bot, and edits land in the same projects you see in the web studio. Clients that cannot do OAuth can use `Authorization: Bearer <your Levea API key>` instead.
+(or use **Connect apps → add an MCP server by URL**). A browser opens to sign in to your Levea account — then every tool the hosted endpoint lists (direct canonical actions, GPU previews, job polling, caption templates, brand kits, projects, assets) is available to that Bot, and edits land in the same projects you see in the web studio. Clients that cannot do OAuth can use `Authorization: Bearer <your Levea API key>` instead.
 
 ### 🧑‍💻 Path A: For Developers & AI Engineers (The MCP Route)
 
@@ -199,7 +199,7 @@ Levea is built around **Skills (`SKILL.md`)** at three levels — so your agent 
 
 Levea ships with **100+ production craft playbooks** covering short-form hooks, podcast repurposing, documentary montage, color grading & LUT finishing, kinetic caption typography, 2D/3D motion graphics, VFX keying & optics, broadcast audio mastering (`-18 LUFS` ducking), and lip-synced dubbing.
 
-- **In Levea Harness (`autonomous_edit`):** Levea automatically selects and applies the matching craft skills for your prompt and footage.
+- **In Levea Harness (`autonomous_edit`; opt-in on the MCP server with `LEVEA_ENABLE_AUTONOMOUS=1`):** Levea automatically selects and applies the matching craft skills for your prompt and footage.
 - **In Your Agent's Harness (`execute_action` / `execute_batch` / `render_preview`):** Your agent can search, load, and follow any built-in craft skill directly in its own context window before calling `execute_action` or `execute_batch`:
   1. **`search_skills`** — search all 100+ craft playbooks by keyword or category (e.g. `query: "captions"`, `"color"`, `"podcast"`, `"montage"`).
   2. **`load_skill`** — load the full `SKILL.md` playbook and its bundled resource list for one or more `skill_id`s.
@@ -258,7 +258,7 @@ When the user asks to edit a clip in our house style:
 1. **Load built-in craft guidance (optional):**
    Call `load_skill` with `skill_id: "caption-typography"` to combine Levea's typography rules with our house rules below.
 
-2. **Option A — One-Call Autonomous Edit (`autonomous_edit`):**
+2. **Option A — One-Call Autonomous Edit (`autonomous_edit`; on the MCP server only with `LEVEA_ENABLE_AUTONOMOUS=1`):**
    Call `autonomous_edit` with:
    - `brandId`: `"brand_your_kit_id"`
    - `captionTemplatePreset`: `"hormozi"`
@@ -283,7 +283,7 @@ When the user asks to edit a clip in our house style:
    seed once → read `source_map` (the whole source, not a transcript page) → `PLAN_EDITORIAL_CUT` (+ `HOOK_CANDIDATES` for the opening) → `ASSEMBLE_PICTURE_EDIT` → `checkpoint { label: "story-cut" }` → finishing batch with `dry_run: true`, then for real → `VERIFY_EDIT` (`depth: "editorial"`) → `EXPORT_VIDEO`. If a finishing step makes it worse, `UNDO` or `restore_version { label: "story-cut" }` instead of patching on top; try alternative openings as variants (`fork_variant`, `compare_variants`, `promote_variant`).
 ```
 
-**Keep the skill on your Levea account (any client, any machine):** call `save_skill { path: "~/.claude/skills/my-show-style" }` from the local `npx levea-mcp-server` (or pass the text as `skill_md` from a hosted client). It is stored as `user/my-show-style` and appears first in `search_skills`; `load_skill` and `read_skill_resource` work on it, and `delete_skill` removes it. Frontmatter can set `apply: always` (used on every edit you run), and default `brand_id`, `caption_template` and `style_reference_url` (a request's own values win). Pass `skills: ["user/my-show-style"]` on `autonomous_edit` / `queue_edit` for skills that are not `apply: always`. Limits: 50 skills, a 48k-character playbook, 12 bundled text files.
+**Keep the skill on your Levea account (any client, any machine):** call `save_skill { path: "~/.claude/skills/my-show-style" }` from the local `npx levea-mcp-server` (or pass the text as `skill_md` from a hosted client). It is stored as `user/my-show-style` and appears first in `search_skills`; `load_skill` and `read_skill_resource` work on it, and `delete_skill` removes it. Frontmatter can set `apply: always` (used on every autonomous edit you run), and default `brand_id`, `caption_template` and `style_reference_url` (a request's own values win). Pass `skills: ["user/my-show-style"]` on `autonomous_edit` / `queue_edit` (on the MCP server, with `LEVEA_ENABLE_AUTONOMOUS=1`) for skills that are not `apply: always`. Limits: 50 skills, a 48k-character playbook, 12 bundled text files.
 
 Once saved, simply tell your agent: *"Edit `https://.../episode12.mp4` using `my-show-style`"* — your agent reads your custom `SKILL.md` and drives Levea with your exact rules every time.
 
@@ -350,9 +350,9 @@ Say it in plain language; Levea plans, executes, and finishes the complete edit:
 | **Background replace** | Key out green screen or draw rotoscope masks by hand | One call — an AI alpha matte handles any footage without a green screen |
 | **Broadcast-grade audio** | Manual loudness metering + compression + EQ | Auto LUFS loudness-normalized (EBU R128), true-peak limited, music ducked under speech |
 | **Editorial reasoning** | You listen and hunt for the climax | Agent surfaces narrative peaks and high-retention moments |
-| **Verification & Repair** | You eyeball it and manually re-render | `autonomous_edit` checks every edit on the rendered frames, repairs failures automatically and returns a typed verification report; with direct tools your agent runs `VERIFY_EDIT` (depth `editorial` adds a rendered critic) and `EXPORT_VIDEO` applies a safe polish pass first |
+| **Verification & Repair** | You eyeball it and manually re-render | In autonomous mode, `autonomous_edit` checks every edit on the rendered frames, repairs failures automatically and returns a typed verification report; with direct tools your agent runs `VERIFY_EDIT` (depth `editorial` adds a rendered critic) and `EXPORT_VIDEO` applies a safe polish pass first |
 | **Multi-platform export** | One render per aspect ratio | TikTok + Reels + Shorts + YouTube in one pass |
-| **Extensibility** | Plugins call external binaries | 39 MCP tools unlocking 195 editing actions, 28 inspection tools, and 100+ craft skills |
+| **Extensibility** | Plugins call external binaries | 35 MCP tools (39 with autonomous mode) unlocking 195 editing actions, 28 inspection tools, and 100+ craft skills |
 
 ---
 
@@ -406,15 +406,15 @@ Availability of specific tracks varies by deployment, active model tiers, and ac
 
 ---
 
-## 📂 MCP Tool Surface (39 Annotated Tools Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
+## 📂 MCP Tool Surface (35 Annotated Tools by Default, 39 with Autonomous Mode, Unlocking All 195 Canonical Actions, 28 Read Tools & 100+ Craft Skills)
 
-The MCP server (`levea-mcp-server`, 39 tools) exposes **both** high-level goal delegation (`autonomous_edit`) **and** direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`), alongside typed management and polling tools. The OpenClaw and Hermes plugins expose the same dual-mode editing and discovery surface.
+The MCP server (`levea-mcp-server`) lists 35 tools by default: direct progressive-discovery & execution (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`) alongside typed management and polling tools — your agent plans the edit, and Levea executes each action exactly as given and reports what happened. High-level goal delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`, plus `get_active_task`; 39 tools in all) is opt-in since 0.8.0: set `LEVEA_ENABLE_AUTONOMOUS=1` in the MCP server's environment (Claude Desktop `.mcpb`: the **Enable autonomous mode** setting). The hosted endpoint lists the direct tools. The OpenClaw and Hermes plugins expose the dual-mode editing and discovery surface and keep autonomous mode.
 
 | Group | Tools | Description |
 | --- | --- | --- |
-| **Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`)** | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Send a natural-language brief; Levea's autonomous editing agent inspects the footage, edits, verifies on rendered frames, and exports. |
-| **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`)** | `search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` | Discover any of the 195 canonical actions, 28 read tools, and 100+ editing craft skills on demand, execute single actions or atomic batches (with automatic safe-zone checks, timeline reconciliation, and async asset completion), and inspect real GPU-composited JPEG screenshots (`render_preview`, like `ffmpeg` frame grabs) without calling `autonomous_edit`. |
-| **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` | Track rendering, generation jobs, and the active task of a project. |
+| **Your Agent's Harness — Direct Canonical Control & Skill Discovery (`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource`)** (default) | `search_tools`, `get_action_schema`, `execute_action`, `execute_batch`, `render_preview`, `search_skills`, `load_skill`, `read_skill_resource` | Discover any of the 195 canonical actions, 28 read tools, and 100+ editing craft skills on demand, execute single actions or atomic batches (with automatic safe-zone checks, timeline reconciliation, and async asset completion), and inspect real GPU-composited JPEG screenshots (`render_preview`, like `ffmpeg` frame grabs) without Levea's planner. |
+| **Levea Harness — Goal Delegation (`autonomous_edit`, `autonomous_edit_streaming`, `queue_edit`)** (opt-in: `LEVEA_ENABLE_AUTONOMOUS=1`) | `autonomous_edit`, `autonomous_edit_streaming`, `queue_edit` | Send a natural-language brief; Levea's autonomous editing agent inspects the footage, edits, verifies on rendered frames, and exports. |
+| **Job Polling** | `check_job_status`, `check_task_status`, `get_active_task` (opt-in, with autonomous mode) | Track rendering, generation jobs, and the active task of a project. |
 | **Caption Templates** | `list_caption_templates`, `apply_caption_template`, `save_caption_template`, `save_current_caption_template`, `delete_caption_template` | Manage styling templates (216 built-in: Hormozi, Spotlight, Karaoke, …); `list_caption_templates` returns the exact ids. |
 | **Brand Kits** | `list_brand_kits`, `get_brand_kit`, `create_brand_kit`, `update_brand_kit`, `delete_brand_kit` | Manage brand colors, fonts, logos, voice tone, and grading rules. |
 | **Projects** | `list_projects`, `get_project`, `create_project`, `delete_project` | Project workspace management. |
@@ -428,10 +428,10 @@ The MCP server (`levea-mcp-server`, 39 tools) exposes **both** high-level goal d
 
 | Scenario | Best Harness | Why |
 |---|---|---|
-| Broad creative brief / full video from prompt | **Levea Harness (`autonomous_edit`)** | Autonomous editing agent + 100+ craft skills handle decomposition, pacing, and verification in 1 call |
+| Broad creative brief / full video from prompt | **Levea Harness (`autonomous_edit`; on the MCP server, opt-in with `LEVEA_ENABLE_AUTONOMOUS=1`)** | Autonomous editing agent + 100+ craft skills handle decomposition, pacing, and verification in 1 call |
 | Exact parameter tweak, custom timestamp math, or local-file-driven script | **Your Agent's Harness (`execute_action` / `execute_batch`)** | Edits apply in about a second with no planner LLM in the loop and deterministic control over all 195 actions (generation, judges and listening/watching reads take longer and use models) |
 | Visual QA loop (like Claude Code `ffmpeg` frame check) | **Your Agent's Harness (`render_preview` → `execute_action`)** | Returns real GPU-composited JPEG screenshots (`frames[]` + MCP `image` blocks) so your agent can visually verify and nudge layers |
-| Heavy first draft + surgical fine-tuning | **Hybrid (Levea Harness → Your Agent's Harness)** | Fast first draft via `autonomous_edit`, instant pixel-level polish via `execute_action` / `render_preview` |
+| Heavy first draft + surgical fine-tuning | **Hybrid (Levea Harness → Your Agent's Harness)** | Fast first draft via `autonomous_edit` (autonomous mode), instant pixel-level polish via `execute_action` / `render_preview` |
 
 Every edit result carries a `verificationReport` (`verified`, `rejected`, `unverified`, or `not_applicable`, plus each requirement that failed its check and what repair tried) and `qualityNotes`.
 

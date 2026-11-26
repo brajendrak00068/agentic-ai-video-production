@@ -1,6 +1,6 @@
 # Levea AI Video Editor plugin
 
-Prompt-first AI video editing inside Claude Code and Cursor. Describe the edit in plain language and Levea plans it, runs it on its editing engine, checks the result and exports a finished MP4.
+Prompt-first AI video editing inside Claude Code and Cursor. Describe the edit in plain language: your agent plans it with Levea's direct editing tools, and Levea runs each action on its editing engine, renders preview frames to check the result and exports a finished MP4.
 
 ## What's inside
 

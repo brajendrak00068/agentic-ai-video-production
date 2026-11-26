@@ -28,7 +28,7 @@ This skill calls the Levea (livecore.ai) editing service, which requires a Levea
 
 ## Tool interface
 
-Use the registered `ai-video-editor` (OpenClaw plugin) or `autonomous_edit` (MCP server) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control.
+Use the registered `ai-video-editor` (OpenClaw plugin) tool, or call `search_skills` / `load_skill` + `execute_action` / `execute_batch` for direct canonical control (the MCP server's default). On the MCP server, `autonomous_edit` is listed only when its environment sets `LEVEA_ENABLE_AUTONOMOUS=1`.
 
 ### Tool parameters
 

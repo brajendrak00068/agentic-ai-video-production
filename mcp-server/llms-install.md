@@ -4,15 +4,22 @@ This file helps coding agents (Cline, Claude Code, Cursor, etc.) install and
 configure the Levea autonomous AI video editor MCP server automatically.
 
 ## What this server does
-One primary edit tool, `autonomous_edit`: send a natural-language description of
-the video you want and it plans, edits, verifies on the rendered frames, and
-exports the finished result (viral clips, captions, 9:16 reframe, 2D and 3D
-motion graphics, chroma key, motion tracking, B-roll, voiceover, music and sound
-effects, multi-platform export). No timeline. Alongside it: `queue_edit` for long
-edits, the direct canonical suite (`search_tools`, `get_action_schema`,
-`execute_action`, `execute_batch`, `render_preview`, `search_skills`,
-`load_skill`, `read_skill_resource`) for agents that drive the edit themselves,
-plus job status, brand kits, projects, assets, and caption-template tools.
+By default (35 tools) the agent plans the edit and the direct canonical suite
+(`search_tools`, `get_action_schema`, `execute_action`, `execute_batch`,
+`render_preview`, `search_skills`, `load_skill`, `read_skill_resource`)
+executes each action exactly as given and reports what happened (viral clips,
+captions, 9:16 reframe, 2D and 3D motion graphics, chroma key, motion tracking,
+B-roll, voiceover, music and sound effects, multi-platform export), plus
+shader-effect, job status, brand kit, project, asset, skill and caption-template
+tools.
+
+Autonomous mode is opt-in: with `LEVEA_ENABLE_AUTONOMOUS=1` in the server's
+environment (Claude Desktop `.mcpb`: the "Enable autonomous mode" setting) it
+also lists `autonomous_edit` (send a natural-language description of the video
+you want and it plans, edits, verifies on the rendered frames, and exports),
+`autonomous_edit_streaming`, `queue_edit` for long edits, and `get_active_task`
+(39 tools). Without the flag, calling one of them returns an error naming the
+flag. The hosted endpoint lists the direct tools.
 
 ## Default: hosted endpoint (OAuth, nothing to install)
 Connect to the hosted Streamable HTTP endpoint. The client signs the user in to
@@ -45,6 +52,7 @@ dependencies; Node 18+) and needs an API key:
 |---|---|---|
 | `LEVEA_API_KEY` | yes (for edits) | Create one at https://livecore.ai/?openclaw=1&utm_source=cline&utm_medium=mcp-server&utm_campaign=levea-mcp-server |
 | `LEVEA_API_URL` | no | Defaults to `https://api.livecore.ai` (host only — no path) |
+| `LEVEA_ENABLE_AUTONOMOUS` | no | `1` (or `true`) lists the autonomous-mode tools; off by default |
 
 > Legacy `ADSCENE_API_URL` / `ADSCENE_API_KEY` are still accepted as a silent fallback.
 
@@ -67,10 +75,10 @@ dependencies; Node 18+) and needs an API key:
 
 ## Verify
 Call the `editor_health` tool — it should report the backend as healthy.
-`tools/list` returns the Levea tools (`autonomous_edit` first).
+`tools/list` returns the Levea tools (35 by default; 39, `autonomous_edit` first, with `LEVEA_ENABLE_AUTONOMOUS=1`).
 
 ## Notes for the agent
 - Never print or log `LEVEA_API_KEY`.
-- `autonomous_edit` is the primary tool; pass the user's goal verbatim as `prompt`. For long edits prefer `queue_edit` + `check_task_status`.
-- If a call returns status `running`, follow it with `get_active_task { project_id }`; never re-send the edit.
-- Mutating edits auto-export; async generation returns a `jobId` to poll with `check_job_status`.
+- Direct tools: `search_tools` and `get_action_schema` return the actions and their parameter schemas; `execute_action` / `execute_batch` run them; `render_preview` returns rendered frames; `EXPORT_VIDEO` (through `execute_action`) renders the MP4. A direct call that returns status `running` with a `dc_…` taskId is read with `check_task_status`; an identical resend waits for it and is never applied twice.
+- Autonomous mode (`LEVEA_ENABLE_AUTONOMOUS=1`): `autonomous_edit` is the primary tool; pass the user's goal verbatim as `prompt`. For long edits prefer `queue_edit` + `check_task_status`. If it returns status `running`, follow it with `get_active_task { project_id }`; never re-send the edit. Mutating edits auto-export.
+- Async generation returns a `jobId` to poll with `check_job_status`.
