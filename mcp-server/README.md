@@ -118,7 +118,7 @@ Scope:  levea  (vendor-advertised in RFC 9728 & RFC 8414 metadata)
 | **Advertised OAuth Scope** | `levea` (`scopes_supported: ["levea"]`, `code_challenge_methods_supported: ["S256"]`) |
 | **Account & Pricing** | Free tier available (3 cloud edits/month, 720p export, watermark) + paid plans at https://livecore.ai |
 
-Same default tools, same backend. OAuth-capable clients (Cursor, Grok Bot, Claude.ai, ChatGPT) register dynamically and open the Levea browser sign-in flow automatically with the `levea` scope — **no API key or client ID is needed** for both listing tools and running video edits. Non-OAuth clients can pass `Authorization: Bearer <LEVEA_API_KEY>` (or `?apiKey=...`). Every request is authenticated; an unauthenticated call returns `401` with `WWW-Authenticate: Bearer realm="levea", resource_metadata="https://api.livecore.ai/.well-known/oauth-protected-resource/api/v1/misc/mcp", scope="levea"`.
+Same backend. The hosted endpoint moves to the 0.8.0 default in a later release; until then it lists all 39 tools, autonomous mode included. OAuth-capable clients (Cursor, Grok Bot, Claude.ai, ChatGPT) register dynamically and open the Levea browser sign-in flow automatically with the `levea` scope — **no API key or client ID is needed** for both listing tools and running video edits. Non-OAuth clients can pass `Authorization: Bearer <LEVEA_API_KEY>` (or `?apiKey=...`). Every request is authenticated; an unauthenticated call returns `401` with `WWW-Authenticate: Bearer realm="levea", resource_metadata="https://api.livecore.ai/.well-known/oauth-protected-resource/api/v1/misc/mcp", scope="levea"`.
 
 Every client calls the **same backend**: this MCP server, the hosted endpoint, the OpenClaw and Hermes plugins, and the ChatGPT action share one tool contract.
 
@@ -157,7 +157,7 @@ Since 0.8.0 the server lists the direct tools by default: your agent plans the e
 - **Turn it on:** set `LEVEA_ENABLE_AUTONOMOUS=1` (or `true`) in the MCP server's environment, e.g. `"env": { "LEVEA_API_KEY": "...", "LEVEA_ENABLE_AUTONOMOUS": "1" }` in the stdio block above, or `claude mcp add levea -e LEVEA_API_KEY=... -e LEVEA_ENABLE_AUTONOMOUS=1 -- npx -y levea-mcp-server`. In Claude Desktop (`.mcpb` bundle), switch on **Enable autonomous mode** in the extension settings.
 - **With the flag** the server lists all 39 tools, exactly the 0.7.x list, and sends the same instructions.
 - **Without it**, calling one of the four returns a tool error that names the flag.
-- **The hosted endpoint** lists the direct tools.
+- **The hosted endpoint** moves to this default in a later release; until then it lists all 39 tools.
 - **Unchanged:** the REST API, the web app, and the OpenClaw, Hermes and ChatGPT clients keep autonomous mode.
 
 ### How Skills Work & How to Use Your Own Custom Skills (`SKILL.md`)
