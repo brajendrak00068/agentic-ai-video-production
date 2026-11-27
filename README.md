@@ -73,9 +73,15 @@
 | *"Pull the key stats and animate them as charts"* | Transcript-driven charts, counters and callouts placed clear of faces |
 | *"Put the price tag in her hand and keep it there"* | Hand tracking: the overlay follows the palm |
 | *"Dub this into Spanish in my voice and lip-sync it"* | Translated, voice-cloned dub with measured mouth-to-audio sync |
-| *"Blur the license plates and bleep the swearing"* | Object/face blur + transcript-based profanity bleeps |
+| *"Blur the faces, hide the license plate and bleep the swearing"* | Tracked face blur, redaction boxes for plates/screens/documents, bleeped words masked in the captions too |
 | *"Make a 15-second 3D animation of a robot racing a deadline"* | An original motion-graphics film with camera moves, music and sound design |
 | *"Export for TikTok, Reels, Shorts and YouTube"* | Every aspect ratio in one pass, loudness-mastered per platform |
+
+---
+
+## 💡 Why Levea exists
+
+Editing software was built for a person dragging clips on a timeline. More and more work is now done by AI agents, and they need an editor they can drive directly: one that tells them what is in the footage, takes precise actions, shows them the rendered frames, and keeps every version. Levea is that editor. Your agent does the editing; you stay the director, and the project stays open in the studio for your final touch.
 
 ---
 
@@ -93,7 +99,7 @@ Levea is a cloud non-linear editor (multi-track timeline, GPU compositor, vision
 
 **Turning on autonomous mode:**
 - **Hosted endpoint:** currently lists all 39 tools, autonomous mode included (it moves to the direct-tools default in a later release).
-- **Local `levea-mcp-server` (0.8.0+):** set `LEVEA_ENABLE_AUTONOMOUS=1`. In the Claude Desktop `.mcpb`, switch on **Enable autonomous mode**.
+- **Local `levea-mcp-server` (0.8.0+):** set `LEVEA_ENABLE_AUTONOMOUS=1`. In the Claude Desktop `.mcpb` (0.8.0+), switch on **Enable autonomous mode**.
 - **OpenClaw and Hermes plugins:** both modes are always on.
 
 ### What a direct-tools edit looks like
@@ -121,12 +127,13 @@ execute_batch { "project_id": "…", "actions": [
 render_preview { "project_id": "…", "timestamps": [1.5, 8, 20] }
 
 // 4. Deliver (loudness mastering and a safe polish pass run automatically)
-execute_action { "project_id": "…", "action": "EXPORT_VIDEO", "params": { "quality": "high" } }
+execute_action { "project_id": "…", "action": "EXPORT_VIDEO", "action_params": { "quality": "high" } }
 // → videoUrl, or a jobId for check_job_status
 ```
 
 Useful things to know:
 - **Start with `timeline_view`.** It returns the whole edit as one short text block: every layer with its times, source range, text, style and position. Re-read it after a batch to see exactly what changed.
+- **Parameter names:** inside `execute_batch` each step takes `params`; `execute_action` takes `action_params`.
 - A batch is **atomic**: if a step fails, nothing is saved, unless you pass `allow_partial`.
 - **Every call is saved as a version.** `UNDO`, `restore_version`, `checkpoint` and variants (`fork_variant` → `compare_variants` → `promote_variant`) let you try alternatives safely.
 - **References save lookups:** `@primary`, `@last`, `@all:caption`, `@end-3`, `@shot:4.start`, `@word:"welcome".end`.
@@ -238,10 +245,10 @@ It becomes `user/my-show-style`, shows up first in `search_skills`, and with `ap
 ## ✅ How you know it worked
 
 - **Direct tools:** results come back marked `unverified` until you check them.
-  - `render_preview` returns the real composited frames.
+  - `render_preview` returns the real composited frames; `RENDER_PREVIEW_CLIP` returns a ≤10 s clip with sound to check motion, cut timing and the mix.
   - `VERIFY_EDIT` lists craft problems, each with a suggested fix action: faces covered, words cut mid-way, black frames, unreadable text.
   - `measure_audio` and `measure_color` give the numbers.
-  - `EXPORT_VIDEO` fixes safe defects first and reports the rest in `polish`.
+  - `EXPORT_VIDEO` fixes safe defects first and reports the rest in `polish`; `FINAL_DELIVERY_CHECK` measures the exported file itself.
 - **Autonomous mode:** every result carries a `verificationReport`. `verified` means the final review of the rendered frames passed; `unverified` means no verdict was reached, and the report lists what failed and what repair tried.
 - **Corrections:** send a follow-up with the same `project_id`. Nothing is lost; every version is saved.
 
