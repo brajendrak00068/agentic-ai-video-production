@@ -298,6 +298,176 @@ Yes. Create a brand kit (`create_brand_kit`) and pass its id. Off-palette colors
 
 ---
 
+## 📚 More detail
+
+<details>
+<summary><b>Why not just let Claude Code run ffmpeg, MoviePy or an HTML/headless-Chrome video tool?</b></summary>
+
+<br/>
+
+| | Local `ffmpeg` / MoviePy | HTML / headless-Chrome video tools | **Levea (cloud GPU editor over MCP)** |
+| :--- | :--- | :--- | :--- |
+| **Best for** | Remuxing, fixed-coordinate trims | Code-driven motion design, HTML decks, website promos | **Editing real footage**: talking heads, podcasts, interviews, shorts, with graphics on top |
+| **Sees the footage** | ❌ Blind to faces, speakers, words, shots | ❌ No vision models on video | ✅ Faces and active speakers, identity, shots, on-screen text (OCR), hands, depth, word-level transcripts |
+| **9:16 reframe** | ❌ A fixed crop you compute by hand, so a moving speaker drifts out | ❌ No face tracking | ✅ Follows the active speaker; automatic split-screen when two people share the frame |
+| **Captions** | ⚠️ Flat `drawtext` / `.srt` that can sit on a face | ⚠️ Hand-coded CSS per video | ✅ 216 kinetic templates, word-timed, kept off faces and platform UI |
+| **Cuts** | ⚠️ `silencedetect` clips word tails | ❌ Not an NLE | ✅ Word-boundary cuts, filler removal, multicam sync, J/L and match cuts, speed ramps |
+| **Audio** | ⚠️ Manual filter chains | ❌ `<video>` tags drift on long multi-track edits | ✅ Speech-aware ducking, EBU R128 loudness per platform, stems, voiceover, dubbing |
+| **Compositing & color** | ⚠️ Basic `chromakey`, no 3D or depth | ⚠️ Limited by headless Chrome | ✅ Despilled keying, AI mattes, depth bokeh, LUTs, 368 GPU VFX, 168 transitions, real 3D camera moves |
+| **Motion graphics** | ❌ None | ✅ Full HTML/CSS/GSAP/Three.js | ✅ Titles, charts, After Effects-style shape layers and 2D/3D motion-graphic films, composited over tracked footage |
+| **Rendering** | CPU on your laptop; 4K is slow | Frame capture on your laptop | Cloud GPUs, up to 4K at 60 fps |
+| **Afterwards** | Edit the command and re-encode | Edit the code and re-render | An editable project: fix it by prompt, or drag a caption in the web studio |
+
+For pure code-driven motion design with no footage, a hand-written HTML/GSAP composition is still the more flexible tool.
+
+</details>
+
+<details>
+<summary><b>Levea vs Premiere, DaVinci Resolve, CapCut and Descript</b></summary>
+
+<br/>
+
+| | Traditional editors | **Levea** |
+| :--- | :--- | :--- |
+| **Interface** | Drag, drop and keyframe by hand | A sentence to your agent, or precise tool calls from it |
+| **Analysis on upload** | Manual scene detection and subtitles | Faces, speakers, shots, on-screen text and a word-level transcript, automatically |
+| **"Make this viral"** | Hunt for hooks, crop, splice and align yourself | Hook-first cut, 9:16 reframe, captions and silence removal in one pass |
+| **Finding people** | Filename search | "Find every clip where Alex appears" across the project |
+| **Background replacement** | Green screen or hand-drawn roto | An AI matte on any footage |
+| **Broadcast audio** | Manual metering, compression and EQ | Loudness-normalized (EBU R128), true-peak limited, music ducked under speech |
+| **Checking the result** | You watch it and re-render | Rendered frames, measured audio and color, a craft checker and an export polish pass |
+| **Multi-platform delivery** | One render per aspect ratio | TikTok, Reels, Shorts and YouTube in one pass |
+| **Extensibility** | Plugins that call external binaries | 195 actions over MCP, your own `SKILL.md` playbooks and your own WGSL GPU effects |
+
+</details>
+
+<details>
+<summary><b>Full capability list</b></summary>
+
+<br/>
+
+- **Project and timeline:**
+  - Track and clip operations: insert, overwrite, lift, extract, ripple delete/trim, roll, slip, slide, freeze frame, reverse, nesting
+  - Version history: undo/redo, `revert_steps`, named and automatic checkpoints, `restore_version`
+  - Variants: `fork_variant` → `compare_variants` with a rendered judge → `promote_variant`
+- **Editing techniques:**
+  - Speed changes, speed ramps, stutters, time-lapse/hyperlapse and optical-flow slow motion
+  - J/L, match, smash and jump cuts
+  - Beat-synced cutting, keyframed 3D camera moves with depth parallax, warp stabilization
+  - AI outpainting to new aspect ratios, upscaling, eye-contact correction, face retouch
+  - 168 transitions
+- **Story and structure:**
+  - `source_map` of the whole source
+  - Editorial planning: hook, setup, payoff, ending
+  - Edit-decision-list assembly to an exact length, highlight detection, viral clip generation
+  - Multicam sync with active-speaker and forced-angle cuts
+  - Slideshows; reels from explainers, with slides cropped to their content
+- **Framing and perception:**
+  - Face detection, tracking and identity search; active-speaker detection
+  - 9:16 / 4:5 / 1:1 reframes, following a face or any named object
+  - Shot detection, on-screen text detection, OCR and replacement
+  - Point, region, planar (corner-pin) and hand tracking; 3D camera solve with world-pinned overlays
+- **Captions:**
+  - 216 templates (Hormozi, karaoke, typewriter, podcast lower-thirds and more), word-timed with keyword emphasis
+  - Kept off faces and out of TikTok/Reels/Shorts UI zones
+  - Latin, Indic, Arabic, Cyrillic and Greek scripts
+- **Titles and motion graphics:**
+  - 61 title-card templates, including lower thirds, end cards, counters, checklists and media grids
+  - Film-style 3D extruded metal/chrome/stone titles
+  - Charts and stat callouts, After Effects-style shape layers (Trim Paths, Repeaters, shape modifiers) and Bezier motion paths
+  - Full 2D/3D motion-graphic films reviewed by an AI critic
+- **Compositing and color:**
+  - Screen keying with spill suppression and AI background replacement
+  - Bezier and shape masks, track mattes, 29 blend modes, adjustment layers, stacked effects
+  - Color presets, RGB curves, LUTs (including your own `.cube`), auto color and shot-to-shot matching, depth lens blur
+  - 368 GPU VFX (film burn, bloom, glitch, rain, smoke, light leaks, anamorphic flares and more); your own WGSL shaders
+  - Burned-in text and watermark removal
+- **Audio:**
+  - A licensed music and sound-effects library, music fitted to length, picture-synced sound design
+  - Silence/filler cleanup, profanity bleeps with caption masking, EQ, denoise, crossfades
+  - Speech-aware ducking, EBU R128 mastering per platform, vocal/instrumental stem separation
+  - Voiceover, voice cloning and conversion, translated lip-synced dubbing, beat-matched harmonic DJ mixes
+- **Privacy:** tracked face blur (everyone, one person, or everyone except the host) and redaction boxes for plates, screens and documents.
+- **Sources and delivery:**
+  - Public links, including Google Drive files and folders, and uploads
+  - MP4 or GIF in H.264/H.265/VP9, every platform aspect ratio, up to 4K at 60 fps
+  - Several separate files from one timeline
+
+</details>
+
+<details>
+<summary><b>Use cases</b></summary>
+
+<br/>
+
+| Use case | Typical path |
+| --- | --- |
+| **Faceless channel** | Script → voiceover → B-roll and motion graphics → music → captions → export |
+| **Podcast to shorts** | `source_map` → pick the strongest moments → multicam or split-screen 9:16 → captions → music → one file per short |
+| **Talking-head polish** | Silence and filler removal → punch-in jump cuts → grade → lower third → loudness master |
+| **Interview / documentary** | Story-first assembly → J/L cuts → speaker names → color match across cameras |
+| **Green screen and background swap** | Key or AI matte → new background → color-match the speaker to it |
+| **Product and explainer reels** | Slides cropped to content → animated stats → hand-tracked labels → brand kit |
+| **Localization** | Translated, voice-cloned dub → lip-sync → captions in the new language |
+
+</details>
+
+<details>
+<summary><b>Write your own house-style skill (copy and customize)</b></summary>
+
+<br/>
+
+Save it to `.claude/skills/my-show-style/SKILL.md` (Claude Code), `.cursor/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/` or `~/.config/opencode/skills/`. Or store it on your Levea account with `save_skill` so every client can use it.
+
+````markdown
+---
+name: my-show-style
+description: "Edit videos in our channel's 9:16 house style with Levea."
+caption_template: hormozi
+---
+
+# My Show house style
+
+When the user asks to edit a clip in our house style:
+
+1. Inspect: execute_batch with timeline_view and source_map.
+2. If the brief picks moments (a short, highlights), plan first:
+   PLAN_EDITORIAL_CUT { objective } → ASSEMBLE_PICTURE_EDIT.
+3. One execute_batch, sent with "dry_run": true first, then for real:
+   - REMOVE_SILENCES   { layer_id: "@primary", min_silence_duration: 0.4, padding: 80, remove_filler_words: true }
+   - VERTICAL_REFRAME  { aspect_ratio: "9:16", mode: "track_face" }
+   - COLOR_GRADE       { color_preset: "warm", contrast: 1.08, saturation: 1.05 }
+   - GENERATE_CAPTIONS { style: "hormozi", max_words_per_chunk: 3, position: "bottom" }
+   - TITLE_CARD        { template: "lower_third", headline: "<guest name>", subline: "<role>", start_time: 2, duration_sec: 4 }
+   - GENERATE_MUSIC    { prompt: "upbeat", mix_role: "under_dialogue" }
+   - AUTO_DUCK         { mode: "music_under_speech", duck_db: -14 }
+   - MASTER_AUDIO      { delivery_target: "streaming_tiktok" }
+4. render_preview at 3 timestamps; fix anything covering a face.
+5. execute_action EXPORT_VIDEO with action_params { quality: "high" }.
+
+Autonomous alternative (when enabled): autonomous_edit with this brief plus
+brandId: "<your brand kit id>", captionTemplatePreset: "hormozi",
+style_reference_url: "<a reel whose style to match>".
+````
+
+`padding` is in milliseconds. Every step above was checked against the live action schemas with `dry_run`.
+
+</details>
+
+<details>
+<summary><b>OpenClaw and Hermes: plugin vs skill</b></summary>
+
+<br/>
+
+- **The plugin** (`openclaw-ai-video-editor`, `levea-video-editor` for Hermes) is the **tools**: the natural-language editor, the direct actions and batches, previews, skill discovery, queueing, status and uploads, with your API key and streamed progress.
+- **The skill** (`levea-ai-video-editor`, or your own `SKILL.md`) is the **instructions**: when to use Levea, which parameters and house rules to pass, and how to handle approvals, preview checks and long-running edits.
+
+Install both: the plugin makes Levea callable, and the skill makes your agent use it well.
+
+</details>
+
+---
+
 ## 🔗 Links
 
 - **Studio & API keys:** [livecore.ai](https://livecore.ai/?openclaw=1&utm_source=github&utm_medium=readme&utm_campaign=agentic-ai-video-production)
