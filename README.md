@@ -86,7 +86,7 @@ Levea is a cloud non-linear editor (multi-track timeline, GPU compositor, vision
 | | **Direct tools** (default) | **Autonomous mode** (opt-in) |
 | --- | --- | --- |
 | **Who plans the edit** | Your agent (Claude, GPT, …) | Levea's own editing agent |
-| **Main tools** | `execute_batch`, `execute_action`, `render_preview`, `search_tools` | `autonomous_edit`, `queue_edit` |
+| **Main tools** | `execute_batch` / `execute_action` (edits, plus read tools like `timeline_view` and `source_map`), `render_preview`, `search_tools` | `autonomous_edit`, `queue_edit` |
 | **Best for** | Precise control, step-by-step review, your own house style | "Here's the footage and a brief — just make it" |
 | **Speed** | Most edits apply in about a second; generation, judging and export take longer | Minutes (10–20 for a full edit with motion graphics, music and export) |
 | **Checking** | Your agent looks at `render_preview` frames and runs `VERIFY_EDIT` | Levea checks the rendered frames, repairs failures and returns a `verificationReport` |
@@ -126,6 +126,7 @@ execute_action { "project_id": "…", "action": "EXPORT_VIDEO", "params": { "qua
 ```
 
 Useful things to know:
+- **Start with `timeline_view`.** It returns the whole edit as one short text block: every layer with its times, source range, text, style and position. Re-read it after a batch to see exactly what changed.
 - A batch is **atomic**: if a step fails, nothing is saved, unless you pass `allow_partial`.
 - **Every call is saved as a version.** `UNDO`, `restore_version`, `checkpoint` and variants (`fork_variant` → `compare_variants` → `promote_variant`) let you try alternatives safely.
 - **References save lookups:** `@primary`, `@last`, `@all:caption`, `@end-3`, `@shot:4.start`, `@word:"welcome".end`.
